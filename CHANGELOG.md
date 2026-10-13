@@ -6,104 +6,58 @@ All notable changes to OtterKeep are documented in this file in accordance with 
 
 ## [Unreleased]
 
-### 🏛️ Architecture & Verification Hardening
-
-- **Standard test harness (breaking internal change)**: replaced the 1,748-line hand-rolled
-  `OtterKeepTestRunner` executable with a `swift-testing` target
-  (`Tests/OtterKeepIntegrationTests`, 12 modules, 62 tests). Tests are now discovered, filtered
-  (`--filter`) and reported by `swift test`, run serially because they exercise process-wide
-  singletons. CI runs `scripts/test.sh -c release`.
-- **Single version source**: added `version.json` and `scripts/sync_version.sh`, which derives the
-  `CoreEngine` constants, the `scripts/package_app.sh` defaults and the newest
-  `Distribution/appcast.xml` item from that manifest. `scripts/sync_version.sh --check` is a CI gate
-  and the version tests now assert consistency instead of duplicating literals (the stale
-  `1.6.0 / 1600` header and the `1.4.0 / 50 tests` documentation drift are gone).
-- **Single localization source**: `L10n+English.swift` and `L10n+Hungarian.swift` were collapsed into
-  `L10n+Strings.swift`, where each key carries both languages in one entry, so a missing translation
-  cannot silently fall back to English. The public `L10n.t(_:lang:)` API is unchanged.
-- **Platform boundary in the backup pipeline**: `OtterKeepCore/Pipeline` no longer imports AppKit.
-  Volume ejection is injected through the new `VolumeEjecting` protocol (co-located in `OtterKeepCore/System`
-  alongside volume monitoring) and implemented by `SystemVolumeEjector`.
-- **Unified replication pipeline**: the four near-duplicate 3-2-1 replicators now implement the
-  `ReplicationSink` protocol and are driven by one shared orchestration routine that owns snapshot
-  bookkeeping, file records, progress emission and result construction.
-- **UI decomposition completed**: `RemoteDestinationEditorModalView` (975 → 194),
-  `MenuBarContentView` (753 → 54), `SettingsView` (752 → 169) and `PhotosBackupView` (550 → 46) were
-  split into focused `TypeName+Area.swift` extensions.
-- **`AppState` decomposition completed**: the remaining feature state moved into
-  `RestoreTimelineStore`, `PhotosStore`, `ReplicationDestinationStore` and `MaintenanceSettingsStore`
-  (together with the earlier `BackupRuntimeStore`). `AppState.swift` dropped from 749 to 456 lines;
-  forwarding accessors keep every view call site unchanged, the public surface identical, and the
-  former `didSet` side effects (theme/language propagation, launch-at-login, start-minimized, Finder
-  integration, debug logging) are preserved — guarded by the new
-  `test10_8_SettingsStateSideEffectPropagation`.
-- **Core platform seams & headless hardening**: `VolumeMonitor`, `FinderPermissionManager` and
-  `NotificationDeliveryService` now consume the `VolumeObserving`, `FinderSettingsOpening` and
-  `NotificationPresenting` protocols, so AppKit is confined to four leaf adapter files
-  (`SystemVolumeEjector`, `SystemVolumeObserver`, `SystemFinderSettingsOpener`,
-  `SystemNotificationPresenter`), all wrapped with `#if canImport(AppKit)` guards to enable pure Darwin / headless builds.
-- **Strict localization verification**: `L10n.hasExplicitTranslation(for:in:)` now validates
-  the targeted language specifically and confirms non-empty translation strings.
-- **Formatting baseline**: added `.swift-format` (project 4-space style) and `scripts/format.sh`;
-  CI reports the pre-existing style backlog instead of failing.
-- **Documentation**: rewrote `docs/dev/testing.md`, and updated `docs/dev/contributing.md`,
-  `docs/dev/build-and-packaging.md` and `docs/dev/architecture.md` for the new workflows.
-
 ---
 
 ## [1.7.1] - 2026-10-13 (Build 1701)
 
 ### 🌟 Release Summary / Verzióösszefoglaló
-Version **1.7.1** is a comprehensive architectural modularization and decomposition release for OtterKeep. Monolithic files exceeding 800–3,200 lines across core subsystems have been decoupled into focused, single-responsibility files and domain-specific extensions under strict Swift 6 concurrency, with zero regression in functionality or performance:
-- **`OtterKeepCore` Diagnostics & Localization Decomposition**:
-  - Decomposed 3,249-line `Localization.swift` monolith into distinct files:
-    - `L10n.swift` (Key enumerations and default catalog routing)
-    - `L10n+Hungarian.swift` (Hungarian translation dictionary)
-    - `L10n+English.swift` (English translation dictionary)
-    - `LocalizationManager.swift` (Runtime localization state actor)
-    - `AppSettings.swift` (Decoupled settings domain model)
-- **`OtterKeepDatabase` Engine Decomposition**:
-  - Decomposed 1,592-line `DatabaseEngine.swift` monolith into:
-    - `DatabaseRecords.swift` (Catalog models and schema definitions)
-    - `DatabaseEngine.swift` (Core connection initialization, WAL configuration, and query execution)
-    - `DatabaseEngine+Snapshots.swift` (Snapshot lifecycle and metadata operations)
-    - `DatabaseEngine+FileCatalog.swift` (File indexing and differential queries)
-    - `DatabaseEngine+Replication.swift` (Replication tracking and mirror cataloging)
-    - `DatabaseEngine+ScrubbingAndPhotos.swift` (Data scrubbing bit-rot checks and photos metadata)
-- **`OtterKeepCLI` Command Architecture Modularization**:
-  - Decomposed 1,323-line `OtterKeepCLI/main.swift` into modular command dispatchers:
-    - `main.swift` (Clean root command routing and help)
-    - `CLIHelpers.swift` (Terminal formatting, output helpers, and error formatting)
-    - `BackupCommands.swift` (`backup`, `restore`, `timeline`, `diff`)
-    - `ProfileCommands.swift` (`list`, `create`, `delete`, `export`, `import`)
-    - `MaintenanceCommands.swift` (`prune`, `scrub`, `compliance`, `verify`)
-    - `ReplicationAndPhotosCommands.swift` (`replicate`, `photos`)
-    - `SystemCommands.swift` (`status`, `doctor`, `update`)
-- **`OtterKeepCore` Pipeline & Replication Decoupling**:
-  - Decomposed `BackupSessionCoordinator.swift` (1,401 lines) into:
-    - `BackupSessionModels.swift` (Session metrics, progress states, and run options)
-    - `BackupSessionCoordinator+DryRun.swift` (Dry-run simulation logic)
-    - `BackupSessionCoordinator+Hooks.swift` (Pre/post execution hook handling)
-    - `BackupSessionCoordinator.swift` (Core pipeline coordination)
-  - Decomposed `BackupCopyJobCoordinator.swift` (812 lines) into:
-    - `ReplicationModels.swift` (Replication status models and options)
-    - `BackupCopyJobCoordinator+Providers.swift` (Local, S3, WebDAV, SFTP replication workers)
-    - `BackupCopyJobCoordinator.swift` (Core copy coordinator)
-- **`OtterKeepUI` State & View Decomposition**:
-  - Decomposed `AppState.swift` (3,044 lines) into domain extensions:
-    - `AppState.swift` (Pure state properties and reactive publishers)
-    - `UINavigationModels.swift` (Navigation tabs and modal states)
-    - `AppState+ProfileOperations.swift`, `AppState+BackupOperations.swift`, `AppState+RestoreOperations.swift`
-    - `AppState+Replication.swift`, `AppState+MaintenanceOperations.swift`, `AppState+PhotosOperations.swift`, `AppState+Configuration.swift`
-  - Decomposed monolithic views:
-    - `RestoreExplorerView.swift` (1,266 lines → 205 lines) into `RestoreExplorerView+Toolbars.swift`, `+Browser.swift`, `+Modals.swift`
-    - `ProfileRulesView.swift` (1,067 lines → 102 lines) into `ProfileRulesView+Header.swift`, `+FilterTabs.swift`, `+RuleCards.swift`, `+Modals.swift`
+Version **1.7.1** is a comprehensive architectural modularization, subsystem decomposition, and verification hardening release for OtterKeep. Monolithic files exceeding 800–3,200 lines across all core subsystems have been decoupled into focused, single-responsibility components and domain stores under strict Swift 6 concurrency, with zero regression in functionality or performance:
+
+Az **1.7.1-es** verzió egy átfogó architekturális modularizációs, alrendszer-dekompozíciós és megbízhatósági mérföldkő az OtterKeep ökoszisztémában. A korábbi 800–3200 soros monolitikus fájlok szigorú Swift 6 konkurens elvek mentén önálló, egyetlen felelősséggel bíró komponensekre, protokoll-alapú platformadapterekre és dedikált állapottárakra (Stores) lettek szétbontva – funkcióvesztés vagy sebességcsökkenés nélkül:
+
+- **🏛️ Platform-függetlenítés és Headless működés (Platform Boundaries & Headless Hardening)**:
+  - Szigorú réteghatárok a háttérfolyamatokban: a mentési mag (`OtterKeepCore/Pipeline`) teljesen mentesült a közvetlen AppKit és `NSWorkspace` függőségektől.
+  - A kötetkezelés és lecsatolás a közös `VolumeEjecting` protokollon keresztül valósul meg (`OtterKeepCore/System/VolumeEjecting.swift`), az AppKit-alapú megvalósítás (`SystemVolumeEjector`) pedig izoláltan injektálódik.
+  - A rendszerfigyelés, értesítéskezelés és Finder-beállítások kezelése tiszta protokoll-absztrakciók mögé került (`VolumeObserving`, `NotificationPresenting`, `FinderSettingsOpening`), amelyek platform-adapterei (`SystemVolumeObserver`, `SystemNotificationPresenter`, `SystemFinderSettingsOpener`) `#if canImport(AppKit)` védelemmel vannak ellátva, garantálva a tiszta Darwin / headless CLI és daemon futtathatóságot.
+
+- **🌐 Egyetlen forrású típusbiztos lokalizáció (Single Source of Truth Localization)**:
+  - A korábbi különálló `L10n+English.swift` és `L10n+Hungarian.swift` szótárak összevonásra kerültek a `L10n+Strings.swift` táblába, ahol minden kulcshoz egymás mellett definiált a magyar és angol fordítás (`Translation`), megszüntetve a hiányzó fordítások és runtime fallback hibák kockázatát.
+  - Szigorított `hasExplicitTranslation(for:in:)` ellenőrzés: automatikusan feloldja a rendszer nyelvét (`.system`) az effektív nyelvre, és ellenőrzi a nem-üres szövegtartalmat.
+
+- **🔄 Egységesített 3-2-1 replikációs motor (Unified Replication Pipeline)**:
+  - A WebDAV, SFTP, S3 és helyi/SMB replikáció 850+ sornyi redundáns állapotkezelése és ciklusszervezése felszámolásra került.
+  - A háttértárak a közös `ReplicationSink` protokollt valósítják meg, míg a tranzakciós pillanatkép-rekordok, a fájl-nyilvántartás (`recordReplicationFile`), a folyamat-visszajelzés (progress emission) és a hibakezelés egyetlen központi futtató motorban (`executeReplicationPipeline`) összpontosul.
+
+- **🖥️ SwiftUI felület és állapotkezelés dekompozíciója (UI & State Modularization)**:
+  - Az `AppState.swift` monolit (több mint 3000 sor) 456 sorra csökkent. A logikai állapotok 5 dedikált `@Observable` Store-ba kerültek: `RestoreTimelineStore`, `PhotosStore`, `ReplicationDestinationStore`, `MaintenanceSettingsStore` és `BackupRuntimeStore`.
+  - A nagyméretű nézetek fókuszált kártya- és szekció-kiterjesztésekre lettek bontva:
+    - `RemoteDestinationEditorModalView.swift` (975 → 194 sor)
+    - `MenuBarContentView.swift` (753 → 54 sor)
+    - `SettingsView.swift` (752 → 169 sor)
+    - `PhotosBackupView.swift` (550 → 46 sor)
+    - `RestoreExplorerView.swift` (1266 → 205 sor)
+    - `ProfileRulesView.swift` (1067 → 102 sor)
+
+- **🗄️ Adatbázis- és CLI-architektúra modularizációja (Database & CLI Decoupling)**:
+  - A `DatabaseEngine.swift` (1592 sor) szétbontásra került: `DatabaseRecords.swift`, `DatabaseEngine+Snapshots.swift`, `DatabaseEngine+FileCatalog.swift`, `DatabaseEngine+Replication.swift`, és `DatabaseEngine+ScrubbingAndPhotos.swift`.
+  - Az `OtterKeepCLI/main.swift` (1323 sor) fókuszált parancsmodulokra tagolódott: `BackupCommands.swift`, `ProfileCommands.swift`, `MaintenanceCommands.swift`, `ReplicationAndPhotosCommands.swift`, `SystemCommands.swift`, és `CLIHelpers.swift`.
+
+- **🧪 Hivatalos Swift-Testing integrációs tesztcsomag (Official Swift-Testing Suite)**:
+  - A korábbi 1,748 soros kézi CLI futtató (`OtterKeepTestRunner`) leváltásra került egy hivatalos `swift-testing` integrációs targetre (`Tests/OtterKeepIntegrationTests`, 12 modul, 62 teszt).
+  - A tesztek közvetlenül a `swift test` paranccsal és az Xcode-ból futtathatók és szűrhetők (`--filter`).
+  - A `scripts/test.sh` felkészítésre került a Command Line Tools `TestingMacros` fordítópluginjának automatikus feloldására és a stabil futtatásra.
+
+- **📌 Központi verziókezelési manifeszt (Single Version Manifest)**:
+  - Bevezetésre került a `version.json` és a `scripts/sync_version.sh` eszköz, amely egyetlen forrásból származtatja a `CoreEngine` konstansait, a `package_app.sh` alapértelmezéseit és a Sparkle `appcast.xml` metaadatait, megszüntetve a korábbi dokumentációs és verzió-eltéréseket.
+
 - **Subsystem SemVer Alignment**:
+  - `OtterKeepStorage`: `1.3.0`
   - `OtterKeepDatabase`: `1.3.1` (Patch refactor)
   - `OtterKeepCore`: `1.7.1` (Patch refactor)
   - `OtterKeepUI`: `1.7.1` (Patch refactor)
   - `OtterKeepCLI`: `1.3.1` (Patch refactor)
-  - Full suite verified: 61/61 system integration tests passing with 100% success rate.
+  - `OtterKeepFinderSyncExtension`: `1.0.1`
+  - Teljes tesztcsomag ellenőrizve: 62/62 integrációs teszt 100%-os sikerességgel lefut.
 
 ---
 
