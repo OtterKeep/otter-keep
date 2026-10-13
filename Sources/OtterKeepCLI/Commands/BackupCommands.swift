@@ -14,7 +14,12 @@ extension OtterKeepCLI {
         let storage = DefaultFileSystemProvider()
         let database = DatabaseEngine()
         let retentionManager = RetentionManager(storage: storage, database: database)
-        let coordinator = BackupSessionCoordinator(storage: storage, database: database, retentionManager: retentionManager)
+        let coordinator = BackupSessionCoordinator(
+            storage: storage,
+            database: database,
+            retentionManager: retentionManager,
+            volumeEjector: SystemVolumeEjector()
+        )
 
         let modeLabel = isFull ? " [\(L10n.t(.backupTypeFull).uppercased())]" : ""
         LogManager.shared.log("CLI backup initiated for profile '\(profile.name)' [UUID: \(profile.id.uuidString)] (DryRun: \(isDryRun), Full: \(isFull))", level: .info, category: "CLI")

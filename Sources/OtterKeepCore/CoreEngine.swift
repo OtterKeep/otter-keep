@@ -2,6 +2,8 @@ import Foundation
 
 /// Core namespace and versioning umbrella for the OtterKeep engine.
 public struct CoreEngine: Sendable {
+    // MARK: - Version Manifest (generated from version.json by scripts/sync_version.sh)
+    // <version-manifest:begin>
     /// Semantic version identifier of the OtterKeep application (main product version).
     public static let version = "1.7.1"
 
@@ -15,6 +17,7 @@ public struct CoreEngine: Sendable {
     public static let uiVersion = "1.7.1"
     public static let cliVersion = "1.3.1"
     public static let finderSyncVersion = "1.0.1"
+    // <version-manifest:end>
 
     /// Structured dictionary of all subsystem components and their respective SemVer versions.
     public static var componentVersions: [String: String] {

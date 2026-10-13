@@ -4,6 +4,53 @@ All notable changes to OtterKeep are documented in this file in accordance with 
 
 ---
 
+## [Unreleased]
+
+### 🏛️ Architecture & Verification Hardening
+
+- **Standard test harness (breaking internal change)**: replaced the 1,748-line hand-rolled
+  `OtterKeepTestRunner` executable with a `swift-testing` target
+  (`Tests/OtterKeepIntegrationTests`, 12 modules, 62 tests). Tests are now discovered, filtered
+  (`--filter`) and reported by `swift test`, run serially because they exercise process-wide
+  singletons. CI runs `scripts/test.sh -c release`.
+- **Single version source**: added `version.json` and `scripts/sync_version.sh`, which derives the
+  `CoreEngine` constants, the `scripts/package_app.sh` defaults and the newest
+  `Distribution/appcast.xml` item from that manifest. `scripts/sync_version.sh --check` is a CI gate
+  and the version tests now assert consistency instead of duplicating literals (the stale
+  `1.6.0 / 1600` header and the `1.4.0 / 50 tests` documentation drift are gone).
+- **Single localization source**: `L10n+English.swift` and `L10n+Hungarian.swift` were collapsed into
+  `L10n+Strings.swift`, where each key carries both languages in one entry, so a missing translation
+  cannot silently fall back to English. The public `L10n.t(_:lang:)` API is unchanged.
+- **Platform boundary in the backup pipeline**: `OtterKeepCore/Pipeline` no longer imports AppKit.
+  Volume ejection is injected through the new `VolumeEjecting` protocol (co-located in `OtterKeepCore/System`
+  alongside volume monitoring) and implemented by `SystemVolumeEjector`.
+- **Unified replication pipeline**: the four near-duplicate 3-2-1 replicators now implement the
+  `ReplicationSink` protocol and are driven by one shared orchestration routine that owns snapshot
+  bookkeeping, file records, progress emission and result construction.
+- **UI decomposition completed**: `RemoteDestinationEditorModalView` (975 → 194),
+  `MenuBarContentView` (753 → 54), `SettingsView` (752 → 169) and `PhotosBackupView` (550 → 46) were
+  split into focused `TypeName+Area.swift` extensions.
+- **`AppState` decomposition completed**: the remaining feature state moved into
+  `RestoreTimelineStore`, `PhotosStore`, `ReplicationDestinationStore` and `MaintenanceSettingsStore`
+  (together with the earlier `BackupRuntimeStore`). `AppState.swift` dropped from 749 to 456 lines;
+  forwarding accessors keep every view call site unchanged, the public surface identical, and the
+  former `didSet` side effects (theme/language propagation, launch-at-login, start-minimized, Finder
+  integration, debug logging) are preserved — guarded by the new
+  `test10_8_SettingsStateSideEffectPropagation`.
+- **Core platform seams & headless hardening**: `VolumeMonitor`, `FinderPermissionManager` and
+  `NotificationDeliveryService` now consume the `VolumeObserving`, `FinderSettingsOpening` and
+  `NotificationPresenting` protocols, so AppKit is confined to four leaf adapter files
+  (`SystemVolumeEjector`, `SystemVolumeObserver`, `SystemFinderSettingsOpener`,
+  `SystemNotificationPresenter`), all wrapped with `#if canImport(AppKit)` guards to enable pure Darwin / headless builds.
+- **Strict localization verification**: `L10n.hasExplicitTranslation(for:in:)` now validates
+  the targeted language specifically and confirms non-empty translation strings.
+- **Formatting baseline**: added `.swift-format` (project 4-space style) and `scripts/format.sh`;
+  CI reports the pre-existing style backlog instead of failing.
+- **Documentation**: rewrote `docs/dev/testing.md`, and updated `docs/dev/contributing.md`,
+  `docs/dev/build-and-packaging.md` and `docs/dev/architecture.md` for the new workflows.
+
+---
+
 ## [1.7.1] - 2026-10-13 (Build 1701)
 
 ### 🌟 Release Summary / Verzióösszefoglaló
