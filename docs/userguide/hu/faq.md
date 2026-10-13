@@ -19,7 +19,7 @@ Válaszok a leggyakoribb kérdésekre az OtterKeep működésével, jogosultság
 ---
 
 ### K: Miért szükséges a Teljes hozzáférés a lemezhez (Full Disk Access)?
-**V:** A macOS TCC védelmi rendszere korlátozza a hozzáférést a személyes adatokhoz (Dokumentumok, Levelezés, Fotók). Ezen engedély nélkül az OtterKeep nem tudná megbízhatóan lementeni ezeket az állományokat. Kövesse az [Első lépések](getting-started.hu.md) útmutatót az engedélyezéshez.
+**V:** A macOS TCC védelmi rendszere korlátozza a hozzáférést a személyes adatokhoz (Dokumentumok, Levelezés, Fotók). Ezen engedély nélkül az OtterKeep nem tudná megbízhatóan lementeni ezeket az állományokat. Kövesse az [Első lépések](getting-started.md) útmutatót az engedélyezéshez.
 
 ---
 
@@ -29,4 +29,4 @@ Válaszok a leggyakoribb kérdésekre az OtterKeep működésével, jogosultság
 ---
 
 ### K: Gyűjt az OtterKeep telemetriát vagy használati statisztikákat?
-**V:** **Nem.** Az OtterKeep zéró külső nyomkövetést, telemetriát vagy felhős elemzést tartalmaz. A diagnosztikai naplók kizárólag az Ön Mac számítógépén maradnak (`~/.otterkeep/`), és a `LogPrivacySanitizer` automatikusan anonimizálja a felhasználóneveket, jelszavakat és magánjellegű fájlneveket.
+**V:** **Nem.** Az OtterKeep zéró külső nyomkövetést, telemetriát vagy felhős elemzést tartalmaz. A diagnosztikai naplók kizárólag az Ön Mac számítógépén maradnak az Apple szabványos naplómappájában (`~/Library/Logs/OtterKeep/`), és a `LogPrivacySanitizer` automatikusan anonimizálja a felhasználóneveket, jelszavakat és magánjellegű fájlneveket.

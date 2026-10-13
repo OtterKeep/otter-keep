@@ -24,7 +24,7 @@ brew install --cask otterkeep
 ```
 
 ### Option B: Direct Disk Image (.dmg)
-1. Download the latest `OtterKeep-1.4.0.dmg` from the [Releases](https://github.com/richardeszeshu/otter-keep/releases) page.
+1. Download the latest `OtterKeep-2.0.0.dmg` from the [Releases](https://github.com/richardeszeshu/otter-keep/releases) page.
 2. Double-click the DMG to open it.
 3. Drag **OtterKeep.app** into your `/Applications` folder.
 4. Launch OtterKeep from Launchpad or Spotlight.

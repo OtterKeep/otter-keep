@@ -5,9 +5,9 @@
 
 [![macOS](https://img.shields.io/badge/macOS-15.0%2B%20%28Sequoia%29-blue.svg)](https://apple.com/macos)
 [![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org)
-[![Verzió](https://img.shields.io/badge/verzi%C3%B3-1.7.1-emerald.svg)](https://github.com/richardeszeshu/otter-keep/releases)
-[![Build](https://img.shields.io/badge/build-1701-cyan.svg)](https://github.com/richardeszeshu/otter-keep)
-[![Tesztek](https://img.shields.io/badge/tesztek-61%2F61%20sikeres-brightgreen.svg)](https://github.com/richardeszeshu/otter-keep)
+[![Verzió](https://img.shields.io/badge/verzi%C3%B3-2.0.0-emerald.svg)](https://github.com/richardeszeshu/otter-keep/releases)
+[![Build](https://img.shields.io/badge/build-2000-cyan.svg)](https://github.com/richardeszeshu/otter-keep)
+[![Tesztek](https://img.shields.io/badge/tesztek-75%2F75%20sikeres-brightgreen.svg)](https://github.com/richardeszeshu/otter-keep)
 [![Licenc](https://img.shields.io/badge/licenc-MIT-lightgrey.svg)](LICENSE)
 [![English](https://img.shields.io/badge/English-README.md-blue.svg)](README.md)
 
@@ -29,7 +29,13 @@ A hagyományos, ventillátorzajt keltő és akkumulátort merítő mentőszoftve
 ## Főbb jellemzők
 
 - ⚡ **Nulla bájt duplikáció**: Az APFS Copy-on-Write (`clonefile(2)`) révén a változatlan fájlok semennyi extra lemezterületet nem foglalnak az APFS célköteten.
-- 🧭 **Menedék élmény és profilállapot-megőrzés**: Natív macOS HIG felhasználói felület, profilok közötti váltáskor azonnali utolsó mentési állapotkijelzéssel, felélesztett Időgép idővonal-böngészéssel és gyorsbillentyűkkel (`⌘1`, `⌘2`, `⌘3`, `⌘B`, `⌘D`).
+- 🏛️ **Tiszta architektúra (Clean Architecture / Ports & Adapters)**: Tiszta szétválasztás a domain modellek (`OtterKeepDomain`), absztrakt portok, DTO-k és használati esetek (`OtterKeepApplication`), infrastruktúra tároló/adatbázis illesztők és a megjelenítési réteg között.
+- 🗄️ **Központi adatbázis és offline idővonal**: Állandó helyi SQLite adatbázis (`~/.otterkeep/central.sqlite`), amely tárolja a profilokat és a gyorsítótárazott pillanatkép-metaadatokat, lehetővé téve a pillanatképek böngészését akkor is, ha a célmeghajtó nincs csatlakoztatva.
+- 🛡️ **Hibatűrő motor és kötetáramkör-megszakító (Volume Circuit Breaker)**: Azonnali gyors hiba és feladatszintű leállítás meghajtó-leválasztás (`EIO`, `ENODEV`, `EROFS`) vagy lemeztelítettség (`ENOSPC`) esetén, megelőzve a CPU-túlterhelést és a logáradatot.
+- 🔄 **100%-os bizonyosságú katalógus-egyeztetés**: Felfedezi és beindexeli a lemezen található, korábban nem indexelt pillanatképeket szigorú pecsét- és teljesség-ellenőrzéssel.
+- 📦 **3-fázisú atomi mappavisszaállítás `.old` védelemmel**: Nulla adatvesztés a visszaállítás során; a célkönyvtárakat a rendszer biztonságosan a `.old_<időbélyeg>` mappába mozgatja, és csak az ellenőrzött új állapot sikeres beemelése után törli (azonnali visszagörgetéssel hiba esetén).
+- 🧭 **Megújult menedék felhasználói felület (UI/UX)**: Nyugtató Menedék státuszkártya integrált tárhely-kijelzővel, összevont műveletek (Dry-Run + Back Up Now), tabokkal ellátott felugró ablakok (Preferences, Profile Settings, System Logs), dinamikus egészségi ikonok és barátságos Ottie kabala megerősítő párbeszédpanelek.
+- 🪵 **Apple-szabványos diagnosztika**: Adatvédelmi szempontból tisztított egységes naplózás (`os_log`), amely az Apple szabványos naplókönyvtárába (`~/Library/Logs/OtterKeep/`) kerül mentésre.
 - 🔍 **Egymás melletti fájl-differencia**: Grafikus és parancssori összehasonlítás Myers LCS algoritmussal és bináris metaadat-vizsgálóval két pillanatkép között.
 - 🛡️ **Csendes háttérbeli adatintegritás-ellenőrző**: Folyamatos, alacsony prioritású (`I/O QoS: .background`) SHA-256 hash újraszámolás és bit-rot riasztás.
 - 🔒 **WORM immutabilitási zárolás**: BSD `uchg` hardveres/fájlrendszeri zárolás védi a pillanatképeket a zsarolóvírusoktól és a törléstől beállítható ideig (alapértelmezett 30 nap).
@@ -49,32 +55,46 @@ A hagyományos, ventillátorzajt keltő és akkumulátort merítő mentőszoftve
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    OtterKeep Felhasználói Felület           │
-│      SwiftUI Menüsor Extra  •  Főablak  •  CLI Motor        │
+│                    OtterKeep Megjelenítés                   │
+│        SwiftUI Menüsor Extra  •  Főablak  •  CLI Motor      │
 └──────────────────────────────┬──────────────────────────────┘
                                │
             Unix Domain Socket │ (AF_UNIX / Egyetlen példány)
             Peer UID Ellenőrzés│ (getpeereid 0600 socket)
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                       OtterKeepCore                         │
+│                    OtterKeepApplication                    │
+│      Use Case-ek (SnapshotCatalog, Retention, DTO Mapperek) │
+│      Portok (FileSystemPort, SnapshotRepositoryProtocol)    │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      OtterKeepDomain                        │
+│      Tiszta Entitások (SnapshotRecord, FileCatalogRecord)   │
+│      Domain Invariánsok  •  GFS Megőrzési Kalkulátor        │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                        OtterKeepCore                        │
 │  ┌───────────────────────┐       ┌───────────────────────┐  │
 │  │ BackupSession         │       │ RestoreEngine         │  │
-│  │ Coordinator           │       │ Ütközésmentes Vissza. │  │
+│  │ Coordinator           │       │ 3-Fázisú Atomi Csere  │  │
 │  └───────────┬───────────┘       └───────────┬───────────┘  │
 │              │                               │              │
 │  ┌───────────▼───────────┐       ┌───────────▼───────────┐  │
-│  │ Differenciális Motor  │       │ Zsarolóvírus &        │  │
-│  │ GitIgnore Szabályok   │       │ Anomália Detektor     │  │
+│  │ Kötet Áramkörmegszak. │       │ Zsarolóvírus &        │  │
+│  │ Katalógus Egyeztető   │       │ Anomália Detektor     │  │
 │  └───────────────────────┘       └───────────────────────┘  │
 └──────────────┬───────────────────────────────┬──────────────┘
                │                               │
                ▼                               ▼
 ┌─────────────────────────────┐ ┌─────────────────────────────┐
 │      OtterKeepDatabase      │ │      OtterKeepStorage       │
-│  SQLite WAL Üzemmód         │ │  APFS CoW (clonefile)       │
-│  Kötegelt Fájlkatalógus     │ │  POSIX Hardlink Tartalék    │
-│  Idővonal & Globális Kereső │ │  SFTP & S3 Illesztők        │
+│  Központi DB (~/.otterkeep) │ │  APFS CoW (clonefile)       │
+│  SQLite WAL Üzemmód         │ │  POSIX Hardlink Tartalék    │
+│  Kötegelt Fájlkatalógus     │ │  SFTP, S3 & B2 Illesztők    │
 └─────────────────────────────┘ └─────────────────────────────┘
 ```
 

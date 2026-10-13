@@ -1,6 +1,6 @@
 # Security & Unified Logging Architecture
 
-This document details security controls, cryptographic implementations, IPC protections, and privacy-preserving observability in OtterKeep v1.4.0.
+This document details security controls, cryptographic implementations, IPC protections, privacy-preserving observability, and data resilience invariants in OtterKeep v2.0.0.
 
 ---
 
@@ -29,7 +29,7 @@ Remote archives and cloud backups are encrypted client-side using **AES-256-GCM*
 
 OtterKeep utilizes a hardened Unix Domain Socket architecture:
 - **Socket Path**: `~/.otterkeep/gui.sock`
-- **File Permissions**: `0600` (owner read/write only). The containing folder `~/.otterkeep/` is set to `0700`.
+- **File Permissions**: `0600` (owner read/write only). The containing configuration and database folder `~/.otterkeep/` is set to `0700`.
 - **Peer UID Verification**:
   ```c
   uid_t peerUID;
@@ -47,7 +47,12 @@ OtterKeep utilizes a hardened Unix Domain Socket architecture:
 
 ## 3. Privacy-Preserving Unified Logging
 
-To ensure diagnostic logs can be safely exported without leaking personal information, all telemetry passes through `LogPrivacySanitizer`:
+To ensure diagnostic logs can be safely exported without leaking personal information, all telemetry passes through `LogPrivacySanitizer` and adheres to Apple platform standards:
+
+### Standard Log Directory
+- **Storage Path**: `~/Library/Logs/OtterKeep/` (standard macOS user log repository).
+- **Log Files**: Daily rolling text logs (e.g., `otterkeep-2026-10-13.log`) formatted for native inspection with Console.app or CLI tools (`tail -f`).
+- **Separation of Concerns**: State configuration and databases remain in `~/.otterkeep/`, keeping logs separated in the OS-managed directory.
 
 ### Redacted Elements
 - **Usernames**: NSUserName and NSFullUserName replaced with `<USER>`.
@@ -58,6 +63,28 @@ To ensure diagnostic logs can be safely exported without leaking personal inform
 
 ### Preserved Diagnostic Context
 - File extensions (`.pdf`, `.sqlite`, `.heic`)
-- Error codes (`ENOENT`, `EACCES`, `ENOSPC`)
+- Error codes (`ENOENT`, `EACCES`, `ENOSPC`, `EIO`, `ENODEV`, `EROFS`)
 - Snapshot IDs and ISO 8601 timestamps
 - File sizes and transfer byte rates
+
+---
+
+## 4. Data Resilience & Atomic Recovery Invariants
+
+OtterKeep enforces three key resilience invariants to protect user data from corruption during hardware or network failures:
+
+### A. Volume Circuit Breaker
+- When an I/O operation encounters volume detachment (`EIO`, `ENODEV`, `EROFS`) or disk exhaustion (`ENOSPC`), the `VolumeCircuitBreaker` triggers immediately.
+- Pending queue processing is aborted, preventing CPU thrashing and unbounded log error spam.
+
+### B. 100% Certainty Catalog Reconciliation
+- Drives with unindexed snapshots undergo strict validation before registration:
+  1. Non-empty directory structure.
+  2. Snapshot completeness seal verification.
+  3. No partial or corrupted stages accepted.
+
+### C. 3-Phase Atomic Folder Restore with `.old` Safety Hold
+- Restoring over an existing directory never deletes data in advance:
+  1. **Phase 1 (Staging)**: Content is extracted to `.staging_<uuid>`.
+  2. **Phase 2 (Hold)**: The existing target directory is renamed to `.old_<timestamp>`.
+  3. **Phase 3 (Swap & Cleanup)**: Staging is renamed to the target directory. Only on confirmed success is `.old_<timestamp>` removed. Any failure immediately triggers rollback of `.old_<timestamp>` to the original target.

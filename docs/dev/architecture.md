@@ -118,18 +118,51 @@ Prevents unintended APFS kernel faults and unwanted cellular/network downloads:
 
 ---
 
-## 10. Human Interface & Sanctuary Architecture (v1.6.0)
+## 10. Human Interface & Sanctuary Architecture (v2.0.0)
 
 Designed according to macOS Human Interface Guidelines and the Sanctuary Principle:
-- **Segmented Sub-Tab Topology**: `ProfileRulesAndMaintenanceView` is partitioned into three discrete workspaces (`rules`, `automation`, `maintenance`) governed by `ProfileMaintenanceSubTab`, eliminating cognitive overload from linear scrolls.
-- **Dynamic Sanctuary Mascot Mood Engine**: `OttieSanctuaryMascotView` dynamically transitions across three emotional states (`.safe`, `.warning`, `.danger`) evaluating backup success, snapshot freshness, and `StorageForecastReport` depletion velocity without alarmist visual stress.
-- **Direct Pipeline Action Integration**: Source and destination directory management (`change`, `reveal`) is embedded directly into `BackupPipelineView`, eliminating duplicate bottom cards.
-- **Software Update Dispatch**: System update notifications are broadcast via `UNUserNotificationCenter` with audible feedback and foreground activation.
-
+- **Centralized Header & Sidebar**: System Logs and Preferences buttons consolidated into the sidebar toggle toolbar. Profile status in the sidebar displays dynamic health icons reflecting freshness (last backup within schedule / >14 days) and outcome (success/failure).
+- **Sanctuary Hero Card**: Consolidated overview integrating destination volume storage gauges, backup directory configuration, warnings, 3-2-1 rule compliance, and Time Machine status.
+- **Unified Actions**: "Dry-Run Analysis" and "Back Up Now" action buttons co-located on the status card; redundant action buttons removed from the profile page header.
+- **Tabbed Modal Windows**: Profile Settings, Application Preferences, and System Logs are displayed in native tabbed modal sheets accessible globally across views.
+- **Ottie Mascot Modals**: Destructive profile deletions are safeguarded by a reassuring, custom OtterKeep dialog featuring Ottie the mascot with calm visual confirmations.
 
 ---
 
-## 11. Layering Invariants & Single Sources of Truth
+## 11. Data Resilience & Fault Tolerance Hardening
+
+To withstand abrupt hardware disconnections, kernel interruptions, and disk starvation:
+- **Volume Circuit Breaker (`VolumeCircuitBreaker`)**: Tracks filesystem and volume health during active sessions. On encountering non-recoverable volume detachment errors (`EIO`, `ENODEV`, `EROFS`) or disk exhaustion (`ENOSPC`), the circuit breaker trips immediately, aborts remaining batch items, signals the coordinator, and avoids repetitive syscall loops or log flooding.
+- **100% Certainty Catalog Reconciliation (`CatalogReconciler`)**: When attaching external volumes or restoring from uncataloged media, reconciles disk snapshots against the catalog. Only snapshots meeting 100% certainty invariants (valid directory structure, non-empty files, verified seal file/status) are registered, preventing corrupted partial states from entering the timeline.
+- **3-Phase Atomic Folder Restore with `.old` Safety Hold (`RestoreEngine`)**:
+  1. *Staging*: Extract files into a sibling temporary directory (`.staging_<uuid>`).
+  2. *Safety Hold*: Rename existing destination folder to `.old_<timestamp>` instead of deleting it.
+  3. *Atomic Swap & Prune*: Atomically rename the staging directory into place. The `.old` folder is pruned only after the swap succeeds. In the event of any interruption or error, the `.old` folder is automatically restored to the original location, guaranteeing zero data loss.
+
+---
+
+## 12. Central Database & Offline Repository (`~/.otterkeep/central.sqlite`)
+
+Decouples UI browsing and profile management from physical storage availability:
+- **Architecture**: Persistent SQLite repository in `~/.otterkeep/central.sqlite` (restricted to POSIX `0700` directory / `0600` file permissions).
+- **Profile Persistence**: Profiles are stored centrally in the `profiles` table as validated JSON payloads, eliminating dependency on loose plist files while retaining full JSON export/import capability.
+- **Metadata Caching**: Caches snapshot headers (`cached_snapshots`) and file records (`cached_file_records`), allowing users to browse snapshot timelines and search historical files even when external drives are disconnected.
+
+---
+
+## 13. Data Transfer Objects (DTOs) & Boundary Enforcement
+
+To enforce Clean Architecture separation between `OtterKeepDomain`, `OtterKeepApplication`, and `OtterKeepUI`/`OtterKeepCLI`:
+- Pure domain models (`SnapshotRecord`, `FileCatalogRecord`, `BackupProfile`) are mapped into immutable, Sendable DTOs:
+  - `SnapshotSummaryDTO`: Lightweight timeline metadata for UI lists and selector menus.
+  - `SnapshotDetailDTO`: Complete snapshot telemetry, including lock state and verification checksums.
+  - `FileCatalogItemDTO`: File metadata records for the snapshot explorer and diffing views.
+  - `BackupProfileDTO`: Profile configuration data transferred across presentation and use case layers.
+- Presentation layers interact exclusively with Use Cases and DTOs, keeping presentation decoupled from domain entity mutability or persistence implementations.
+
+---
+
+## 14. Layering Invariants & Single Sources of Truth
 
 ### Versioning
 `version.json` is the only authored version source. `scripts/sync_version.sh` derives the

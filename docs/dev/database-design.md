@@ -75,3 +75,71 @@ Rather than executing individual `INSERT` operations per file, `DatabaseEngine` 
 - Files are buffered into batches of 1,000 items.
 - Prepared statement handles are reused across iterations.
 - Batch operations reduce SQLite transaction overhead from seconds to single-digit milliseconds.
+
+---
+
+## 5. Central Database Architecture (`~/.otterkeep/central.sqlite`)
+
+Introduced in v2.0.0, the **Central Database** provides a persistent local repository inside the user's home directory (`~/.otterkeep/central.sqlite`). This decouples local profile configurations and historical browsing from the physical availability of destination backup drives.
+
+### Directory & File Security
+- Directory `~/.otterkeep/` permissions: `0700` (`rwx------`).
+- Database file permissions: `0600` (`rw-------`).
+- Pragmas: `WAL` journal mode, `synchronous = NORMAL`, `foreign_keys = ON`, `busy_timeout = 10000`.
+
+### Relational Schema
+
+```
+┌──────────────────────────────────────┐
+│               profiles               │
+├──────────────────────────────────────┤
+│ id: TEXT PRIMARY KEY                 │
+│ name: TEXT NOT NULL                  │
+│ json_data: TEXT NOT NULL             │
+│ created_at: REAL NOT NULL            │
+│ updated_at: REAL NOT NULL            │
+└──────────────────────────────────────┘
+
+┌──────────────────────────────────────┐
+│           cached_snapshots           │
+├──────────────────────────────────────┤
+│ id: TEXT NOT NULL                    │
+│ profile_id: TEXT NOT NULL            │
+│ timestamp: REAL NOT NULL             │
+│ status: TEXT NOT NULL                │
+│ total_files: INTEGER NOT NULL        │
+│ total_bytes: INTEGER NOT NULL        │
+│ snapshot_path: TEXT NOT NULL         │
+│ backup_type: TEXT NOT NULL           │
+│ locked_until: REAL                   │
+│ PRIMARY KEY (profile_id, id)         │
+└──────────────────┬───────────────────┘
+                   │ 1:N
+                   ▼
+┌──────────────────────────────────────┐
+│         cached_file_records          │
+├──────────────────────────────────────┤
+│ id: INTEGER PRIMARY KEY AUTOINCREMENT│
+│ profile_id: TEXT NOT NULL            │
+│ snapshot_id: TEXT NOT NULL           │
+│ relative_path: TEXT NOT NULL         │
+│ file_size: INTEGER NOT NULL          │
+│ mtime: REAL NOT NULL                 │
+│ inode: INTEGER NOT NULL              │
+│ checksum: TEXT                       │
+│ is_directory: INTEGER NOT NULL       │
+│ is_symlink: INTEGER NOT NULL         │
+│ sample_hash: TEXT                    │
+└──────────────────────────────────────┘
+```
+
+### Performance Indexes
+- `idx_profiles_updated`: `(updated_at DESC)`
+- `idx_cached_snaps_prof`: `(profile_id, timestamp DESC)`
+- `idx_cached_files_prof_snap`: `(profile_id, snapshot_id)`
+- `idx_cached_files_prof_path`: `(profile_id, relative_path)`
+
+### Synchronization & Offline Invariant
+- **Post-Backup Mirroring**: Upon successful completion of a backup session, `CentralDatabase.shared.cacheSnapshots()` mirrors the target volume's snapshot metadata and file manifest into the central database.
+- **Offline Browsing**: When an external drive is detached, UI stores query `CentralDatabase` directly. Users can review snapshots, search file manifests, and inspect diffs without mounting the destination media.
+- **Profile Persistence**: Profiles are stored centrally in the `profiles` table as validated JSON payloads, eliminating dependency on loose plist files while retaining full JSON import/export capability.

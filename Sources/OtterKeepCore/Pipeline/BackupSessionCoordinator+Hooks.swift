@@ -5,6 +5,9 @@ import OtterKeepStorage
 import OtterKeepDatabase
 
 extension BackupSessionCoordinator {
+    /// Determines whether an error indicates destination disk space exhaustion (ENOSPC).
+    ///
+    /// Evaluates `FileSystemError.isOutOfSpace`, POSIX `ENOSPC`, and Cocoa `NSFileWriteOutOfSpaceError`.
     static func isOutOfSpaceError(_ error: Error) -> Bool {
         if let fs = error as? FileSystemError, fs.isOutOfSpace {
             return true
@@ -19,6 +22,9 @@ extension BackupSessionCoordinator {
         return false
     }
 
+    /// Determines whether an error represents an abrupt, non-recoverable storage or volume failure.
+    ///
+    /// Detects POSIX `EIO` (I/O error), `ENODEV` (no such device / detached volume), and `EROFS` (read-only filesystem).
     static func isFatalVolumeError(_ error: Error) -> Bool {
         if let fs = error as? FileSystemError, fs.isFatalVolumeError {
             return true
@@ -31,6 +37,9 @@ extension BackupSessionCoordinator {
         return false
     }
 
+    /// Cleans up uncommitted staging directories or leftover temporary artifacts from previous interrupted sessions.
+    ///
+    /// Strips immutable flags if set and removes `.in-progress_*`, `.latest_temp`, and `.trash_*` folders.
     func cleanupDanglingStagingDirectories(at destinationURL: URL) throws {
         let contents = (try? FileManager.default.contentsOfDirectory(at: destinationURL, includingPropertiesForKeys: nil)) ?? []
         for url in contents {

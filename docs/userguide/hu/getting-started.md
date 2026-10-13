@@ -24,7 +24,7 @@ brew install --cask otterkeep
 ```
 
 ### B) lehetőség: Lemezkép (.dmg) közvetlen letöltése
-1. Töltse le a legfrissebb `OtterKeep-1.4.0.dmg` fájlt a [Kiadások (Releases)](https://github.com/richardeszeshu/otter-keep/releases) oldalról.
+1. Töltse le a legfrissebb `OtterKeep-2.0.0.dmg` fájlt a [Kiadások (Releases)](https://github.com/richardeszeshu/otter-keep/releases) oldalról.
 2. Kattintson duplán a letöltött DMG fájlra.
 3. Húzza az **OtterKeep.app** ikont az `Alkalmazások` (Applications) mappába.
 4. Indítsa el az OtterKeep alkalmazást a Launchpadről vagy a Spotlight keresőből.
@@ -61,6 +61,6 @@ A macOS védi a személyes fájlokat (Dokumentumok, Mail, Fotók, Safari adatok)
 
 ## 5. További útmutatók
 
-- [Mentés és visszaállítás](backup-and-restore.hu.md) — Pillanatképek böngészése és fájlok helyreállítása.
-- [Távoli célállomások](remote-destinations.hu.md) — SFTP és NAS meghajtók beállítása.
-- [Fotók védelme](photos-protection.hu.md) — Apple Fotókönyvtár mentése.
+- [Mentés és visszaállítás](backup-and-restore.md) — Pillanatképek böngészése és fájlok helyreállítása.
+- [Távoli célállomások](remote-destinations.md) — SFTP és NAS meghajtók beállítása.
+- [Fotók védelme](photos-protection.md) — Apple Fotókönyvtár mentése.

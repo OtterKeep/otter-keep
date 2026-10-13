@@ -5,9 +5,9 @@
 
 [![macOS](https://img.shields.io/badge/macOS-15.0%2B%20%28Sequoia%29-blue.svg)](https://apple.com/macos)
 [![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org)
-[![Version](https://img.shields.io/badge/version-1.7.1-emerald.svg)](https://github.com/richardeszeshu/otter-keep/releases)
-[![Build](https://img.shields.io/badge/build-1701-cyan.svg)](https://github.com/richardeszeshu/otter-keep)
-[![Tests](https://img.shields.io/badge/tests-61%2F61%20passed-brightgreen.svg)](https://github.com/richardeszeshu/otter-keep)
+[![Version](https://img.shields.io/badge/version-2.0.0-emerald.svg)](https://github.com/richardeszeshu/otter-keep/releases)
+[![Build](https://img.shields.io/badge/build-2000-cyan.svg)](https://github.com/richardeszeshu/otter-keep)
+[![Tests](https://img.shields.io/badge/tests-75%2F75%20passed-brightgreen.svg)](https://github.com/richardeszeshu/otter-keep)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)](LICENSE)
 [![Hungarian](https://img.shields.io/badge/Magyar%20nyelv-README.hu.md-red.svg)](README.hu.md)
 
@@ -29,16 +29,20 @@ Unlike traditional backup utilities that trigger thermal throttling, battery dra
 ## Key Highlights
 
 - ⚡ **Near-Zero Byte Duplication**: Leverages APFS Copy-on-Write (`clonefile(2)`) so duplicate and unchanged files consume zero extra blocks on APFS destinations.
-- 🧭 **Sanctuary Experience & Profile State Harmony**: Native macOS HIG-compliant multi-profile UI with instant per-profile last backup status awareness, reactivated vertical Time Machine timeline browsing, and native keyboard shortcuts (`⌘1`, `⌘2`, `⌘3`, `⌘B`, `⌘D`).
+- 🏛️ **Clean Architecture (Hexagonal / Ports & Adapters)**: Full separation of pure Domain models (`OtterKeepDomain`), abstract ports, DTOs and use cases (`OtterKeepApplication`), infrastructure storage/database adapters, and presentation layers.
+- 🗄️ **Central Database & Offline Timeline**: Persistent central SQLite repository (`~/.otterkeep/central.sqlite`) storing profiles and cached snapshot metadata, enabling offline snapshot browsing when backup drives are unmounted.
+- 🛡️ **Fault-Tolerant Engine & Volume Circuit Breaker**: Immediate fast-fail and task cancellation on volume disconnection (`EIO`, `ENODEV`, `EROFS`) or disk exhaustion (`ENOSPC`), preventing CPU spikes and log spam.
+- 🔄 **100% Certainty Catalog Reconciliation**: Discovers and indexes unindexed snapshots on disk with strict seal and completeness validation.
+- 📦 **3-Phase Atomic Folder Restore with `.old` Protection**: Zero data loss during restores; target folders are safely held in `.old_<timestamp>` and only removed once verified staging is swapped in (with instant rollback on failure).
+- 🧭 **Modernized Sanctuary UI / UX**: Reassuring Sanctuary Hero Card with integrated storage gauges, consolidated actions (Dry-Run + Back Up Now), tabbed popup modals (Preferences, Profile Settings, System Logs), dynamic health icons, and Ottie mascot confirmation modals.
+- 🪵 **Apple-Standard Diagnostics**: Privacy-scrubbed unified logging (`os_log`) routed to Apple's standard log directory (`~/Library/Logs/OtterKeep/`).
 - 🔍 **Side-by-Side Snapshot Diffing**: Aligned dual-column file comparison with Myers LCS text diffing and binary inspection directly in GUI and CLI.
 - 🛡️ **Silent Background Data Scrubber**: Whisper-quiet background process (`I/O QoS: .background`) continually re-verifying SHA-256 hashes against silent bit-rot.
 - 🔒 **WORM Immutability Locking**: Hardware/BSD-enforced `uchg` flags protect snapshots from deletion or ransomware for configurable retention periods (30 days default).
-- ☁️ **Backblaze B2 Cloud Integration**: Native Backblaze B2 S3-compatible cloud storage destination.
-- ⚡ **Parallel Multi-Destination & Catch-Up**: Simultaneous APFS CoW local and remote replication with offline tolerance and automated background catch-up.
+- ☁️ **Backblaze B2 & S3 Cloud Integration**: Native S3-compatible cloud storage destination with parallel multi-destination and automated background catch-up.
 - 🍏 **Dataless iCloud Change Detection**: Detects modified iCloud files purely from file size and mtime without triggering unwanted downloads.
 - 🔒 **Zero-Knowledge Privacy & Client Encryption**: Client-side AES-256-GCM encryption with PBKDF2-HMAC-SHA256 key derivation (600,000 rounds) protects remote archives before transmission.
 - 🪶 **Whisper-Quiet Efficiency**: Strict cooperative concurrency (`Task.yield()`), I/O throttling, QoS scheduling, and macOS power state awareness eliminate fan noise and thermal spikes.
-- 🛡️ **Ransomware & Anomaly Shield**: Analyzes differential change ratios and mass extension changes before committing snapshots, shielding against mass file corruption.
 - 📸 **Apple Photos Sanctuary**: Native PhotoKit integration with differential asset scanning, live metadata sidecar generation (EXIF/IPTC/GPS to XMP), and ephemeral cache rate-limiting.
 - 🔌 **Safe Drive Management**: Explicit SQLite database closure (`PRAGMA wal_checkpoint(TRUNCATE)`) and connection release prevents external drive unmount locks during volume ejection.
 - 🇭🇺 **100% Native Bilingual Parity**: Fully localized in English and Hungarian across every interface screen, CLI command, and documentation guide.
@@ -49,32 +53,46 @@ Unlike traditional backup utilities that trigger thermal throttling, battery dra
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    OtterKeep User Surface                   │
-│      SwiftUI Menu Bar Extra  •  Window  •  CLI Engine       │
+│                    OtterKeep Presentation                   │
+│        SwiftUI UI Extra  •  Window  •  CLI Engine           │
 └──────────────────────────────┬──────────────────────────────┘
                                │
             Unix Domain Socket │ (AF_UNIX / Single Instance)
             Peer UID Validated │ (getpeereid 0600 socket)
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                       OtterKeepCore                         │
+│                    OtterKeepApplication                    │
+│      Use Cases (SnapshotCatalog, Retention, DTO Mappers)    │
+│      Ports (FileSystemPort, SnapshotRepositoryProtocol)     │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      OtterKeepDomain                        │
+│      Pure Entities (SnapshotRecord, FileCatalogRecord)      │
+│      Domain Invariants  •  GFS Retention Calculator         │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                        OtterKeepCore                        │
 │  ┌───────────────────────┐       ┌───────────────────────┐  │
 │  │ BackupSession         │       │ RestoreEngine         │  │
-│  │ Coordinator           │       │ Safe Collision Avoid. │  │
+│  │ Coordinator           │       │ 3-Phase Atomic Swap   │  │
 │  └───────────┬───────────┘       └───────────┬───────────┘  │
 │              │                               │              │
 │  ┌───────────▼───────────┐       ┌───────────▼───────────┐  │
-│  │ Differential Scanner  │       │ Ransomware Anomaly    │  │
-│  │ GitIgnore Rule Engine │       │ Detection Guard       │  │
+│  │ Volume Circuit Breaker│       │ Ransomware Anomaly    │  │
+│  │ Catalog Reconciler    │       │ Detection Guard       │  │
 │  └───────────────────────┘       └───────────────────────┘  │
 └──────────────┬───────────────────────────────┬──────────────┘
                │                               │
                ▼                               ▼
 ┌─────────────────────────────┐ ┌─────────────────────────────┐
 │      OtterKeepDatabase      │ │      OtterKeepStorage       │
-│  SQLite WAL Mode            │ │  APFS CoW (clonefile)       │
-│  Batch File Cataloging      │ │  POSIX Hardlinks Fallback   │
-│  Timeline & Full-Text Search│ │  SFTP & S3 Adapters         │
+│  Central DB (~/.otterkeep)  │ │  APFS CoW (clonefile)       │
+│  SQLite WAL Mode            │ │  POSIX Hardlinks Fallback   │
+│  Batch File Cataloging      │ │  SFTP, S3 & B2 Adapters     │
 └─────────────────────────────┘ └─────────────────────────────┘
 ```
 

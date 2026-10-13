@@ -29,4 +29,4 @@ Find answers to common questions regarding OtterKeep's architecture, permissions
 ---
 
 ### Q: Does OtterKeep collect telemetry or crash reports?
-**A:** **No.** OtterKeep contains zero remote tracking, telemetry, or third-party analytics. Diagnostic logs are stored strictly on your local Mac (`~/.otterkeep/`) and scrub all usernames, passwords, tokens, and personal filenames using `LogPrivacySanitizer`.
+**A:** **No.** OtterKeep contains zero remote tracking, telemetry, or third-party analytics. Diagnostic logs are stored strictly on your local Mac in Apple's standard logging location (`~/Library/Logs/OtterKeep/`) and scrub all usernames, passwords, tokens, and personal filenames using `LogPrivacySanitizer`.

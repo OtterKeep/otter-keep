@@ -11,11 +11,42 @@ All notable changes to OtterKeep are documented in this file in accordance with 
 ## [2.0.0] - 2026-10-13 (Build 2000)
 
 ### 🌟 Release Summary / Verzióösszefoglaló
-Version **2.0.0** initiates the Clean Architecture (Hexagonal / Ports & Adapters) transition for OtterKeep, establishing pure Domain and Application layers, abstract repository and storage interfaces, and dependency inversion across the entire subsystem topology.
+Version **2.0.0** is a monumental milestone release for OtterKeep, delivering a full transition to Clean Architecture (Hexagonal / Ports & Adapters), a centralized user database with offline inspection capabilities, Apple-standard unified logging, deep data resilience and crash-consistency hardening, and a refined, human-centric native macOS user interface.
 
-A **2.0.0-ás** verzió elindítja az OtterKeep Clean Architecture (Hexagonal / Ports & Adapters) átállását: tiszta Domain és Application rétegek, absztrakt repository és háttértár interface-ek, valamint szigorú függőség-megfordítás kialakításával a teljes alrendszer-topológiában.
+A **2.0.0-ás** verzió az OtterKeep történetének egyik legjelentősebb mérföldköve: teljes átállás a Clean Architecture (Hexagonal / Ports & Adapters) rétegződésre, központi SQLite adatbázis bevezetése offline történeti böngészéssel, Apple-szisztémájú egységesített diagnosztika és naplózás, mélyreható adatbiztonsági és összeomlás-biztosítási mechanizmusok, valamint egy megújult, emberközpontú natív macOS felület.
+
+- **🏛️ Clean Architecture (Hexagonal / Ports & Adapters) Átállás**:
+  - **Pure Domain Layer (`OtterKeepDomain`)**: Független tiszta üzleti modellek (`SnapshotRecord`, `FileCatalogRecord`, `PendingReplicationRecord`, `PhotosAssetRecord`), GFS retenciós szabályok és invariánsok nulla külső függőséggel.
+  - **Application Layer (`OtterKeepApplication`)**: Absztrakt repository és háttértár portok (`SnapshotRepositoryProtocol`, `FileCatalogRepositoryProtocol`, `FileSystemPort`, `PlatformPorts`), DTO adattranszfer határok (`ProfileDTO`, `SnapshotDTO`, `RetentionDTO`), valamint magas szintű use case munkafolyamatok (`SnapshotCatalogUseCases`, `RetentionUseCases`).
+  - **Dependency Inversion**: A háttértárak (`OtterKeepStorage`) és az adatbázis (`OtterKeepDatabase`) tiszta infrastruktúra-adapterekként valósítják meg a portokat.
+
+- **🗄️ Központi Adatbázis és Offline Történeti Böngészés (Central Database)**:
+  - Új központi SQLite adatbázis a felhasználó profiljának rejtett könyvtárában (`~/.otterkeep/central.sqlite`), amely tárolja a backup profilok konfigurációit (`profiles`), valamint a pillanatképek és fájlok metaadatait (`cached_snapshots`, `cached_file_records`).
+  - **Offline böngészés**: A mentési előzmények, pillanatkép-statisztikák és fájlidővonalak akkor is azonnal megtekinthetők a felületen, ha a célmeghajtó éppen nincs csatolva.
+  - **Duális formátum-megőrzés**: A profilok JSON exportja és importja maradéktalanul megmaradt az SQLite tárolás mellett.
+
+- **🪵 Apple-Szisztémájú Egységes Diagnosztika és Logolás (Apple-Standard Logging)**:
+  - Strukturált `os_log` naplózás kategóriák szerint (`Backup`, `Restore`, `Storage`, `Security`, `Database`, `Hook`), automatikus személyes adatmaszkolással (`LogPrivacySanitizer`).
+  - Dedikált Apple-szabványos diagnosztikai naplókönyvtár: `~/Library/Logs/OtterKeep/otterkeep.log`.
+
+- **🛡️ Adatbiztonsági és Hibatűrési Erődítés (Data Resilience & Fault-Tolerance)**:
+  - **Volume Circuit Breaker**: Hardveres lecsatlakozás (`EIO`, `ENODEV`, `EROFS`, `ENOENT`) vagy ismétlődő fatális írási hiba esetén azonnali feladatcsoport-megszakítás (`group.cancelAll()`) és strukturált leállás felesleges CPU-terhelés és log-spam nélkül.
+  - **`ENOSPC` Fast-Fail**: Azonnali leállás és az átmeneti `.in-progress_` staging könyvtár azonnali felszabadítása, ha a célmeghajtó tárhelye mentés közben kimerül.
+  - **100% Biztonságú Katalógus Rekonciliáció**: A lemezen talált, de adatbázisból hiányzó befejezett snapshotokat a rendszer automatikusan és biztonságosan beemeli az SQLite katalógusba, szigorú ellenőrzéssel (létező és committed `.snapshot_info.json`, megegyező profilnév, érvényes `root/` mappa), kizárva a félkész vagy sérült mappákat.
+  - **3-Fázisú Atomikus Restore & `.old` Védőháló**: Felülírásos és teljes mappa visszaállításkor a meglévő célkönyvtárat a motor egy atomikus átnevezéssel átmozgatja a `<target>.old_<timestamp>` mappába, a helyreállított tranzakciós staging könyvtárat beemeli a helyére, és csak a sikeres befejezés után törli a `.old` másolatot (hiba esetén azonnali automatikus rollback).
+  - **SQLite WAL Mód & Busy Timeout**: Kényszerített WAL naplózás és 10 másodperces busy timeout a konkurens folyamatok zavartalan, zárolásmentes működéséért.
+
+- **🎨 Megújult, Emberközpontú Natív UI / UX (User Experience Redesign)**:
+  - **Kezdőbarát Sanctuary Hero Kártya**: Az Overview képernyőbe integrált élő tárhely-foglaltsági statisztika, 3-2-1 backup szabály státusz és Time Machine idővonal.
+  - **Összevont vezérlőgombok**: A korábbi redundáns gombok helyett egyetlen letisztult műveleti fürt (Dry-Run Analysis + Back Up Now / Stop Backup).
+  - **Tab-okkal ellátott popup ablakok**: A Preferences, Profile Settings, és System Logs mind elegáns, globálisan elérhető modális ablakokká alakultak.
+  - **Reagáló oldalsávi státuszikonok**: A mappaikonok helyett az utolsó mentés állapotát reprezentáló ikonok (sikeres zöld, hibás piros háromszög, 14 napnál régebbi óra, vagy ütemezés szerint esedékes kérdőjel).
+  - **Kedves Ottie törlés-megerősítő felugró ablak**: A profil törlésekor Ottie, a kabalafigura jelenik meg kérdő, aggódó, de végtelenül kedves arckifejezéssel, mellette egy kérdőjeles buborék badge-dzsel (garantált `Bundle.module` feloldással).
+  - **Egységesített feliratok és lokalizáció**: Mentés gombok egységesítése (`L10n.t(.save)`), 100%-os kétnyelvű (magyar és angol) fordítási paritás.
 
 - **Subsystem SemVer Alignment**:
+  - `OtterKeepDomain`: `2.0.0`
+  - `OtterKeepApplication`: `2.0.0`
   - `OtterKeepStorage`: `2.0.0`
   - `OtterKeepDatabase`: `2.0.0`
   - `OtterKeepCore`: `2.0.0`
