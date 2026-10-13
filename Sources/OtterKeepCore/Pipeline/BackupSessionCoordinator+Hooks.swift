@@ -1,6 +1,5 @@
 import Foundation
 import os
-import AppKit
 import OtterKeepStorage
 import OtterKeepDatabase
 

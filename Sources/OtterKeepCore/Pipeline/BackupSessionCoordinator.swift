@@ -1,6 +1,5 @@
 import Foundation
 import os
-import AppKit
 import OtterKeepStorage
 import OtterKeepDatabase
 
@@ -9,6 +8,7 @@ public actor BackupSessionCoordinator {
     let database: DatabaseEngine
     private let icloudController: ICloudEvictionController
     private let retentionManager: RetentionManager
+    private let volumeEjector: VolumeEjecting
     let logger = Logger(subsystem: "com.otterkeep.desktop", category: "BackupCoordinator")
 
     /// Summary of the most recently executed backup session.
@@ -20,16 +20,19 @@ public actor BackupSessionCoordinator {
     ///   - database: Database engine.
     ///   - icloudController: iCloud eviction and download controller.
     ///   - retentionManager: Snapshot retention manager.
+    ///   - volumeEjector: Platform-provided volume ejector used when a profile enables auto-eject.
     public init(
         storage: FileSystemProvider = DefaultFileSystemProvider(),
         database: DatabaseEngine = DatabaseEngine(),
         icloudController: ICloudEvictionController = ICloudEvictionController(),
-        retentionManager: RetentionManager? = nil
+        retentionManager: RetentionManager? = nil,
+        volumeEjector: VolumeEjecting = NoopVolumeEjector()
     ) {
         self.storage = storage
         self.database = database
         self.icloudController = icloudController
         self.retentionManager = retentionManager ?? RetentionManager(storage: storage, database: database)
+        self.volumeEjector = volumeEjector
     }
 
     private static let dateFormatter: DateFormatter = {
@@ -865,7 +868,7 @@ public actor BackupSessionCoordinator {
         if profile.autoEjectOnCompletion && (snapshotStatus == "completed" || snapshotStatus == "completed_with_warnings") {
             logger.info("Auto-eject enabled for profile '\(profile.name, privacy: .private)'. Ejecting destination device...")
             do {
-                try NSWorkspace.shared.unmountAndEjectDevice(at: profile.destinationURL)
+                try volumeEjector.ejectVolume(at: profile.destinationURL)
                 LogManager.shared.log("Destination volume safely unmounted and ejected for profile '\(profile.name)'.", level: .info, category: "Storage")
             } catch {
                 LogManager.shared.log("Failed to safely unmount destination volume at '\(profile.destinationURL.path)': \(error.localizedDescription)", level: .warning, category: "Storage")

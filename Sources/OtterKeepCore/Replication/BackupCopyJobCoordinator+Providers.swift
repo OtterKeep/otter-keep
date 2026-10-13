@@ -3,8 +3,331 @@ import os
 import OtterKeepStorage
 import OtterKeepDatabase
 
+// MARK: - Backend Adapters
+
+/// S3-compatible replication sink. Also serves Backblaze B2, which reuses this code path.
+struct S3ReplicationSink: ReplicationSink {
+    struct Session: Sendable {
+        let provider: S3StorageProvider
+        let passphrase: String
+    }
+
+    let context: ReplicationContext
+    let config: S3Configuration
+
+    var destinationIdentifier: String { "s3://\(config.bucket)/\(config.pathPrefix)" }
+    var destinationType: String { "s3" }
+    var logName: String { "S3" }
+    var supportsArchivePackaging: Bool { true }
+    var archivePackagingStatusMessage: String? { "Packaging snapshot into compressed archive..." }
+    var announcesCurrentFileBeforeReplication: Bool { true }
+
+    func open() async throws -> Session {
+        Session(
+            provider: RemoteStorageFactory.makeS3Provider(for: context.destination, config: config),
+            passphrase: RemoteStorageFactory.resolveEncryptionPassphrase(for: context.destination, profileId: context.profile.id)
+        )
+    }
+
+    func replicateFile(_ file: FileCatalogRecord, session: Session) async throws -> ReplicationUnitOutcome {
+        let destId = destinationIdentifier
+        let (alreadySynced, existingKey, existingETag) = try await context.database.isReplicationFileSynced(
+            destinationIdentifier: destId,
+            relativePath: file.relativePath,
+            checksum: file.checksum,
+            fileSize: file.fileSize
+        )
+
+        if alreadySynced, let key = existingKey {
+            return .reusedFile(record: ReplicationFileRecord(
+                snapshotId: context.snapshot.id,
+                destinationIdentifier: destId,
+                relativePath: file.relativePath,
+                remoteKey: key,
+                remoteETag: existingETag,
+                checksum: file.checksum,
+                fileSize: file.fileSize,
+                status: "reused"
+            ))
+        }
+
+        let localFileURL = context.snapshotRoot.appendingPathComponent(file.relativePath)
+        guard FileManager.default.fileExists(atPath: localFileURL.path(percentEncoded: false)) else {
+            return .ignored
+        }
+
+        let rawData = try Data(contentsOf: localFileURL)
+        let payload: Data
+        let objectKey: String
+        if context.destination.isClientEncryptionEnabled {
+            payload = try ClientSideEncryptor.encrypt(data: rawData, passphrase: session.passphrase)
+            objectKey = "\(context.snapshot.id)/\(file.relativePath).enc"
+        } else {
+            payload = rawData
+            objectKey = "\(context.snapshot.id)/\(file.relativePath)"
+        }
+
+        await context.throttler.throttle(byteCount: Int64(payload.count))
+        let etag = try await upload(payload, objectKey: objectKey, session: session)
+
+        return .replicatedFile(bytes: file.fileSize, record: ReplicationFileRecord(
+            snapshotId: context.snapshot.id,
+            destinationIdentifier: destId,
+            relativePath: file.relativePath,
+            remoteKey: objectKey,
+            remoteETag: etag,
+            checksum: file.checksum,
+            fileSize: file.fileSize,
+            status: "replicated"
+        ))
+    }
+
+    func replicateArchive(session: Session) async throws -> ReplicationUnitOutcome {
+        let snapshot = context.snapshot
+        let format = ArchivePackagingEngine.shared.defaultFormat
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("OtterKeep_Arch_\(UUID().uuidString)")
+        let archiveURL = tempDir.appendingPathComponent("\(snapshot.id).\(format.fileExtension)")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        try await ArchivePackagingEngine.shared.createArchive(
+            sourceDirectory: context.snapshotRoot,
+            destinationArchiveURL: archiveURL,
+            compressionLevel: context.destination.archiveCompressionLevel
+        )
+
+        let rawData = try Data(contentsOf: archiveURL)
+        let payload: Data
+        let objectKey: String
+        if context.destination.isClientEncryptionEnabled {
+            payload = try ClientSideEncryptor.encrypt(data: rawData, passphrase: session.passphrase)
+            objectKey = "\(snapshot.id)/\(archiveURL.lastPathComponent).enc"
+        } else {
+            payload = rawData
+            objectKey = "\(snapshot.id)/\(archiveURL.lastPathComponent)"
+        }
+
+        await context.throttler.throttle(byteCount: Int64(payload.count))
+        let etag = try await upload(payload, objectKey: objectKey, session: session)
+
+        return ReplicationUnitOutcome(
+            replicatedFiles: 1,
+            replicatedBytes: Int64(payload.count),
+            processedFilesDelta: context.filesToSync.count,
+            progressBytesDelta: Int64(payload.count),
+            emitProgress: true,
+            fileRecord: ReplicationFileRecord(
+                snapshotId: snapshot.id,
+                destinationIdentifier: destinationIdentifier,
+                relativePath: archiveURL.lastPathComponent,
+                remoteKey: objectKey,
+                remoteETag: etag,
+                checksum: try? ChecksumCalculator.computeSHA256(for: archiveURL),
+                fileSize: Int64(payload.count),
+                status: "replicated"
+            )
+        )
+    }
+
+    /// Uploads an object, switching to a 5 MB chunked multipart upload above the 8 MB single-PUT threshold.
+    private func upload(_ payload: Data, objectKey: String, session: Session) async throws -> String {
+        if payload.count > 8 * 1024 * 1024 {
+            let uploadId = try await session.provider.initiateMultipartUpload(key: objectKey)
+            var parts: [(partNumber: Int, etag: String)] = []
+            let chunkSize = 5 * 1024 * 1024
+            var offset = 0
+            var partNumber = 1
+
+            while offset < payload.count {
+                try Task.checkCancellation()
+                let length = min(chunkSize, payload.count - offset)
+                let chunkData = payload.subdata(in: offset..<(offset + length))
+                await context.throttler.throttle(byteCount: Int64(chunkData.count))
+                let partETag = try await session.provider.uploadPart(key: objectKey, uploadId: uploadId, partNumber: partNumber, data: chunkData)
+                parts.append((partNumber: partNumber, etag: partETag))
+                offset += length
+                partNumber += 1
+            }
+            try await session.provider.completeMultipartUpload(key: objectKey, uploadId: uploadId, parts: parts)
+            return parts.first?.etag ?? ""
+        }
+        return try await session.provider.putObject(key: objectKey, data: payload)
+    }
+}
+
+/// SMB/NFS network share replication sink (mounted-share copy semantics; no archive packaging).
+struct SMBReplicationSink: ReplicationSink {
+    struct Session: Sendable {
+        let targetDirectory: URL
+    }
+
+    let context: ReplicationContext
+    let config: NetworkShareConfiguration
+
+    var destinationIdentifier: String { config.shareURL }
+    var destinationType: String { "smb" }
+    var logName: String { "SMB" }
+    var successLogTarget: String { "SMB NAS" }
+    var successLogIncludesCounts: Bool { false }
+
+    func open() async throws -> Session {
+        let (mountPoint, resolvedSubpath) = try await RemoteStorageFactory.mountNetworkShare(for: context.destination, config: config)
+        let targetDir = mountPoint.appendingPathComponent(resolvedSubpath).appendingPathComponent(context.snapshot.snapshotPath)
+        try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+        return Session(targetDirectory: targetDir)
+    }
+
+    func replicateFile(_ file: FileCatalogRecord, session: Session) async throws -> ReplicationUnitOutcome {
+        let srcURL = context.snapshotRoot.appendingPathComponent(file.relativePath)
+        let dstURL = session.targetDirectory.appendingPathComponent("root").appendingPathComponent(file.relativePath)
+        try FileManager.default.createDirectory(at: dstURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+
+        if !FileManager.default.fileExists(atPath: dstURL.path(percentEncoded: false)) {
+            try FileManager.default.copyItem(at: srcURL, to: dstURL)
+            return .replicatedFile(bytes: file.fileSize)
+        }
+        return .skippedFile(bytes: file.fileSize)
+    }
+}
+
+/// WebDAV replication sink.
+struct WebDAVReplicationSink: ReplicationSink {
+    struct Session: Sendable {
+        let provider: WebDAVStorageProvider
+        let passphrase: String
+    }
+
+    let context: ReplicationContext
+    let config: WebDAVConfiguration
+
+    var destinationIdentifier: String { config.serverURL + config.destinationPath }
+    var destinationType: String { "webdav" }
+    var logName: String { "WebDAV" }
+    var supportsArchivePackaging: Bool { true }
+
+    func open() async throws -> Session {
+        Session(
+            provider: RemoteStorageFactory.makeWebDAVProvider(for: context.destination, config: config),
+            passphrase: RemoteStorageFactory.resolveEncryptionPassphrase(for: context.destination, profileId: context.profile.id)
+        )
+    }
+
+    func replicateFile(_ file: FileCatalogRecord, session: Session) async throws -> ReplicationUnitOutcome {
+        let localFileURL = context.snapshotRoot.appendingPathComponent(file.relativePath)
+        guard FileManager.default.fileExists(atPath: localFileURL.path(percentEncoded: false)) else {
+            return .ignored
+        }
+
+        let rawData = try Data(contentsOf: localFileURL)
+        let payload: Data
+        let remotePath: String
+        if context.destination.isClientEncryptionEnabled {
+            payload = try ClientSideEncryptor.encrypt(data: rawData, passphrase: session.passphrase)
+            remotePath = "\(context.snapshot.id)/\(file.relativePath).enc"
+        } else {
+            payload = rawData
+            remotePath = "\(context.snapshot.id)/\(file.relativePath)"
+        }
+
+        await context.throttler.throttle(byteCount: Int64(payload.count))
+        try await session.provider.uploadFile(path: remotePath, data: payload)
+        return .replicatedFile(bytes: file.fileSize)
+    }
+
+    func replicateArchive(session: Session) async throws -> ReplicationUnitOutcome {
+        let snapshot = context.snapshot
+        let format = ArchivePackagingEngine.shared.defaultFormat
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("OtterKeep_WebDAV_\(UUID().uuidString)")
+        let archiveURL = tempDir.appendingPathComponent("\(snapshot.id).\(format.fileExtension)")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        try await ArchivePackagingEngine.shared.createArchive(
+            sourceDirectory: context.snapshotRoot,
+            destinationArchiveURL: archiveURL,
+            compressionLevel: context.destination.archiveCompressionLevel
+        )
+
+        let rawArchiveData = try Data(contentsOf: archiveURL)
+        let payload: Data
+        let remoteFilename: String
+        if context.destination.isClientEncryptionEnabled {
+            payload = try ClientSideEncryptor.encrypt(data: rawArchiveData, passphrase: session.passphrase)
+            remoteFilename = "\(archiveURL.lastPathComponent).enc"
+        } else {
+            payload = rawArchiveData
+            remoteFilename = archiveURL.lastPathComponent
+        }
+
+        try await session.provider.uploadFile(path: remoteFilename, data: payload)
+
+        return ReplicationUnitOutcome(replicatedFiles: 1, replicatedBytes: Int64(payload.count))
+    }
+}
+
+/// SFTP replication sink.
+struct SFTPReplicationSink: ReplicationSink {
+    struct Session: Sendable {
+        let provider: SFTPStorageProvider
+        let passphrase: String
+    }
+
+    let context: ReplicationContext
+    let config: SFTPConfiguration
+
+    var destinationIdentifier: String { "\(config.host):\(config.remotePath)" }
+    var destinationType: String { "sftp" }
+    var logName: String { "SFTP" }
+    var supportsArchivePackaging: Bool { true }
+
+    func open() async throws -> Session {
+        Session(
+            provider: RemoteStorageFactory.makeSFTPProvider(for: context.destination, config: config),
+            passphrase: RemoteStorageFactory.resolveEncryptionPassphrase(for: context.destination, profileId: context.profile.id)
+        )
+    }
+
+    func replicateFile(_ file: FileCatalogRecord, session: Session) async throws -> ReplicationUnitOutcome {
+        let localFileURL = context.snapshotRoot.appendingPathComponent(file.relativePath)
+        guard FileManager.default.fileExists(atPath: localFileURL.path(percentEncoded: false)) else {
+            return .ignored
+        }
+
+        try await session.provider.uploadFile(localURL: localFileURL, remotePath: "\(context.snapshot.id)/\(file.relativePath)")
+        return .replicatedFile(bytes: file.fileSize)
+    }
+
+    func replicateArchive(session: Session) async throws -> ReplicationUnitOutcome {
+        let snapshot = context.snapshot
+        let format = ArchivePackagingEngine.shared.defaultFormat
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("OtterKeep_SFTP_\(UUID().uuidString)")
+        let archiveURL = tempDir.appendingPathComponent("\(snapshot.id).\(format.fileExtension)")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        try await ArchivePackagingEngine.shared.createArchive(
+            sourceDirectory: context.snapshotRoot,
+            destinationArchiveURL: archiveURL,
+            compressionLevel: context.destination.archiveCompressionLevel
+        )
+
+        let uploadURL: URL
+        if context.destination.isClientEncryptionEnabled {
+            let rawArchiveData = try Data(contentsOf: archiveURL)
+            let payload = try ClientSideEncryptor.encrypt(data: rawArchiveData, passphrase: session.passphrase)
+            let encURL = tempDir.appendingPathComponent("\(archiveURL.lastPathComponent).enc")
+            try payload.write(to: encURL)
+            uploadURL = encURL
+        } else {
+            uploadURL = archiveURL
+        }
+
+        try await session.provider.uploadFile(localURL: uploadURL, remotePath: uploadURL.lastPathComponent)
+
+        let fileSize = (try? FileManager.default.attributesOfItem(atPath: uploadURL.path)[.size] as? Int64) ?? 0
+        return ReplicationUnitOutcome(replicatedFiles: 1, replicatedBytes: fileSize)
+    }
+}
+
 extension BackupCopyJobCoordinator {
-    // MARK: - Private Protocol-Specific Replicators
+    // MARK: - Thin Protocol-Specific Adapters
 
     func replicateS3(
         dest: RemoteDestination,
@@ -16,219 +339,18 @@ extension BackupCopyJobCoordinator {
         throttler: BandwidthThrottler,
         state: inout ReplicationProgressState
     ) async throws -> DestinationSyncResult {
-        let destId = "s3://\(s3Config.bucket)/\(s3Config.pathPrefix)"
-        _ = try await database.recordReplicationSnapshot(ReplicationSnapshotRecord(
-            snapshotId: snapshot.id,
-            destinationType: "s3",
-            destinationIdentifier: destId,
-            status: "in_progress",
-            replicatedBytes: 0,
-            totalBytes: snapshot.totalBytes,
-            startedAt: Date()
-        ))
-
-        do {
-            let s3Provider = RemoteStorageFactory.makeS3Provider(for: dest, config: s3Config)
-            let passphrase = RemoteStorageFactory.resolveEncryptionPassphrase(for: dest, profileId: profile.id)
-
-            var destReplicatedFiles = 0
-            var destReplicatedBytes: Int64 = 0
-            var destSkippedFiles = 0
-
-            if dest.archivePackagingEnabled || profile.copyJobConfig.archivePackagingEnabled {
-                state.statusMessage = "Packaging snapshot into compressed archive..."
-                let format = ArchivePackagingEngine.shared.defaultFormat
-                state.currentFile = "\(snapshot.id).\(format.fileExtension)"
-                onProgress?(state)
-
-                let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("OtterKeep_Arch_\(UUID().uuidString)")
-                let archiveURL = tempDir.appendingPathComponent("\(snapshot.id).\(format.fileExtension)")
-                defer { try? FileManager.default.removeItem(at: tempDir) }
-
-                try await ArchivePackagingEngine.shared.createArchive(
-                    sourceDirectory: snapshotRoot,
-                    destinationArchiveURL: archiveURL,
-                    compressionLevel: dest.archiveCompressionLevel
-                )
-
-                let rawData = try Data(contentsOf: archiveURL)
-                let payload: Data
-                let objectKey: String
-                if dest.isClientEncryptionEnabled {
-                    payload = try ClientSideEncryptor.encrypt(data: rawData, passphrase: passphrase)
-                    objectKey = "\(snapshot.id)/\(archiveURL.lastPathComponent).enc"
-                } else {
-                    payload = rawData
-                    objectKey = "\(snapshot.id)/\(archiveURL.lastPathComponent)"
-                }
-
-                await throttler.throttle(byteCount: Int64(payload.count))
-
-                let etag: String
-                if payload.count > 8 * 1024 * 1024 {
-                    let uploadId = try await s3Provider.initiateMultipartUpload(key: objectKey)
-                    var parts: [(partNumber: Int, etag: String)] = []
-                    let chunkSize = 5 * 1024 * 1024
-                    var offset = 0
-                    var partNumber = 1
-
-                    while offset < payload.count {
-                        try Task.checkCancellation()
-                        let length = min(chunkSize, payload.count - offset)
-                        let chunkData = payload.subdata(in: offset..<(offset + length))
-                        await throttler.throttle(byteCount: Int64(chunkData.count))
-                        let partETag = try await s3Provider.uploadPart(key: objectKey, uploadId: uploadId, partNumber: partNumber, data: chunkData)
-                        parts.append((partNumber: partNumber, etag: partETag))
-                        offset += length
-                        partNumber += 1
-                    }
-                    try await s3Provider.completeMultipartUpload(key: objectKey, uploadId: uploadId, parts: parts)
-                    etag = parts.first?.etag ?? ""
-                } else {
-                    etag = try await s3Provider.putObject(key: objectKey, data: payload)
-                }
-
-                try await database.recordReplicationFile(ReplicationFileRecord(
-                    snapshotId: snapshot.id,
-                    destinationIdentifier: destId,
-                    relativePath: archiveURL.lastPathComponent,
-                    remoteKey: objectKey,
-                    remoteETag: etag,
-                    checksum: try? ChecksumCalculator.computeSHA256(for: archiveURL),
-                    fileSize: Int64(payload.count),
-                    status: "replicated"
-                ))
-
-                destReplicatedFiles = 1
-                destReplicatedBytes = Int64(payload.count)
-                state.processedFiles = filesToSync.count
-                state.replicatedBytes = destReplicatedBytes
-                onProgress?(state)
-            } else {
-                for file in filesToSync {
-                    try Task.checkCancellation()
-
-                    state.currentFile = file.relativePath
-                    onProgress?(state)
-
-                    let (alreadySynced, existingKey, existingETag) = try await database.isReplicationFileSynced(
-                        destinationIdentifier: destId,
-                        relativePath: file.relativePath,
-                        checksum: file.checksum,
-                        fileSize: file.fileSize
-                    )
-
-                    if alreadySynced, let key = existingKey {
-                        destSkippedFiles += 1
-                        try await database.recordReplicationFile(ReplicationFileRecord(
-                            snapshotId: snapshot.id,
-                            destinationIdentifier: destId,
-                            relativePath: file.relativePath,
-                            remoteKey: key,
-                            remoteETag: existingETag,
-                            checksum: file.checksum,
-                            fileSize: file.fileSize,
-                            status: "reused"
-                        ))
-                        state.processedFiles += 1
-                        onProgress?(state)
-                        continue
-                    }
-
-                    let localFileURL = snapshotRoot.appendingPathComponent(file.relativePath)
-                    guard FileManager.default.fileExists(atPath: localFileURL.path(percentEncoded: false)) else {
-                        continue
-                    }
-
-                    let rawData = try Data(contentsOf: localFileURL)
-                    let payload: Data
-                    let objectKey: String
-                    if dest.isClientEncryptionEnabled {
-                        payload = try ClientSideEncryptor.encrypt(data: rawData, passphrase: passphrase)
-                        objectKey = "\(snapshot.id)/\(file.relativePath).enc"
-                    } else {
-                        payload = rawData
-                        objectKey = "\(snapshot.id)/\(file.relativePath)"
-                    }
-
-                    await throttler.throttle(byteCount: Int64(payload.count))
-
-                    let etag: String
-                    if payload.count > 8 * 1024 * 1024 {
-                        let uploadId = try await s3Provider.initiateMultipartUpload(key: objectKey)
-                        var parts: [(partNumber: Int, etag: String)] = []
-                        let chunkSize = 5 * 1024 * 1024
-                        var offset = 0
-                        var partNumber = 1
-
-                        while offset < payload.count {
-                            try Task.checkCancellation()
-                            let length = min(chunkSize, payload.count - offset)
-                            let chunkData = payload.subdata(in: offset..<(offset + length))
-                            await throttler.throttle(byteCount: Int64(chunkData.count))
-                            let partETag = try await s3Provider.uploadPart(key: objectKey, uploadId: uploadId, partNumber: partNumber, data: chunkData)
-                            parts.append((partNumber: partNumber, etag: partETag))
-                            offset += length
-                            partNumber += 1
-                        }
-                        try await s3Provider.completeMultipartUpload(key: objectKey, uploadId: uploadId, parts: parts)
-                        etag = parts.first?.etag ?? ""
-                    } else {
-                        etag = try await s3Provider.putObject(key: objectKey, data: payload)
-                    }
-
-                    try await database.recordReplicationFile(ReplicationFileRecord(
-                        snapshotId: snapshot.id,
-                        destinationIdentifier: destId,
-                        relativePath: file.relativePath,
-                        remoteKey: objectKey,
-                        remoteETag: etag,
-                        checksum: file.checksum,
-                        fileSize: file.fileSize,
-                        status: "replicated"
-                    ))
-
-                    destReplicatedFiles += 1
-                    destReplicatedBytes += file.fileSize
-                    state.processedFiles += 1
-                    state.replicatedBytes += file.fileSize
-                    onProgress?(state)
-                }
-            }
-
-            try await database.updateReplicationSnapshot(
-                snapshotId: snapshot.id,
-                destinationIdentifier: destId,
-                status: "completed",
-                replicatedBytes: destReplicatedBytes,
-                completedAt: Date()
-            )
-
-            logger.info("Successfully replicated snapshot \(snapshot.id) to S3: \(destReplicatedFiles) files, \(destReplicatedBytes) bytes")
-            return DestinationSyncResult(
-                replicatedFiles: destReplicatedFiles,
-                replicatedBytes: destReplicatedBytes,
-                skippedFiles: destSkippedFiles,
-                isSuccess: true
-            )
-        } catch {
-            let errMsg = error.localizedDescription
-            logger.error("Failed to replicate snapshot to S3: \(errMsg)")
-            try? await database.updateReplicationSnapshot(
-                snapshotId: snapshot.id,
-                destinationIdentifier: destId,
-                status: "failed",
-                replicatedBytes: 0,
-                completedAt: Date(),
-                errorMessage: errMsg
-            )
-            return DestinationSyncResult(
-                replicatedFiles: 0,
-                replicatedBytes: 0,
-                skippedFiles: 0,
-                isSuccess: false
-            )
-        }
+        let sink = S3ReplicationSink(
+            context: replicationContext(
+                dest: dest,
+                snapshot: snapshot,
+                snapshotRoot: snapshotRoot,
+                filesToSync: filesToSync,
+                profile: profile,
+                throttler: throttler
+            ),
+            config: s3Config
+        )
+        return try await executeReplicationPipeline(sink, state: &state)
     }
 
     func replicateSMB(
@@ -241,78 +363,18 @@ extension BackupCopyJobCoordinator {
         throttler: BandwidthThrottler,
         state: inout ReplicationProgressState
     ) async throws -> DestinationSyncResult {
-        let destId = smbConfig.shareURL
-        _ = try await database.recordReplicationSnapshot(ReplicationSnapshotRecord(
-            snapshotId: snapshot.id,
-            destinationType: "smb",
-            destinationIdentifier: destId,
-            status: "in_progress",
-            replicatedBytes: 0,
-            totalBytes: snapshot.totalBytes,
-            startedAt: Date()
-        ))
-
-        do {
-            let (mountPoint, resolvedSubpath) = try await RemoteStorageFactory.mountNetworkShare(for: dest, config: smbConfig)
-            let targetDir = mountPoint.appendingPathComponent(resolvedSubpath).appendingPathComponent(snapshot.snapshotPath)
-            try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
-
-            var destReplicatedFiles = 0
-            var destReplicatedBytes: Int64 = 0
-            var destSkippedFiles = 0
-
-            for file in filesToSync {
-                try Task.checkCancellation()
-                let srcURL = snapshotRoot.appendingPathComponent(file.relativePath)
-                let dstURL = targetDir.appendingPathComponent("root").appendingPathComponent(file.relativePath)
-                try FileManager.default.createDirectory(at: dstURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-
-                if !FileManager.default.fileExists(atPath: dstURL.path(percentEncoded: false)) {
-                    try FileManager.default.copyItem(at: srcURL, to: dstURL)
-                    destReplicatedFiles += 1
-                    destReplicatedBytes += file.fileSize
-                } else {
-                    destSkippedFiles += 1
-                }
-
-                state.processedFiles += 1
-                state.replicatedBytes += file.fileSize
-                onProgress?(state)
-            }
-
-            try await database.updateReplicationSnapshot(
-                snapshotId: snapshot.id,
-                destinationIdentifier: destId,
-                status: "completed",
-                replicatedBytes: destReplicatedBytes,
-                completedAt: Date()
-            )
-
-            logger.info("Successfully replicated snapshot \(snapshot.id) to SMB NAS")
-            return DestinationSyncResult(
-                replicatedFiles: destReplicatedFiles,
-                replicatedBytes: destReplicatedBytes,
-                skippedFiles: destSkippedFiles,
-                isSuccess: true
-            )
-        } catch {
-            let errMsg = error.localizedDescription
-            logger.error("Failed to replicate snapshot to SMB: \(errMsg)")
-            try? await database.updateReplicationSnapshot(
-                snapshotId: snapshot.id,
-                destinationIdentifier: destId,
-                status: "failed",
-                replicatedBytes: 0,
-                completedAt: Date(),
-                errorMessage: errMsg
-            )
-            return DestinationSyncResult(
-                replicatedFiles: 0,
-                replicatedBytes: 0,
-                skippedFiles: 0,
-                isSuccess: false
-            )
-        }
+        let sink = SMBReplicationSink(
+            context: replicationContext(
+                dest: dest,
+                snapshot: snapshot,
+                snapshotRoot: snapshotRoot,
+                filesToSync: filesToSync,
+                profile: profile,
+                throttler: throttler
+            ),
+            config: smbConfig
+        )
+        return try await executeReplicationPipeline(sink, state: &state)
     }
 
     func replicateWebDAV(
@@ -325,110 +387,18 @@ extension BackupCopyJobCoordinator {
         throttler: BandwidthThrottler,
         state: inout ReplicationProgressState
     ) async throws -> DestinationSyncResult {
-        let destId = webdavConfig.serverURL + webdavConfig.destinationPath
-        _ = try await database.recordReplicationSnapshot(ReplicationSnapshotRecord(
-            snapshotId: snapshot.id,
-            destinationType: "webdav",
-            destinationIdentifier: destId,
-            status: "in_progress",
-            replicatedBytes: 0,
-            totalBytes: snapshot.totalBytes,
-            startedAt: Date()
-        ))
-
-        do {
-            let webdavProvider = RemoteStorageFactory.makeWebDAVProvider(for: dest, config: webdavConfig)
-            let passphrase = RemoteStorageFactory.resolveEncryptionPassphrase(for: dest, profileId: profile.id)
-
-            var destReplicatedFiles = 0
-            var destReplicatedBytes: Int64 = 0
-            let destSkippedFiles = 0
-
-            if dest.archivePackagingEnabled || profile.copyJobConfig.archivePackagingEnabled {
-                let format = ArchivePackagingEngine.shared.defaultFormat
-                let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("OtterKeep_WebDAV_\(UUID().uuidString)")
-                let archiveURL = tempDir.appendingPathComponent("\(snapshot.id).\(format.fileExtension)")
-                defer { try? FileManager.default.removeItem(at: tempDir) }
-
-                try await ArchivePackagingEngine.shared.createArchive(
-                    sourceDirectory: snapshotRoot,
-                    destinationArchiveURL: archiveURL,
-                    compressionLevel: dest.archiveCompressionLevel
-                )
-
-                let rawArchiveData = try Data(contentsOf: archiveURL)
-                let payload: Data
-                let remoteFilename: String
-                if dest.isClientEncryptionEnabled {
-                    payload = try ClientSideEncryptor.encrypt(data: rawArchiveData, passphrase: passphrase)
-                    remoteFilename = "\(archiveURL.lastPathComponent).enc"
-                } else {
-                    payload = rawArchiveData
-                    remoteFilename = archiveURL.lastPathComponent
-                }
-
-                try await webdavProvider.uploadFile(path: remoteFilename, data: payload)
-
-                destReplicatedFiles = 1
-                destReplicatedBytes = Int64(payload.count)
-            } else {
-                for file in filesToSync {
-                    try Task.checkCancellation()
-                    let localFileURL = snapshotRoot.appendingPathComponent(file.relativePath)
-                    guard FileManager.default.fileExists(atPath: localFileURL.path(percentEncoded: false)) else { continue }
-                    let rawData = try Data(contentsOf: localFileURL)
-                    let payload: Data
-                    let remotePath: String
-                    if dest.isClientEncryptionEnabled {
-                        payload = try ClientSideEncryptor.encrypt(data: rawData, passphrase: passphrase)
-                        remotePath = "\(snapshot.id)/\(file.relativePath).enc"
-                    } else {
-                        payload = rawData
-                        remotePath = "\(snapshot.id)/\(file.relativePath)"
-                    }
-                    await throttler.throttle(byteCount: Int64(payload.count))
-                    try await webdavProvider.uploadFile(path: remotePath, data: payload)
-                    destReplicatedFiles += 1
-                    destReplicatedBytes += file.fileSize
-                    state.processedFiles += 1
-                    state.replicatedBytes += file.fileSize
-                    onProgress?(state)
-                }
-            }
-
-            try await database.updateReplicationSnapshot(
-                snapshotId: snapshot.id,
-                destinationIdentifier: destId,
-                status: "completed",
-                replicatedBytes: destReplicatedBytes,
-                completedAt: Date()
-            )
-
-            logger.info("Successfully replicated snapshot \(snapshot.id) to WebDAV: \(destReplicatedFiles) files, \(destReplicatedBytes) bytes")
-            return DestinationSyncResult(
-                replicatedFiles: destReplicatedFiles,
-                replicatedBytes: destReplicatedBytes,
-                skippedFiles: destSkippedFiles,
-                isSuccess: true
-            )
-        } catch {
-            let errMsg = error.localizedDescription
-            logger.error("Failed to replicate snapshot to WebDAV: \(errMsg)")
-            try? await database.updateReplicationSnapshot(
-                snapshotId: snapshot.id,
-                destinationIdentifier: destId,
-                status: "failed",
-                replicatedBytes: 0,
-                completedAt: Date(),
-                errorMessage: errMsg
-            )
-            return DestinationSyncResult(
-                replicatedFiles: 0,
-                replicatedBytes: 0,
-                skippedFiles: 0,
-                isSuccess: false
-            )
-        }
+        let sink = WebDAVReplicationSink(
+            context: replicationContext(
+                dest: dest,
+                snapshot: snapshot,
+                snapshotRoot: snapshotRoot,
+                filesToSync: filesToSync,
+                profile: profile,
+                throttler: throttler
+            ),
+            config: webdavConfig
+        )
+        return try await executeReplicationPipeline(sink, state: &state)
     }
 
     func replicateSFTP(
@@ -441,99 +411,36 @@ extension BackupCopyJobCoordinator {
         throttler: BandwidthThrottler,
         state: inout ReplicationProgressState
     ) async throws -> DestinationSyncResult {
-        let destId = "\(sftpConfig.host):\(sftpConfig.remotePath)"
-        _ = try await database.recordReplicationSnapshot(ReplicationSnapshotRecord(
-            snapshotId: snapshot.id,
-            destinationType: "sftp",
-            destinationIdentifier: destId,
-            status: "in_progress",
-            replicatedBytes: 0,
-            totalBytes: snapshot.totalBytes,
-            startedAt: Date()
-        ))
+        let sink = SFTPReplicationSink(
+            context: replicationContext(
+                dest: dest,
+                snapshot: snapshot,
+                snapshotRoot: snapshotRoot,
+                filesToSync: filesToSync,
+                profile: profile,
+                throttler: throttler
+            ),
+            config: sftpConfig
+        )
+        return try await executeReplicationPipeline(sink, state: &state)
+    }
 
-        do {
-            let sftpProvider = RemoteStorageFactory.makeSFTPProvider(for: dest, config: sftpConfig)
-            let passphrase = RemoteStorageFactory.resolveEncryptionPassphrase(for: dest, profileId: profile.id)
-
-            var destReplicatedFiles = 0
-            var destReplicatedBytes: Int64 = 0
-            let destSkippedFiles = 0
-
-            if dest.archivePackagingEnabled || profile.copyJobConfig.archivePackagingEnabled {
-                let format = ArchivePackagingEngine.shared.defaultFormat
-                let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("OtterKeep_SFTP_\(UUID().uuidString)")
-                let archiveURL = tempDir.appendingPathComponent("\(snapshot.id).\(format.fileExtension)")
-                defer { try? FileManager.default.removeItem(at: tempDir) }
-
-                try await ArchivePackagingEngine.shared.createArchive(
-                    sourceDirectory: snapshotRoot,
-                    destinationArchiveURL: archiveURL,
-                    compressionLevel: dest.archiveCompressionLevel
-                )
-
-                let uploadURL: URL
-                if dest.isClientEncryptionEnabled {
-                    let rawArchiveData = try Data(contentsOf: archiveURL)
-                    let payload = try ClientSideEncryptor.encrypt(data: rawArchiveData, passphrase: passphrase)
-                    let encURL = tempDir.appendingPathComponent("\(archiveURL.lastPathComponent).enc")
-                    try payload.write(to: encURL)
-                    uploadURL = encURL
-                } else {
-                    uploadURL = archiveURL
-                }
-
-                try await sftpProvider.uploadFile(localURL: uploadURL, remotePath: uploadURL.lastPathComponent)
-
-                let fileSize = (try? FileManager.default.attributesOfItem(atPath: uploadURL.path)[.size] as? Int64) ?? 0
-                destReplicatedFiles = 1
-                destReplicatedBytes = fileSize
-            } else {
-                for file in filesToSync {
-                    try Task.checkCancellation()
-                    let localFileURL = snapshotRoot.appendingPathComponent(file.relativePath)
-                    guard FileManager.default.fileExists(atPath: localFileURL.path(percentEncoded: false)) else { continue }
-                    try await sftpProvider.uploadFile(localURL: localFileURL, remotePath: "\(snapshot.id)/\(file.relativePath)")
-                    destReplicatedFiles += 1
-                    destReplicatedBytes += file.fileSize
-                    state.processedFiles += 1
-                    state.replicatedBytes += file.fileSize
-                    onProgress?(state)
-                }
-            }
-
-            try await database.updateReplicationSnapshot(
-                snapshotId: snapshot.id,
-                destinationIdentifier: destId,
-                status: "completed",
-                replicatedBytes: destReplicatedBytes,
-                completedAt: Date()
-            )
-
-            logger.info("Successfully replicated snapshot \(snapshot.id) to SFTP: \(destReplicatedFiles) files, \(destReplicatedBytes) bytes")
-            return DestinationSyncResult(
-                replicatedFiles: destReplicatedFiles,
-                replicatedBytes: destReplicatedBytes,
-                skippedFiles: destSkippedFiles,
-                isSuccess: true
-            )
-        } catch {
-            let errMsg = error.localizedDescription
-            logger.error("Failed to replicate snapshot to SFTP: \(errMsg)")
-            try? await database.updateReplicationSnapshot(
-                snapshotId: snapshot.id,
-                destinationIdentifier: destId,
-                status: "failed",
-                replicatedBytes: 0,
-                completedAt: Date(),
-                errorMessage: errMsg
-            )
-            return DestinationSyncResult(
-                replicatedFiles: 0,
-                replicatedBytes: 0,
-                skippedFiles: 0,
-                isSuccess: false
-            )
-        }
+    private func replicationContext(
+        dest: RemoteDestination,
+        snapshot: SnapshotRecord,
+        snapshotRoot: URL,
+        filesToSync: [FileCatalogRecord],
+        profile: BackupProfile,
+        throttler: BandwidthThrottler
+    ) -> ReplicationContext {
+        ReplicationContext(
+            destination: dest,
+            profile: profile,
+            snapshot: snapshot,
+            snapshotRoot: snapshotRoot,
+            filesToSync: filesToSync,
+            throttler: throttler,
+            database: database
+        )
     }
 }

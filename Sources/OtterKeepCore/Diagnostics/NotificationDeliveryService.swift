@@ -1,13 +1,11 @@
 import Foundation
 import UserNotifications
 import os
-#if canImport(AppKit)
-import AppKit
-#endif
 
 /// Service managing macOS system notifications (`UNUserNotificationCenter`) and proactive backup alerts.
 public final class NotificationDeliveryService: NSObject, @unchecked Sendable, UNUserNotificationCenterDelegate {
     public static let shared = NotificationDeliveryService()
+    private let presenter: NotificationPresenting
     private let logger = Logger(subsystem: "com.otterkeep", category: "Notifications")
     private let lock = NSLock()
     private var _onNotificationPosted: (@Sendable (String, String) -> Void)?
@@ -27,6 +25,7 @@ public final class NotificationDeliveryService: NSObject, @unchecked Sendable, U
     }
 
     private override init() {
+        self.presenter = SystemNotificationPresenter()
         super.init()
         if Bundle.main.bundleIdentifier != nil {
             UNUserNotificationCenter.current().delegate = self
@@ -38,44 +37,7 @@ public final class NotificationDeliveryService: NSObject, @unchecked Sendable, U
     }
 
     private func resolveNotificationAttachmentURL() -> URL? {
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("OtterKeep_NotifIcon", isDirectory: true)
-        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        let targetPNG = tempDir.appendingPathComponent("AppIcon.png")
-
-        if FileManager.default.fileExists(atPath: targetPNG.path) {
-            return targetPNG
-        }
-
-        #if canImport(AppKit)
-        var sourceImage = NSImage(named: NSImage.applicationIconName)
-
-        if sourceImage == nil {
-            let candidatePaths = [
-                Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
-                Bundle.main.url(forResource: "OttieSuccess", withExtension: "png"),
-                Bundle.main.resourceURL?.appendingPathComponent("AppIcon.icns"),
-                Bundle.main.resourceURL?.appendingPathComponent("OtterKeep_OtterKeepUI.bundle/Contents/Resources/AppIcon.icns"),
-                URL(fileURLWithPath: "/Applications/OtterKeep.app/Contents/Resources/AppIcon.icns"),
-                URL(fileURLWithPath: "/Applications/OtterKeep.app/Contents/Resources/OtterKeep_OtterKeepUI.bundle/Contents/Resources/AppIcon.icns")
-            ]
-            for candidate in candidatePaths.compactMap({ $0 }) {
-                if FileManager.default.fileExists(atPath: candidate.path), let img = NSImage(contentsOf: candidate) {
-                    sourceImage = img
-                    break
-                }
-            }
-        }
-
-        if let img = sourceImage,
-           let tiff = img.tiffRepresentation,
-           let rep = NSBitmapImageRep(data: tiff),
-           let pngData = rep.representation(using: .png, properties: [:]) {
-            try? pngData.write(to: targetPNG, options: .atomic)
-            return targetPNG
-        }
-        #endif
-
-        return nil
+        presenter.notificationAttachmentIconURL()
     }
 
     private func attachApplicationIconIfAvailable(to content: UNMutableNotificationContent) {
@@ -95,32 +57,7 @@ public final class NotificationDeliveryService: NSObject, @unchecked Sendable, U
 
         guard isNotificationSupported else {
             logger.debug("Notifications skipped UNUserNotificationCenter (no bundle identifier): [\(content.title)] \(content.body)")
-            #if canImport(AppKit)
-            let safeBody = content.body.replacingOccurrences(of: "\"", with: "\\\"")
-            let safeTitle = content.title.replacingOccurrences(of: "\"", with: "\\\"")
-            // Try displaying via application id so the notification gets the OtterKeep application icon
-            let scriptWithId = "tell application id \"com.otterkeep.OtterKeepApp\" to display notification \"\(safeBody)\" with title \"\(safeTitle)\""
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            proc.arguments = ["-e", scriptWithId]
-            do {
-                try proc.run()
-                proc.waitUntilExit()
-                if proc.terminationStatus != 0 {
-                    let fallbackScript = "display notification \"\(safeBody)\" with title \"\(safeTitle)\""
-                    let procFallback = Process()
-                    procFallback.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-                    procFallback.arguments = ["-e", fallbackScript]
-                    try? procFallback.run()
-                }
-            } catch {
-                let fallbackScript = "display notification \"\(safeBody)\" with title \"\(safeTitle)\""
-                let procFallback = Process()
-                procFallback.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-                procFallback.arguments = ["-e", fallbackScript]
-                try? procFallback.run()
-            }
-            #endif
+            presenter.deliverFallbackNotification(title: content.title, body: content.body)
             return
         }
 
@@ -366,25 +303,12 @@ public final class NotificationDeliveryService: NSObject, @unchecked Sendable, U
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        #if canImport(AppKit)
         // Only display banner and sound if window is not active, not visible, or notification is critical
-        let isForegroundActive: Bool
-        if Thread.isMainThread {
-            isForegroundActive = MainActor.assumeIsolated {
-                NSApp.isActive && (NSApp.mainWindow?.isVisible == true)
-            }
-        } else {
-            isForegroundActive = false
-        }
-
-        if !isForegroundActive || notification.request.content.sound == .defaultCritical {
+        if !presenter.isApplicationForegroundActive() || notification.request.content.sound == .defaultCritical {
             completionHandler([.banner, .sound, .badge])
         } else {
             completionHandler([])
         }
-        #else
-        completionHandler([.banner, .sound, .badge])
-        #endif
     }
 
     public func userNotificationCenter(
@@ -392,15 +316,7 @@ public final class NotificationDeliveryService: NSObject, @unchecked Sendable, U
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        #if canImport(AppKit)
-        DispatchQueue.main.async {
-            NSApp.activate(ignoringOtherApps: true)
-            if let window = NSApp.windows.first(where: { !($0 is NSPanel) && $0.canBecomeMain }) ?? NSApp.mainWindow {
-                window.makeKeyAndOrderFront(nil)
-                window.orderFrontRegardless()
-            }
-        }
-        #endif
+        presenter.activateApplication()
         completionHandler()
     }
 }

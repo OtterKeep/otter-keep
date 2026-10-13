@@ -18,8 +18,16 @@ public enum L10n {
 
     /// Checks whether an explicit translation entry exists for the given key in the specified language.
     public static func hasExplicitTranslation(for key: Key, in lang: AppLanguage) -> Bool {
-        guard let langDict = translations[lang] else { return false }
-        return langDict[key] != nil
+        guard let translation = stringTable[key] else { return false }
+        let target = lang == .system ? LocalizationManager.shared.effectiveLanguage : lang
+        switch target {
+        case .english:
+            return !translation.english.isEmpty
+        case .hungarian:
+            return !translation.hungarian.isEmpty
+        case .system:
+            return !translation.english.isEmpty
+        }
     }
 
     /// Formats a localized string template with variadic format arguments.
@@ -1058,9 +1066,17 @@ public enum L10n {
 
     // MARK: - Translation Dictionaries
 
-    private static let translations: [AppLanguage: [Key: String]] = [
-        .hungarian: hungarianStrings,
-        .english: englishStrings
-    ]
+    /// Language-keyed lookup derived from ``stringTable``; every key carries both languages.
+    private static let translations: [AppLanguage: [Key: String]] = {
+        var english: [Key: String] = [:]
+        var hungarian: [Key: String] = [:]
+        english.reserveCapacity(stringTable.count)
+        hungarian.reserveCapacity(stringTable.count)
+        for (key, translation) in stringTable {
+            english[key] = translation.english
+            hungarian[key] = translation.hungarian
+        }
+        return [.hungarian: hungarian, .english: english]
+    }()
 
 }
