@@ -120,6 +120,20 @@ public struct MainWindowView: View {
                 )
             }
         }
+        .sheet(isPresented: Binding(
+            get: { appState.showProfileSettingsModal },
+            set: { appState.showProfileSettingsModal = $0 }
+        )) {
+            if let profile = appState.selectedProfile {
+                ProfileSettingsModalView(appState: appState, profile: profile)
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { appState.showDeleteProfileConfirmation },
+            set: { appState.showDeleteProfileConfirmation = $0 }
+        )) {
+            DeleteProfileConfirmationModalView(appState: appState)
+        }
         .alert(L10n.t(.renameProfileSheetTitle), isPresented: Binding(
             get: { appState.showRenameProfileSheet },
             set: { appState.showRenameProfileSheet = $0 }
@@ -225,6 +239,13 @@ public struct MainWindowView: View {
                         }
                         .contextMenu {
                             Button {
+                                appState.selectProfile(id: profile.id)
+                                appState.showProfileSettingsModal = true
+                            } label: {
+                                Label(L10n.t(.profileSettingsButton), systemImage: "slider.horizontal.3")
+                            }
+
+                            Button {
                                 appState.renameProfileName = profile.name
                                 appState.selectedProfileId = profile.id
                                 appState.showRenameProfileSheet = true
@@ -236,7 +257,8 @@ public struct MainWindowView: View {
                             if appState.profiles.count > 1 {
                                 Divider()
                                 Button(role: .destructive) {
-                                    appState.deleteProfile(id: profile.id)
+                                    appState.profilePendingDeletion = profile
+                                    appState.showDeleteProfileConfirmation = true
                                 } label: {
                                     Label(L10n.t(.deleteProfileButton), systemImage: "trash")
                                 }

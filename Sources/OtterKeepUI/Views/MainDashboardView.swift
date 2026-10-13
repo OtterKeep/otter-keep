@@ -285,18 +285,55 @@ public struct MainDashboardView: View {
                         .help(L10n.t(.lastBackupResultSubtitle))
                     }
 
-                    Button {
-                        appState.startBackup(for: profile)
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "arrow.clockwise.circle.fill")
-                            Text(L10n.t(.quickBackupAction))
+                    HStack(spacing: 8) {
+                        // Dry-Run Button
+                        Button {
+                            appState.performDryRun()
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: appState.isDryRunRunning ? "arrow.triangle.2.circlepath" : "magnifyingglass")
+                                    .symbolEffect(.rotate, isActive: appState.isDryRunRunning)
+                                Text(appState.isDryRunRunning ? L10n.t(.analyzingProgress) : L10n.t(.quickDryRunAction))
+                            }
+                            .font(.callout.weight(.medium))
                         }
-                        .font(.callout.bold())
+                        .buttonStyle(.bordered)
+                        .controlSize(.regular)
+                        .keyboardShortcut("d", modifiers: .command)
+                        .disabled(appState.isBackupRunning(for: profile.id) || appState.isDryRunRunning)
+
+                        // Backup Now / Stop Button
+                        if appState.isBackupRunning(for: profile.id) {
+                            Button(role: .destructive) {
+                                appState.cancelBackup(for: profile.id)
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "stop.circle.fill")
+                                    Text(L10n.t(.stopBackupButton))
+                                }
+                                .font(.callout.bold())
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(OtterTheme.statusError)
+                            .controlSize(.regular)
+                            .keyboardShortcut(".", modifiers: .command)
+                        } else {
+                            Button {
+                                appState.startBackup(for: profile)
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "arrow.clockwise.circle.fill")
+                                    Text(L10n.t(.quickBackupAction))
+                                }
+                                .font(.callout.bold())
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(OtterTheme.otterAmber)
+                            .controlSize(.regular)
+                            .keyboardShortcut("b", modifiers: .command)
+                            .disabled(appState.isDryRunRunning)
+                        }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(OtterTheme.otterAmber)
-                    .controlSize(.regular)
                 }
             }
 

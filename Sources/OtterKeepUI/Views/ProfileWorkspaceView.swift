@@ -98,19 +98,6 @@ public struct ProfileWorkspaceView: View {
 
             // Profile Configuration & Quick Action Buttons
             HStack(spacing: 8) {
-                // Profile Settings Button
-                Button {
-                    appState.showProfileSettingsModal = true
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "slider.horizontal.3")
-                        Text(L10n.t(.profileSettingsButton))
-                    }
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-                .help(L10n.t(.profileSettingsTitle))
-
                 // Delete Profile Button (only if multiple profiles exist)
                 if appState.profiles.count > 1 {
                     Button(role: .destructive) {
@@ -126,55 +113,18 @@ public struct ProfileWorkspaceView: View {
                     .disabled(appState.isBackupRunning(for: profile.id))
                 }
 
-                Divider()
-                    .frame(height: 18)
-
-                // Dry-Run Button
+                // Profile Settings Button
                 Button {
-                    appState.performDryRun()
+                    appState.showProfileSettingsModal = true
                 } label: {
                     HStack(spacing: 5) {
-                        Image(systemName: appState.isDryRunRunning ? "arrow.triangle.2.circlepath" : "magnifyingglass")
-                            .symbolEffect(.rotate, isActive: appState.isDryRunRunning)
-                        Text(appState.isDryRunRunning ? L10n.t(.analyzingProgress) : L10n.t(.quickDryRunAction))
+                        Image(systemName: "slider.horizontal.3")
+                        Text(L10n.t(.profileSettingsButton))
                     }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
-                .keyboardShortcut("d", modifiers: .command)
-                .disabled(appState.isBackupRunning(for: profile.id) || appState.isDryRunRunning)
-
-                // Backup Now / Stop Button
-                if appState.isBackupRunning(for: profile.id) {
-                    Button(role: .destructive) {
-                        appState.cancelBackup(for: profile.id)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "stop.circle.fill")
-                            Text(L10n.t(.stopBackupButton))
-                        }
-                        .font(.body.bold())
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(OtterTheme.statusError)
-                    .controlSize(.regular)
-                    .keyboardShortcut(".", modifiers: .command)
-                } else {
-                    Button {
-                        appState.startBackup(for: profile)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.clockwise.circle.fill")
-                            Text(L10n.t(.quickBackupAction))
-                        }
-                        .font(.body.bold())
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(OtterTheme.otterAmber)
-                    .controlSize(.regular)
-                    .keyboardShortcut("b", modifiers: .command)
-                    .disabled(appState.isDryRunRunning)
-                }
+                .help(L10n.t(.profileSettingsTitle))
             }
         }
         .padding(.horizontal, 20)
@@ -190,31 +140,6 @@ public struct ProfileWorkspaceView: View {
             }
             .opacity(0)
             .allowsHitTesting(false)
-        }
-        .sheet(isPresented: Binding(
-            get: { appState.showProfileSettingsModal },
-            set: { appState.showProfileSettingsModal = $0 }
-        )) {
-            ProfileSettingsModalView(appState: appState, profile: profile)
-        }
-        .confirmationDialog(
-            L10n.t(.deleteProfileConfirmTitle),
-            isPresented: Binding(
-                get: { appState.showDeleteProfileConfirmation },
-                set: { appState.showDeleteProfileConfirmation = $0 }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button(L10n.t(.deleteProfileButton), role: .destructive) {
-                let targetId = appState.profilePendingDeletion?.id ?? profile.id
-                appState.deleteProfile(id: targetId)
-                appState.profilePendingDeletion = nil
-            }
-            Button(L10n.t(.cancel), role: .cancel) {
-                appState.profilePendingDeletion = nil
-            }
-        } message: {
-            Text(L10n.t(.deleteProfileConfirmMessage))
         }
     }
 }

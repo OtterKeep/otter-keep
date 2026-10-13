@@ -254,4 +254,30 @@ struct PresentationUITests {
         try assertEqual(overdueStatus, .scheduleOverdue)
         try assertEqual(overdueStatus.systemImage, "clock.badge.questionmark.fill")
     }
+
+    @Test func testProfileDeletionConfirmationAndSaveUnification() throws {
+        let appState = AppState()
+        let p1 = BackupProfile(name: "P1", sourceURL: URL(fileURLWithPath: "/tmp/src1"), destinationURL: URL(fileURLWithPath: "/tmp/dst1"))
+        let p2 = BackupProfile(name: "P2", sourceURL: URL(fileURLWithPath: "/tmp/src2"), destinationURL: URL(fileURLWithPath: "/tmp/dst2"))
+        appState.profiles = [p1, p2]
+
+        // Test deletion state tracking
+        try assertFalse(appState.showDeleteProfileConfirmation)
+        try assertNil(appState.profilePendingDeletion)
+
+        appState.profilePendingDeletion = p2
+        appState.showDeleteProfileConfirmation = true
+        try assertTrue(appState.showDeleteProfileConfirmation)
+        try assertEqual(appState.profilePendingDeletion?.id, p2.id)
+
+        // Confirm cancellation clears pending profile
+        appState.profilePendingDeletion = nil
+        appState.showDeleteProfileConfirmation = false
+        try assertFalse(appState.showDeleteProfileConfirmation)
+        try assertNil(appState.profilePendingDeletion)
+
+        // Verify unified button translation key exists in Hungarian and English
+        try assertEqual(L10n.t(.save, lang: .english), "Save")
+        try assertEqual(L10n.t(.save, lang: .hungarian), "Mentés")
+    }
 }

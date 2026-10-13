@@ -39,6 +39,7 @@ public struct ProfileSettingsModalView: View {
                 Spacer()
 
                 Button(L10n.t(.save)) {
+                    appState.saveProfiles()
                     appState.showProfileSettingsModal = false
                 }
                 .buttonStyle(.borderedProminent)

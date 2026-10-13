@@ -70,7 +70,7 @@ public struct PreferencesModalView: View {
 
                 Spacer()
 
-                Button(L10n.t(.okDone)) {
+                Button(L10n.t(.save)) {
                     appState.showPreferencesModal = false
                 }
                 .buttonStyle(.borderedProminent)
