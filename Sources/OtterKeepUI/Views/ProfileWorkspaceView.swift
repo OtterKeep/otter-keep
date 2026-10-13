@@ -46,9 +46,11 @@ public struct ProfileWorkspaceView: View {
         HStack(spacing: 16) {
             // Profile Title, APFS Badge, and Last Backup Status
             HStack(spacing: 8) {
-                Image(systemName: "folder.fill")
+                let health = appState.profileHealthStatus(for: profile)
+                Image(systemName: health.systemImage)
                     .font(.title3)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(health.color)
+                    .symbolEffect(.rotate, isActive: health == .running)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(profile.name)

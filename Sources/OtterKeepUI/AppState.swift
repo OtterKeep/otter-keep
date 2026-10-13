@@ -84,6 +84,27 @@ public final class AppState: Sendable {
         set { backupRuntime.snapshotCounts = newValue }
     }
 
+    /// Caches snapshot and summary metadata for a profile (useful for testing and cross-profile synchronization).
+    public func cacheProfileStatus(
+        profileId: UUID,
+        latestSnapshot: SnapshotRecord?,
+        snapshotCount: Int? = nil,
+        lastSummary: BackupSessionSummary? = nil
+    ) {
+        if let snap = latestSnapshot {
+            backupRuntime.latestSnapshots[profileId] = snap
+            backupRuntime.snapshotCounts[profileId] = snapshotCount ?? 1
+        } else {
+            backupRuntime.latestSnapshots.removeValue(forKey: profileId)
+            backupRuntime.snapshotCounts.removeValue(forKey: profileId)
+        }
+        if let summary = lastSummary {
+            backupRuntime.lastSummaries[profileId] = summary
+        } else {
+            backupRuntime.lastSummaries.removeValue(forKey: profileId)
+        }
+    }
+
     public struct ProfileBackupStatusInfo: Sendable {
         public let profileId: UUID
         public let profileName: String
@@ -207,6 +228,47 @@ public final class AppState: Sendable {
                 displayDetailText: L10n.t(.sanctuaryNeverBackedUp)
             )
         }
+    }
+
+    /// Evaluates the complete health and timeliness status for a backup profile, accounting for active
+    /// execution, previous backup errors, schedule deadlines, and 14-day staleness boundaries.
+    public func profileHealthStatus(for profile: BackupProfile, now: Date = Date()) -> ProfileHealthStatus {
+        let statusInfo = lastStatusInfo(for: profile)
+
+        // 1. Actively running
+        if statusInfo.isRunning {
+            return .running
+        }
+
+        // 2. Never backed up
+        guard statusInfo.hasSnapshots, let lastDate = statusInfo.lastBackupDate else {
+            return .neverBackedUp
+        }
+
+        // 3. Last backup had errors
+        if let summary = statusInfo.lastSessionSummary, summary.errorCount > 0 {
+            return .failed(errorCount: summary.errorCount)
+        }
+
+        let ageSeconds = now.timeIntervalSince(lastDate)
+
+        // 4. Older than 14 days
+        let fourteenDaysSeconds: TimeInterval = 14 * 86400
+        if ageSeconds > fourteenDaysSeconds {
+            let daysOld = Int(ageSeconds / 86400)
+            return .staleFourteenDays(daysOld: daysOld)
+        }
+
+        // 5. Older than enabled schedule specifies
+        if profile.schedule.isEnabled {
+            let nextRun = BackupScheduler.shared.calculateNextRunDate(for: profile.schedule, referenceDate: lastDate)
+            if nextRun < now && now.timeIntervalSince(nextRun) > 300 {
+                return .scheduleOverdue
+            }
+        }
+
+        // 6. Healthy & up to date
+        return .healthy
     }
 
     /// Backward-compatible progress state resolving to the currently selected profile (or first active).

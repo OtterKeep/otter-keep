@@ -168,4 +168,90 @@ struct PresentationUITests {
             "Disabling debug logging must clear the active debug log file"
         )
     }
+
+    @Test func testProfileHealthStatusEvaluations() throws {
+        let appState = AppState()
+        let profile = BackupProfile(
+            name: "Health Test Profile",
+            sourceURL: URL(fileURLWithPath: "/tmp/src"),
+            destinationURL: URL(fileURLWithPath: "/tmp/dst")
+        )
+
+        // 1. Never backed up
+        let neverStatus = appState.profileHealthStatus(for: profile)
+        try assertEqual(neverStatus, .neverBackedUp)
+        try assertEqual(neverStatus.systemImage, "questionmark.circle.fill")
+
+        // 2. Healthy status
+        let now = Date()
+        let healthySnap = SnapshotRecord(
+            id: "2026-10-13_120000",
+            timestamp: now.addingTimeInterval(-3600),
+            status: "completed",
+            totalFiles: 10,
+            totalBytes: 2048,
+            snapshotPath: "2026-10-13_120000"
+        )
+        appState.cacheProfileStatus(profileId: profile.id, latestSnapshot: healthySnap, snapshotCount: 1)
+        let healthyStatus = appState.profileHealthStatus(for: profile, now: now)
+        try assertEqual(healthyStatus, .healthy)
+        try assertEqual(healthyStatus.systemImage, "checkmark.circle.fill")
+
+        // 3. Failed status (last summary has errors)
+        let failedSummary = BackupSessionSummary(
+            snapshotId: "2026-10-13_120000",
+            profileName: profile.name,
+            timestamp: now.addingTimeInterval(-7200),
+            durationSeconds: 100,
+            totalScannedFiles: 10,
+            totalScannedBytes: 2048,
+            copiedCount: 5,
+            copiedBytes: 1024,
+            clonedCount: 0,
+            clonedBytes: 0,
+            skippedCount: 0,
+            errorCount: 2,
+            skippedItems: [],
+            errorItems: [],
+            status: "completed_with_errors",
+            averageSpeedBytesPerSecond: 1024.0,
+            autoPrunedSnapshotsCount: 0
+        )
+        appState.cacheProfileStatus(profileId: profile.id, latestSnapshot: healthySnap, snapshotCount: 1, lastSummary: failedSummary)
+        let failedStatus = appState.profileHealthStatus(for: profile, now: now)
+        try assertEqual(failedStatus, .failed(errorCount: 2))
+        try assertEqual(failedStatus.systemImage, "exclamationmark.triangle.fill")
+
+        // 4. Stale > 14 days
+        let staleDate = now.addingTimeInterval(-15 * 86400)
+        let staleSnap = SnapshotRecord(
+            id: "2026-09-28_120000",
+            timestamp: staleDate,
+            status: "completed",
+            totalFiles: 10,
+            totalBytes: 2048,
+            snapshotPath: "2026-09-28_120000"
+        )
+        appState.cacheProfileStatus(profileId: profile.id, latestSnapshot: staleSnap, snapshotCount: 1, lastSummary: nil)
+        let staleStatus = appState.profileHealthStatus(for: profile, now: now)
+        try assertEqual(staleStatus, .staleFourteenDays(daysOld: 15))
+        try assertEqual(staleStatus.systemImage, "clock.badge.exclamationmark.fill")
+
+        // 5. Schedule overdue (< 14 days, e.g. 2 days ago with daily schedule)
+        var scheduledProfile = profile
+        scheduledProfile.schedule = BackupSchedule(isEnabled: true, frequency: .daily, hour: 12, minute: 0)
+        let twoDaysAgo = now.addingTimeInterval(-2 * 86400)
+        let scheduleSnap = SnapshotRecord(
+            id: "2026-10-11_120000",
+            timestamp: twoDaysAgo,
+            status: "completed",
+            totalFiles: 10,
+            totalBytes: 2048,
+            snapshotPath: "2026-10-11_120000"
+        )
+        appState.cacheProfileStatus(profileId: scheduledProfile.id, latestSnapshot: scheduleSnap, snapshotCount: 1, lastSummary: nil)
+        let overdueStatus = appState.profileHealthStatus(for: scheduledProfile, now: now)
+        try assertEqual(overdueStatus, .scheduleOverdue)
+        try assertEqual(overdueStatus.systemImage, "clock.badge.questionmark.fill")
+    }
 }

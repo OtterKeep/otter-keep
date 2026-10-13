@@ -97,6 +97,58 @@ public enum PreferencesTab: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Comprehensive health and timeliness status representing the state of a backup profile.
+public enum ProfileHealthStatus: Sendable, Equatable {
+    /// Backup is actively executing right now.
+    case running
+    /// Profile has never had a backup snapshot recorded.
+    case neverBackedUp
+    /// The last executed backup finished with errors.
+    case failed(errorCount: Int)
+    /// The last backup is severely stale (older than 14 days).
+    case staleFourteenDays(daysOld: Int)
+    /// The backup is overdue according to its enabled schedule.
+    case scheduleOverdue
+    /// Backup is fresh, healthy, and up to date.
+    case healthy
+
+    /// SFSymbol name best representing this health status.
+    public var systemImage: String {
+        switch self {
+        case .running:
+            return "arrow.clockwise.circle.fill"
+        case .neverBackedUp:
+            return "questionmark.circle.fill"
+        case .failed:
+            return "exclamationmark.triangle.fill"
+        case .staleFourteenDays:
+            return "clock.badge.exclamationmark.fill"
+        case .scheduleOverdue:
+            return "clock.badge.questionmark.fill"
+        case .healthy:
+            return "checkmark.circle.fill"
+        }
+    }
+
+    /// Semantic theme color for this status.
+    public var color: Color {
+        switch self {
+        case .running:
+            return OtterTheme.otterAmber
+        case .neverBackedUp:
+            return .secondary
+        case .failed:
+            return OtterTheme.statusError
+        case .staleFourteenDays:
+            return OtterTheme.statusWarning
+        case .scheduleOverdue:
+            return OtterTheme.otterAmber
+        case .healthy:
+            return OtterTheme.statusGreen
+        }
+    }
+}
+
 /// Tabs within the unified Photos Workspace.
 public enum PhotosWorkspaceTab: String, CaseIterable, Identifiable, Sendable {
     case syncAndBackup = "syncAndBackup"

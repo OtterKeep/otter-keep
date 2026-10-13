@@ -223,6 +223,9 @@ public struct OtterKeepMenuCommands: Commands {
             }
         }
 
+        // MARK: - Native macOS Sidebar Toggle Commands
+        SidebarCommands()
+
         // MARK: - Standard Text Editing Commands
         TextEditingCommands()
     }

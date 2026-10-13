@@ -22,7 +22,7 @@ public struct MainWindowView: View {
                 .navigationTitle("")
         }
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .navigation) {
                 Button {
                     appState.showSystemLogsModal = true
                 } label: {
@@ -38,7 +38,6 @@ public struct MainWindowView: View {
                 .help(L10n.t(.menuPreferences) + " (⌘,)")
             }
         }
-        .toolbar(removing: .sidebarToggle)
         .onAppear {
             appState.loadSnapshots()
             appState.loadPhotosSnapshots()
@@ -195,11 +194,13 @@ public struct MainWindowView: View {
                 Section {
                     ForEach(appState.profiles) { profile in
                         let statusInfo = appState.lastStatusInfo(for: profile)
+                        let health = appState.profileHealthStatus(for: profile)
                         NavigationLink(value: NavigationSection.profile(profile.id)) {
                             HStack(alignment: .center, spacing: 8) {
-                                Image(systemName: "folder.fill")
-                                    .foregroundStyle(.blue)
+                                Image(systemName: health.systemImage)
+                                    .foregroundStyle(health.color)
                                     .font(.body)
+                                    .symbolEffect(.rotate, isActive: health == .running)
 
                                 VStack(alignment: .leading, spacing: 2) {
                                     HStack(spacing: 4) {
@@ -219,12 +220,6 @@ public struct MainWindowView: View {
                                 }
 
                                 Spacer(minLength: 4)
-
-                                if !appState.isBackupRunning(for: profile.id) {
-                                    Circle()
-                                        .fill(statusInfo.statusColor)
-                                        .frame(width: 6, height: 6)
-                                }
                             }
                             .padding(.vertical, 2)
                         }
@@ -304,30 +299,6 @@ public struct MainWindowView: View {
 
                 // MARK: 3. System Section
                 Section {
-                    Button {
-                        appState.showSystemLogsModal = true
-                    } label: {
-                        Label {
-                            Text(L10n.t(.navLogs))
-                        } icon: {
-                            Image(systemName: "terminal.fill")
-                                .foregroundStyle(OtterTheme.accentPurple)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        appState.showPreferencesModal = true
-                    } label: {
-                        Label {
-                            Text(L10n.t(.navSettings))
-                        } icon: {
-                            Image(systemName: "gearshape.fill")
-                                .foregroundStyle(OtterTheme.oceanicTeal)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
                     Button {
                         AboutWindowController.shared.show()
                     } label: {
@@ -462,11 +433,6 @@ public struct WindowTitleConfigurator: NSViewRepresentable {
         window.styleMask.insert(.fullSizeContentView)
         window.isReleasedWhenClosed = false
         window.delegate = MainWindowDelegate.shared
-        if let toolbar = window.toolbar {
-            if let index = toolbar.items.firstIndex(where: { $0.itemIdentifier.rawValue.contains("ToggleSidebar") || $0.itemIdentifier == .toggleSidebar }) {
-                toolbar.removeItem(at: index)
-            }
-        }
 
         if let appState = appState, appState.startMinimized && !Self.hasPerformedInitialMinimization {
             Self.hasPerformedInitialMinimization = true
