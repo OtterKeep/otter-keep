@@ -292,20 +292,24 @@ public actor RestoreEngine {
             }
         }
 
-        // 4. Staging verified successfully! Perform atomic swap to finalDestinationURL
+        // 4. Staging verified successfully! Perform atomic swap to finalDestinationURL with .old protection
         if FileManager.default.fileExists(atPath: finalDestinationURL.standardizedFileURL.path(percentEncoded: false)) {
             // Unlock destination file if it has UF_IMMUTABLE active so atomic replace succeeds
             try? storage.setImmutable(at: finalDestinationURL, immutable: false, recursive: true)
+            let backupOldURL = parentDir.appendingPathComponent("\(finalDestinationURL.lastPathComponent).old_\(Int(Date().timeIntervalSince1970))_\(UUID().uuidString.prefix(6))")
+            try await storage.atomicMove(from: finalDestinationURL, to: backupOldURL)
             do {
                 try await storage.atomicMove(from: stagingURL, to: finalDestinationURL)
+                stagingCommitted = true
+                try? storage.removeItem(at: backupOldURL)
             } catch {
-                try storage.removeItem(at: finalDestinationURL)
-                try await storage.atomicMove(from: stagingURL, to: finalDestinationURL)
+                try? await storage.atomicMove(from: backupOldURL, to: finalDestinationURL)
+                throw error
             }
         } else {
             try await storage.atomicMove(from: stagingURL, to: finalDestinationURL)
+            stagingCommitted = true
         }
-        stagingCommitted = true
 
         // Guarantee immutability flag is cleared on final target
         try? storage.setImmutable(at: finalDestinationURL, immutable: false, recursive: true)
@@ -341,7 +345,7 @@ public actor RestoreEngine {
         }
 
         let targetURL = targetDirectoryURL.standardizedFileURL
-        try storage.createDirectory(at: targetURL)
+        let parentDir = targetURL.deletingLastPathComponent()
 
         // 1. Enumerate all items in the snapshot's root directory
         progress?(RestoreProgressState(phase: .preparing, totalFiles: 0, processedFiles: 0, totalBytes: 0, processedBytes: 0, currentItem: "Scanning snapshot items..."))
@@ -358,8 +362,8 @@ public actor RestoreEngine {
         }
 
         // 2. Pre-flight capacity check
-        if let cap = try? storage.storageCapacity(at: targetURL), totalBytes > 0 {
-            let eval = VolumeCapabilityEvaluator.evaluate(sourceURL: sourceRootURL, destinationURL: targetURL)
+        if let cap = try? storage.storageCapacity(at: parentDir), totalBytes > 0 {
+            let eval = VolumeCapabilityEvaluator.evaluate(sourceURL: sourceRootURL, destinationURL: parentDir)
             let safetyMargin: Int64 = 50 * 1024 * 1024 // 50MB safety margin
             let requiredSpace = eval.cowMode == .intraVolumeCoW ? safetyMargin : (totalBytes + safetyMargin)
             if cap.availableBytes < requiredSpace {
@@ -370,23 +374,38 @@ public actor RestoreEngine {
             }
         }
 
-        // 3. Sequential restoration with atomic staging and progress tracking
-        var processedFiles = 0
-        var processedBytes: Int64 = 0
+        // 3. Staging and directory creation
+        // If overwrite mode is requested, restore into a temporary staging folder first to ensure
+        // existing destination files remain 100% untouched until full restore verification completes.
+        let useFullDirectoryStaging = (collisionResolution == .overwrite)
+        let stagingDir = useFullDirectoryStaging
+            ? parentDir.appendingPathComponent(".otterkeep_restore_staging_\(UUID().uuidString)")
+            : targetURL
+
+        var stagingCommitted = false
+        defer {
+            if useFullDirectoryStaging && !stagingCommitted {
+                try? storage.removeItem(at: stagingDir)
+            }
+        }
+
+        try storage.createDirectory(at: stagingDir)
 
         // Create directories first in order of relative path
         let directories = scannedItems.filter { $0.metadata.isDirectory }.sorted { $0.relativePath < $1.relativePath }
         for dir in directories {
             try Task.checkCancellation()
-            let destDir = targetURL.appendingPathComponent(dir.relativePath)
+            let destDir = stagingDir.appendingPathComponent(dir.relativePath)
             try storage.createDirectory(at: destDir)
         }
 
         // Restore files
+        var processedFiles = 0
+        var processedBytes: Int64 = 0
         let files = scannedItems.filter { !$0.metadata.isDirectory }
         for file in files {
             try Task.checkCancellation()
-            let destFileURL = targetURL.appendingPathComponent(file.relativePath)
+            let destFileURL = stagingDir.appendingPathComponent(file.relativePath)
 
             progress?(RestoreProgressState(
                 phase: .restoring,
@@ -402,7 +421,7 @@ public actor RestoreEngine {
                 backupRootURL: backupRootURL,
                 relativePath: file.relativePath,
                 destinationFileURL: destFileURL,
-                collisionResolution: collisionResolution
+                collisionResolution: useFullDirectoryStaging ? .overwrite : collisionResolution
             )
 
             processedFiles += 1
@@ -416,6 +435,35 @@ public actor RestoreEngine {
                 processedBytes: processedBytes,
                 currentItem: file.relativePath
             ))
+        }
+
+        // 4. Atomic directory swap with .old preservation for overwrite mode
+        if useFullDirectoryStaging {
+            if FileManager.default.fileExists(atPath: targetURL.path) {
+                let backupOldURL = parentDir.appendingPathComponent("\(targetURL.lastPathComponent).old_\(Int(Date().timeIntervalSince1970))_\(UUID().uuidString.prefix(6))")
+                try? storage.setImmutable(at: targetURL, immutable: false, recursive: true)
+
+                // Step A: Safely rename existing target directory to .old backup
+                try await storage.atomicMove(from: targetURL, to: backupOldURL)
+
+                do {
+                    // Step B: Atomically move verified staging directory to final target
+                    try await storage.atomicMove(from: stagingDir, to: targetURL)
+                    stagingCommitted = true
+                    try? storage.setImmutable(at: targetURL, immutable: false, recursive: true)
+
+                    // Step C: Only after targetURL is successfully established, clean up .old backup
+                    try? storage.removeItem(at: backupOldURL)
+                } catch {
+                    // Rollback: restore original directory from .old backup
+                    try? await storage.atomicMove(from: backupOldURL, to: targetURL)
+                    throw error
+                }
+            } else {
+                try await storage.atomicMove(from: stagingDir, to: targetURL)
+                stagingCommitted = true
+                try? storage.setImmutable(at: targetURL, immutable: false, recursive: true)
+            }
         }
 
         let duration = Date().timeIntervalSince(startTime)

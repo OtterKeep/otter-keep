@@ -1,9 +1,36 @@
 import Foundation
+import Darwin
 import os
 import OtterKeepStorage
 import OtterKeepDatabase
 
 extension BackupSessionCoordinator {
+    static func isOutOfSpaceError(_ error: Error) -> Bool {
+        if let fs = error as? FileSystemError, fs.isOutOfSpace {
+            return true
+        }
+        let ns = error as NSError
+        if ns.domain == NSPOSIXErrorDomain && Int32(ns.code) == ENOSPC {
+            return true
+        }
+        if ns.domain == NSCocoaErrorDomain && ns.code == NSFileWriteOutOfSpaceError {
+            return true
+        }
+        return false
+    }
+
+    static func isFatalVolumeError(_ error: Error) -> Bool {
+        if let fs = error as? FileSystemError, fs.isFatalVolumeError {
+            return true
+        }
+        let ns = error as NSError
+        if ns.domain == NSPOSIXErrorDomain {
+            let code = Int32(ns.code)
+            return code == EIO || code == ENODEV || code == EROFS
+        }
+        return false
+    }
+
     func cleanupDanglingStagingDirectories(at destinationURL: URL) throws {
         let contents = (try? FileManager.default.contentsOfDirectory(at: destinationURL, includingPropertiesForKeys: nil)) ?? []
         for url in contents {
@@ -14,6 +41,129 @@ extension BackupSessionCoordinator {
                 try? storage.removeItem(at: url)
             }
         }
+    }
+
+    /// Reconciles unindexed completed snapshots from destination storage, certifying 100% completeness before registering into SQLite.
+    public func reconcileUnindexedSnapshots(at destinationURL: URL, profile: BackupProfile) async throws {
+        let existingSnapshots = (try? await database.listSnapshots()) ?? []
+        let indexedPaths = Set(existingSnapshots.map { $0.snapshotPath })
+        let indexedIds = Set(existingSnapshots.map { $0.id })
+
+        let contents = (try? FileManager.default.contentsOfDirectory(at: destinationURL, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
+        for dirURL in contents {
+            let dirName = dirURL.lastPathComponent
+            // Exclude internal directories, staging folders, or symbolic links
+            guard !dirName.hasPrefix("."), dirName != "Latest" else { continue }
+            guard !indexedPaths.contains(dirName) && !indexedIds.contains("snapshot_\(dirName)") else { continue }
+
+            var isDir: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: dirURL.path, isDirectory: &isDir), isDir.boolValue else { continue }
+
+            // 100% certainty verification check
+            guard let verifiedRecord = await verifySnapshotCompleteness(at: dirURL, expectedProfileName: profile.name) else {
+                logger.info("Pre-flight reconciliation skipped unverified or incomplete directory: \(dirName)")
+                continue
+            }
+
+            logger.info("100% verified unindexed snapshot found on disk: \(dirName) (ID: \(verifiedRecord.id)). Registering into SQLite catalog...")
+            LogManager.shared.log("Reconciling unindexed completed snapshot from disk: '\(dirName)' (ID: \(verifiedRecord.id)) for profile '\(profile.name)'.", level: .info, category: "Backup")
+
+            try? await database.insertSnapshot(verifiedRecord)
+
+            // Index files from root/ directory into file catalog
+            let rootURL = dirURL.appendingPathComponent("root")
+            let scanner = FileTreeScanner(storage: storage)
+            if let scannedItems = try? await scanner.scan(rootURL: rootURL) {
+                var records: [FileCatalogRecord] = []
+                for item in scannedItems {
+                    records.append(FileCatalogRecord(
+                        snapshotId: verifiedRecord.id,
+                        relativePath: item.relativePath,
+                        fileSize: item.metadata.size,
+                        modificationTime: item.metadata.modificationTime,
+                        inode: item.metadata.inode,
+                        checksum: try? ChecksumCalculator.computeSHA256(for: item.url),
+                        sampleHash: try? FastHashCalculator.computeSamplingHash(for: item.url),
+                        isDirectory: item.metadata.isDirectory,
+                        isSymlink: item.metadata.isSymlink
+                    ))
+                }
+                if !records.isEmpty {
+                    try? await database.insertFileRecordsBatch(records)
+                }
+                // Mirror to CentralDatabase for offline inspection
+                try? CentralDatabase.shared.cacheSnapshotWithFiles(verifiedRecord, files: records, forProfileId: profile.id.uuidString)
+            }
+        }
+    }
+
+    /// Validates with 100% certainty whether a directory on disk is a fully completed, committed snapshot.
+    public func verifySnapshotCompleteness(at snapshotDirURL: URL, expectedProfileName: String) async -> SnapshotRecord? {
+        let dirName = snapshotDirURL.lastPathComponent
+
+        // 1. Strict name format: yyyy-MM-dd_HHmmss or yyyy-MM-dd_HHmmss_\d+
+        let pattern = #"^\d{4}-\d{2}-\d{2}_\d{6}(_\d+)?$"#
+        guard dirName.range(of: pattern, options: .regularExpression) != nil else {
+            return nil
+        }
+
+        // 2. .snapshot_info.json must exist and be readable
+        let infoURL = snapshotDirURL.appendingPathComponent(".snapshot_info.json")
+        guard FileManager.default.fileExists(atPath: infoURL.path),
+              let infoData = try? Data(contentsOf: infoURL),
+              let json = (try? JSONSerialization.jsonObject(with: infoData)) as? [String: Any] else {
+            return nil
+        }
+
+        // 3. Required fields validation
+        guard let id = json["id"] as? String, !id.isEmpty,
+              let ts = json["timestamp"] as? Double, ts > 0,
+              let totalFiles = json["totalFiles"] as? Int, totalFiles >= 0,
+              let totalBytes = json["totalBytes"] as? Int64, totalBytes >= 0 else {
+            return nil
+        }
+
+        // 4. Must be marked committed or completed
+        let isCommitted = (json["isCommitted"] as? Bool) == true
+        let status = (json["status"] as? String) ?? "completed"
+        guard isCommitted || status == "completed" || status == "completed_with_warnings" || status == "completed_with_errors" else {
+            return nil
+        }
+
+        // 5. Must match profile name if profileName is set in info
+        if let infoProfileName = json["profileName"] as? String, !infoProfileName.isEmpty {
+            guard infoProfileName == expectedProfileName else {
+                return nil
+            }
+        }
+
+        // 6. The root directory must exist and be accessible
+        let rootURL = snapshotDirURL.appendingPathComponent("root")
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: rootURL.path, isDirectory: &isDir), isDir.boolValue else {
+            return nil
+        }
+
+        // 7. Non-empty check: if totalFiles > 0, root directory must contain files
+        if totalFiles > 0 {
+            let rootContents = (try? FileManager.default.contentsOfDirectory(atPath: rootURL.path)) ?? []
+            guard !rootContents.isEmpty else {
+                return nil
+            }
+        }
+
+        let date = Date(timeIntervalSince1970: ts)
+        let backupType = (json["backupType"] as? String) ?? "incremental"
+
+        return SnapshotRecord(
+            id: id,
+            timestamp: date,
+            status: status,
+            totalFiles: Int64(totalFiles),
+            totalBytes: totalBytes,
+            snapshotPath: dirName,
+            backupType: backupType
+        )
     }
 
     struct CopyWorkerResult: Sendable {

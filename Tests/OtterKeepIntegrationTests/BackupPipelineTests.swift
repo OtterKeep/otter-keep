@@ -516,4 +516,149 @@ struct BackupPipelineTests {
         let unlockedSnap = try await SnapshotCatalogService.shared.getSnapshot(id: "2026-10-09-001", in: profile)
         try assertTrue(unlockedSnap?.isLocked == false)
     }
+
+    @Test func testSnapshotCatalogReconciliation100PercentCertainty() async throws {
+        let tempDir = try createTempDirectory(prefix: "ReconciliationTest")
+        defer { removeTempDirectory(tempDir) }
+
+        let srcDir = tempDir.appendingPathComponent("src")
+        let dstDir = tempDir.appendingPathComponent("dst")
+        try FileManager.default.createDirectory(at: srcDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: dstDir, withIntermediateDirectories: true)
+
+        let profile = BackupProfile(name: "ReconcileProfile", sourceURL: srcDir, destinationURL: dstDir)
+        let db = DatabaseEngine()
+        try await db.open(at: profile.manifestDatabasePath)
+        defer { Task { await db.close() } }
+
+        let coordinator = BackupSessionCoordinator(storage: DefaultFileSystemProvider(), database: db)
+
+        // Case A: 100% Valid completed snapshot on disk (unindexed)
+        let validSnapDir = dstDir.appendingPathComponent("2026-10-13_120000")
+        let validRootDir = validSnapDir.appendingPathComponent("root")
+        try FileManager.default.createDirectory(at: validRootDir, withIntermediateDirectories: true)
+        let testFile = validRootDir.appendingPathComponent("document.txt")
+        try "OtterKeep resilient data".write(to: testFile, atomically: true, encoding: .utf8)
+
+        let validInfo: [String: Any] = [
+            "id": "snapshot_2026-10-13_120000",
+            "timestamp": Date().timeIntervalSince1970,
+            "totalFiles": 1,
+            "totalBytes": 24,
+            "profileName": profile.name,
+            "status": "completed",
+            "isCommitted": true,
+            "backupType": "incremental"
+        ]
+        let infoData = try JSONSerialization.data(withJSONObject: validInfo, options: [.prettyPrinted])
+        try infoData.write(to: validSnapDir.appendingPathComponent(".snapshot_info.json"))
+
+        // Case B: Incomplete snapshot directory on disk (missing isCommitted / uncommitted)
+        let incompleteSnapDir = dstDir.appendingPathComponent("2026-10-13_130000")
+        try FileManager.default.createDirectory(at: incompleteSnapDir, withIntermediateDirectories: true)
+        let incompleteInfo: [String: Any] = [
+            "id": "snapshot_2026-10-13_130000",
+            "timestamp": Date().timeIntervalSince1970,
+            "totalFiles": 1,
+            "totalBytes": 24,
+            "profileName": profile.name,
+            "isCommitted": false
+        ]
+        let incompleteData = try JSONSerialization.data(withJSONObject: incompleteInfo)
+        try incompleteData.write(to: incompleteSnapDir.appendingPathComponent(".snapshot_info.json"))
+
+        // Case C: Directory belonging to a different profile
+        let otherProfileSnapDir = dstDir.appendingPathComponent("2026-10-13_140000")
+        let otherRootDir = otherProfileSnapDir.appendingPathComponent("root")
+        try FileManager.default.createDirectory(at: otherRootDir, withIntermediateDirectories: true)
+        try "other".write(to: otherRootDir.appendingPathComponent("f.txt"), atomically: true, encoding: .utf8)
+        let otherInfo: [String: Any] = [
+            "id": "snapshot_2026-10-13_140000",
+            "timestamp": Date().timeIntervalSince1970,
+            "totalFiles": 1,
+            "totalBytes": 5,
+            "profileName": "CompletelyDifferentProfile",
+            "status": "completed",
+            "isCommitted": true
+        ]
+        let otherData = try JSONSerialization.data(withJSONObject: otherInfo)
+        try otherData.write(to: otherProfileSnapDir.appendingPathComponent(".snapshot_info.json"))
+
+        // Execute reconciliation
+        try await coordinator.reconcileUnindexedSnapshots(at: dstDir, profile: profile)
+
+        // Verify only Case A was registered into the database
+        let snapshots = try await db.listSnapshots()
+        try assertEqual(snapshots.count, 1)
+        try assertEqual(snapshots.first?.id, "snapshot_2026-10-13_120000")
+        try assertEqual(snapshots.first?.status, "completed")
+
+        // Verify file catalog was populated for Case A
+        let files = try await db.listFiles(forSnapshotId: "snapshot_2026-10-13_120000")
+        try assertEqual(files.count, 1)
+        try assertEqual(files.first?.relativePath, "document.txt")
+    }
+
+    @Test func testRestoreAtomicFolderSwapWithOldBackupProtection() async throws {
+        let tempDir = try createTempDirectory(prefix: "RestoreSwapTest")
+        defer { removeTempDirectory(tempDir) }
+
+        let backupRoot = tempDir.appendingPathComponent("backupRoot")
+        let snapshotDir = backupRoot.appendingPathComponent("2026-10-13_150000")
+        let snapshotRoot = snapshotDir.appendingPathComponent("root")
+        try FileManager.default.createDirectory(at: snapshotRoot, withIntermediateDirectories: true)
+
+        let file1 = snapshotRoot.appendingPathComponent("restored_a.txt")
+        try "Restored Content A".write(to: file1, atomically: true, encoding: .utf8)
+        let file2 = snapshotRoot.appendingPathComponent("restored_b.txt")
+        try "Restored Content B".write(to: file2, atomically: true, encoding: .utf8)
+
+        // Existing destination folder with pre-existing data
+        let restoreTarget = tempDir.appendingPathComponent("MyRestoreTarget")
+        try FileManager.default.createDirectory(at: restoreTarget, withIntermediateDirectories: true)
+        let oldFile = restoreTarget.appendingPathComponent("preexisting.txt")
+        try "Original old data".write(to: oldFile, atomically: true, encoding: .utf8)
+
+        let restoreEngine = RestoreEngine(storage: DefaultFileSystemProvider())
+        let summary = try await restoreEngine.restoreSnapshot(
+            snapshotPath: "2026-10-13_150000",
+            backupRootURL: backupRoot,
+            targetDirectoryURL: restoreTarget,
+            collisionResolution: .overwrite
+        )
+
+        try assertEqual(summary.restoredFiles, 2)
+
+        // Verify restoreTarget contains restored files and does NOT contain preexisting
+        let restoredFile1 = restoreTarget.appendingPathComponent("restored_a.txt")
+        let restoredFile2 = restoreTarget.appendingPathComponent("restored_b.txt")
+        try assertTrue(FileManager.default.fileExists(atPath: restoredFile1.path))
+        try assertTrue(FileManager.default.fileExists(atPath: restoredFile2.path))
+
+        // Verify no leftover .old_ or .otterkeep_restore_staging directories exist in parent
+        let parentContents = try FileManager.default.contentsOfDirectory(atPath: tempDir.path)
+        let leftovers = parentContents.filter { $0.contains(".old_") || $0.contains(".otterkeep_restore_staging") }
+        try assertEqual(leftovers.count, 0)
+    }
+
+    @Test func testResilienceErrorClassifiers() throws {
+        // ENOSPC / Not enough space
+        let errSpace1 = FileSystemError.notEnoughSpace(requiredBytes: 100, availableBytes: 10)
+        try assertTrue(errSpace1.isOutOfSpace)
+        try assertFalse(errSpace1.isFatalVolumeError)
+
+        let errSpace2 = FileSystemError.copyFailed(path: "/vol/dst", errno: ENOSPC, message: "No space left on device")
+        try assertTrue(errSpace2.isOutOfSpace)
+
+        // Fatal volume disconnection (EIO, ENODEV, EROFS)
+        let errIO = FileSystemError.copyFailed(path: "/vol/dst", errno: EIO, message: "Input/output error")
+        try assertTrue(errIO.isFatalVolumeError)
+        try assertFalse(errIO.isOutOfSpace)
+
+        let errDev = FileSystemError.copyFailed(path: "/vol/dst", errno: ENODEV, message: "Operation not supported by device")
+        try assertTrue(errDev.isFatalVolumeError)
+
+        let errRO = FileSystemError.copyFailed(path: "/vol/dst", errno: EROFS, message: "Read-only file system")
+        try assertTrue(errRO.isFatalVolumeError)
+    }
 }

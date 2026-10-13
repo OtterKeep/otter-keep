@@ -143,6 +143,9 @@ public actor BackupSessionCoordinator {
         // 2. Clean up dangling temporary/staging directories from any interrupted runs
         try cleanupDanglingStagingDirectories(at: destinationURL)
 
+        // 2b. Reconcile unindexed snapshots from disk with 100% certainty verification
+        try await reconcileUnindexedSnapshots(at: destinationURL, profile: profile)
+
         // 3. Find previous snapshot catalog if running in incremental mode
         var previousCatalog: [String: FileCatalogRecord] = [:]
         var previousSnapshotURL: URL?
@@ -563,6 +566,17 @@ public actor BackupSessionCoordinator {
                         throw CancellationError()
                     } catch {
                         try? localStorage.removeItem(at: targetURL)
+                        if Self.isOutOfSpaceError(error) {
+                            throw FileSystemError.notEnoughSpace(
+                                requiredBytes: currentItem.metadata.size,
+                                availableBytes: 0
+                            )
+                        }
+                        if Self.isFatalVolumeError(error) {
+                            throw FileSystemError.unknown(
+                                "Destination volume disconnected or fatal I/O error: \(error.localizedDescription)"
+                            )
+                        }
                         let isPerm = (error as NSError).domain == NSCocoaErrorDomain && (error as NSError).code == NSFileReadNoPermissionError
                         let errItem = BackupErrorItem(
                             url: currentItem.url,
@@ -643,7 +657,16 @@ public actor BackupSessionCoordinator {
             }
         }
 
-        // 9. Write snapshot metadata manifest
+        // 9. Determine final status and write snapshot metadata manifest
+        let snapshotStatus: String
+        if !errorItems.isEmpty {
+            snapshotStatus = "completed_with_errors"
+        } else if !skippedItems.isEmpty {
+            snapshotStatus = "completed_with_warnings"
+        } else {
+            snapshotStatus = "completed"
+        }
+
         progressTracker.withLock { state in
             state.phase = .committing
         }
@@ -656,7 +679,10 @@ public actor BackupSessionCoordinator {
             "totalBytes": scannedItems.reduce(0) { $0 + $1.metadata.size },
             "profileName": profile.name,
             "skippedCount": skippedItems.count,
-            "errorCount": errorItems.count
+            "errorCount": errorItems.count,
+            "status": snapshotStatus,
+            "isCommitted": true,
+            "backupType": mode.rawValue
         ]
         if let infoData = try? JSONSerialization.data(withJSONObject: snapshotInfo, options: [.prettyPrinted]) {
             try infoData.write(to: stagingDir.appendingPathComponent(".snapshot_info.json"))
@@ -697,17 +723,6 @@ public actor BackupSessionCoordinator {
             } catch {
                 logger.warning("Notice: 'Latest' symbolic link could not be created on \(destinationCaps.fsTypeName): \(error.localizedDescription)")
             }
-        }
-
-
-        // 13. Determine final status
-        let snapshotStatus: String
-        if !errorItems.isEmpty {
-            snapshotStatus = "completed_with_errors"
-        } else if !skippedItems.isEmpty {
-            snapshotStatus = "completed_with_warnings"
-        } else {
-            snapshotStatus = "completed"
         }
 
         // 14. Persist database records

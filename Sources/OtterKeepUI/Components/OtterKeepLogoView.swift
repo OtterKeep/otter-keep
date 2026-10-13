@@ -109,6 +109,14 @@ public struct OtterKeepLogoView: View {
 
     /// Universal resource resolver supporting SPM module bundle, main bundle, nested bundles and development filesystem.
     public static func resolveResourceImage(named name: String, ext: String) -> NSImage? {
+        // 0. Primary: SPM module bundle
+        #if SWIFT_PACKAGE
+        if let url = Bundle.module.url(forResource: name, withExtension: ext),
+           let img = NSImage(contentsOf: url) {
+            return img
+        }
+        #endif
+
         // 1. Search in main application bundle resources
         if let url = Bundle.main.url(forResource: name, withExtension: ext),
            let img = NSImage(contentsOf: url) {

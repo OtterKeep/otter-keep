@@ -280,4 +280,19 @@ struct PresentationUITests {
         try assertEqual(L10n.t(.save, lang: .english), "Save")
         try assertEqual(L10n.t(.save, lang: .hungarian), "Mentés")
     }
+
+    @Test func testOttieMascotImageResolution() throws {
+        let warningImg = OtterKeepLogoView.resolveSanctuaryWarningImage()
+        try assertNotNil(warningImg)
+        let safeImg = OtterKeepLogoView.resolveSanctuarySafeImage()
+        try assertNotNil(safeImg)
+        let dangerImg = OtterKeepLogoView.resolveSanctuaryDangerImage()
+        try assertNotNil(dangerImg)
+        let logoImg = OtterKeepLogoView.resolveLogoImage()
+        try assertNotNil(logoImg)
+        let successImg = OtterKeepLogoView.resolveSuccessImage()
+        try assertNotNil(successImg)
+        let failureImg = OtterKeepLogoView.resolveFailureImage()
+        try assertNotNil(failureImg)
+    }
 }

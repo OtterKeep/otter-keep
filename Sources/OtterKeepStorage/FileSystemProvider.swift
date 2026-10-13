@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 /// Storage capacity metrics for a filesystem or volume.
 public struct StorageCapacity: Sendable, Equatable {
@@ -169,6 +170,28 @@ public enum FileSystemError: Error, Sendable, LocalizedError, Equatable {
     case unsupportedOperation(String)
     /// An unknown or unclassified filesystem error occurred.
     case unknown(String)
+
+    /// Whether this error represents an out-of-disk-space condition (ENOSPC).
+    public var isOutOfSpace: Bool {
+        switch self {
+        case .notEnoughSpace:
+            return true
+        case .copyFailed(_, let code, _), .cloneFailed(_, let code, _), .hardLinkFailed(_, let code, _), .atomicMoveFailed(_, _, let code, _):
+            return code == ENOSPC
+        default:
+            return false
+        }
+    }
+
+    /// Whether this error represents a fatal device disconnection or unmounted volume (EIO, ENODEV, EROFS).
+    public var isFatalVolumeError: Bool {
+        switch self {
+        case .copyFailed(_, let code, _), .cloneFailed(_, let code, _), .hardLinkFailed(_, let code, _), .atomicMoveFailed(_, _, let code, _):
+            return code == EIO || code == ENODEV || code == EROFS
+        default:
+            return false
+        }
+    }
 
     /// Human-readable localized error description.
     public var errorDescription: String? {
