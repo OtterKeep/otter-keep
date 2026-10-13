@@ -1,4 +1,5 @@
 import Foundation
+import OtterKeepApplication
 
 /// Strategy for handling dataless/ubiquitous iCloud Drive items during backups.
 public enum ICloudBackupStrategy: String, Codable, Sendable, CaseIterable {
@@ -495,4 +496,34 @@ public struct BackupProfile: Identifiable, Codable, Sendable, Equatable {
         return rel
     }
 }
+
+// MARK: - Application DTO Mapping
+extension BackupProfile {
+    /// Maps domain/core profile to clean architecture Application layer DTO.
+    public func toDTO() -> ProfileConfigurationDTO {
+        ProfileConfigurationDTO(
+            id: id,
+            name: name,
+            sourcePath: sourceURL.path,
+            destinationPath: destinationURL.path,
+            excludePatterns: excludePatterns,
+            isImmutabilityLockEnabled: isImmutabilityLockEnabled,
+            immutabilityLockDays: immutabilityLockDays
+        )
+    }
+
+    /// Initializes profile from Application layer DTO.
+    public init(from dto: ProfileConfigurationDTO) {
+        self.init(
+            id: dto.id,
+            name: dto.name,
+            sourceURL: URL(fileURLWithPath: dto.sourcePath),
+            destinationURL: URL(fileURLWithPath: dto.destinationPath),
+            excludePatterns: dto.excludePatterns,
+            isImmutabilityLockEnabled: dto.isImmutabilityLockEnabled,
+            immutabilityLockDays: dto.immutabilityLockDays
+        )
+    }
+}
+
 

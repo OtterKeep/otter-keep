@@ -114,12 +114,12 @@ otterkeep-cli snapshots list
 
 Részletes felhasználói és fejlesztői dokumentációink:
 
-### Felhasználói kézikönyvek (`docs/userguide/`)
-- [**Első lépések**](docs/userguide/getting-started.hu.md) — Beállítás, jogosultságok (Teljes hozzáférés a lemezhez / Full Disk Access) és gyorsindítás.
-- [**Mentés és visszaállítás**](docs/userguide/backup-and-restore.hu.md) — Pillanatképek készítése, verziók böngészése és biztonságos helyreállítás.
-- [**Távoli célállomások**](docs/userguide/remote-destinations.hu.md) — SFTP, hálózati NAS meghajtók és S3 felhőtárhelyek beállítása.
-- [**Fotók védelme**](docs/userguide/photos-protection.hu.md) — Apple Fotókönyvtár mentése, XMP kísérőfájlok és az iCloud tárhelyvédelmi funkciók.
-- [**Gyakran Ismételt Kérdések (GYIK)**](docs/userguide/faq.hu.md) — Gyakori kérdések, hibaelhárítás és tárhelygazdálkodás.
+### Felhasználói kézikönyvek (`docs/userguide/hu/`)
+- [**Első lépések**](docs/userguide/hu/getting-started.md) — Beállítás, jogosultságok (Teljes hozzáférés a lemezhez / Full Disk Access) és gyorsindítás.
+- [**Mentés és visszaállítás**](docs/userguide/hu/backup-and-restore.md) — Pillanatképek készítése, verziók böngészése és biztonságos helyreállítás.
+- [**Távoli célállomások**](docs/userguide/hu/remote-destinations.md) — SFTP, hálózati NAS meghajtók és S3 felhőtárhelyek beállítása.
+- [**Fotók védelme**](docs/userguide/hu/photos-protection.md) — Apple Fotókönyvtár mentése, XMP kísérőfájlok és az iCloud tárhelyvédelmi funkciók.
+- [**Gyakran Ismételt Kérdések (GYIK)**](docs/userguide/hu/faq.md) — Gyakori kérdések, hibaelhárítás és tárhelygazdálkodás.
 
 ### Fejlesztői útmutatók (`docs/dev/`)
 - [**Architektúra áttekintés**](docs/dev/architecture.md) — Aktorok, alrendszerek és aszinkron Swift 6 modell.

@@ -1,9 +1,8 @@
 //
-//  Module03Tests.swift
+//  DatabaseEngineTests.swift
 //  OtterKeepIntegrationTests
 //
-//  Module 3: SQLite Database Engine, Transactions & Crash Consistency
-//  Migrated verbatim from the legacy OtterKeepTestRunner harness (module 3).
+//  SQLite Database Engine, Cataloging, Text Diff & Central Storage Suite
 //
 
 import Foundation
@@ -22,8 +21,8 @@ import OtterKeepUI
 /// Executed serially: these tests exercise process-wide singletons and fixed paths.
 @MainActor
 @Suite(.serialized)
-struct Module03Tests {
-    @Test func test3_1_SQLiteSchemaInitialization() async throws {
+struct DatabaseEngineTests {
+    @Test func test_SQLiteSchemaInitialization() async throws {
         let tempDir = try createTempDirectory(prefix: "DBInit")
         defer { removeTempDirectory(tempDir) }
 
@@ -40,7 +39,7 @@ struct Module03Tests {
         try assertFalse(open2)
     }
 
-    @Test func test3_2_BatchCatalogIndexing() async throws {
+    @Test func test_BatchCatalogIndexing() async throws {
         let tempDir = try createTempDirectory(prefix: "BatchCatalog")
         defer { removeTempDirectory(tempDir) }
 
@@ -82,7 +81,7 @@ struct Module03Tests {
         try assertEqual(retrieved.first?.relativePath, "docs/file_1.txt")
     }
 
-    @Test func test3_3_SnapshotDiffEngine() async throws {
+    @Test func test_SnapshotDiffEngine() async throws {
         let snap1Files = [
             FileCatalogRecord(snapshotId: "s1", relativePath: "a.txt", fileSize: 10, modificationTime: Date(timeIntervalSince1970: 100), inode: 1, isDirectory: false, isSymlink: false),
             FileCatalogRecord(snapshotId: "s1", relativePath: "b.txt", fileSize: 20, modificationTime: Date(timeIntervalSince1970: 100), inode: 2, isDirectory: false, isSymlink: false)
@@ -101,7 +100,7 @@ struct Module03Tests {
         try assertTrue(report.items.contains { $0.relativePath == "b.txt" && $0.changeType == .deleted })
     }
 
-    @Test func test3_4_TimelineQueries() async throws {
+    @Test func test_TimelineQueries() async throws {
         let tempDir = try createTempDirectory(prefix: "Timeline")
         defer { removeTempDirectory(tempDir) }
 
@@ -123,7 +122,7 @@ struct Module03Tests {
         try assertEqual(versions.first?.file.fileSize, 20, "Timeline should list newest version first")
     }
 
-    @Test func test3_5_GlobalFileSearch() async throws {
+    @Test func test_GlobalFileSearch() async throws {
         let tempDir = try createTempDirectory(prefix: "Search")
         defer { removeTempDirectory(tempDir) }
 
@@ -143,7 +142,7 @@ struct Module03Tests {
         try assertEqual(hits.first?.relativePath, "Documents/financial_q3.xlsx")
     }
 
-    @Test func test3_6_DatabaseCloseRelease() async throws {
+    @Test func test_DatabaseCloseRelease() async throws {
         let tempDir = try createTempDirectory(prefix: "DBClose")
         defer { removeTempDirectory(tempDir) }
 
@@ -167,7 +166,7 @@ struct Module03Tests {
         try assertFalse(open4)
     }
 
-    @Test func test3_7_CascadingSnapshotDeletion() async throws {
+    @Test func test_CascadingSnapshotDeletion() async throws {
         let tempDir = try createTempDirectory(prefix: "DBCascade")
         defer { removeTempDirectory(tempDir) }
 
@@ -187,5 +186,106 @@ struct Module03Tests {
         try await db.deleteSnapshot(id: "s_del")
         files = try await db.listFiles(forSnapshotId: "s_del")
         try assertEqual(files.count, 0, "Deleting snapshot must cascade delete all file catalog entries")
+    }
+
+    @Test func test_TextDiffEngineSideBySide() throws {
+        let tempDir = try createTempDirectory(prefix: "TextDiff")
+        defer { removeTempDirectory(tempDir) }
+
+        let text1URL = tempDir.appendingPathComponent("left.txt")
+        let text2URL = tempDir.appendingPathComponent("right.txt")
+        let binURL = tempDir.appendingPathComponent("binary.dat")
+
+        let leftContent = "Line 1: Alpha\nLine 2: Beta\nLine 3: Gamma\nLine 4: Delta"
+        let rightContent = "Line 1: Alpha\nLine 2: Beta modified\nLine 3: Gamma\nLine 4: Delta\nLine 5: Epsilon"
+
+        try leftContent.write(to: text1URL, atomically: true, encoding: .utf8)
+        try rightContent.write(to: text2URL, atomically: true, encoding: .utf8)
+
+        // 1. Text diffing with Myers LCS alignment
+        let engine = TextDiffEngine()
+        let result = try engine.diffFiles(leftURL: text1URL, rightURL: text2URL, relativePath: "docs/sample.txt")
+
+        try assertFalse(result.isBinary, "Text files must not be flagged as binary")
+        try assertEqual(result.relativePath, "docs/sample.txt")
+        try assertTrue(result.rows.count >= 4, "Must have aligned rows")
+        try assertTrue(result.modifiedLinesCount > 0 || (result.addedLinesCount > 0 && result.deletedLinesCount > 0), "Must detect modifications")
+        try assertTrue(result.addedLinesCount > 0, "Must detect added Line 5")
+
+        // 2. Binary file detection
+        let binaryBytes = Data([0x00, 0x50, 0x4B, 0x03, 0x04, 0x00, 0x00, 0x00])
+        try binaryBytes.write(to: binURL)
+
+        let binResult = try engine.diffFiles(leftURL: binURL, rightURL: text2URL, relativePath: "archive.zip")
+        try assertTrue(binResult.isBinary, "File with null bytes must be identified as binary")
+        try assertEqual(binResult.rows.count, 0, "Binary comparison should not produce line text diffs")
+    }
+
+    @Test func test_CentralDatabaseOfflineSnapshotInspection() async throws {
+        let tempDir = try createTempDirectory(prefix: "OfflineInspectionTest")
+        defer { removeTempDirectory(tempDir) }
+
+        let centralDBPath = tempDir.appendingPathComponent("central.sqlite").path
+        let centralDB = CentralDatabase(databasePath: centralDBPath)
+
+        let profileId = UUID()
+        let snap1 = SnapshotRecord(
+            id: "snap-offline-101",
+            timestamp: Date(),
+            status: "completed",
+            totalFiles: 2,
+            totalBytes: 5000,
+            snapshotPath: "2026-10-13-101",
+            backupType: "incremental"
+        )
+        let file1 = FileCatalogRecord(
+            snapshotId: "snap-offline-101",
+            relativePath: "Projects/otter-keep/README.md",
+            fileSize: 2000,
+            modificationTime: Date(),
+            inode: 5501,
+            checksum: "sha256-readme",
+            isDirectory: false,
+            isSymlink: false
+        )
+        let file2 = FileCatalogRecord(
+            snapshotId: "snap-offline-101",
+            relativePath: "Projects/otter-keep/Package.swift",
+            fileSize: 3000,
+            modificationTime: Date(),
+            inode: 5502,
+            checksum: "sha256-package",
+            isDirectory: false,
+            isSymlink: false
+        )
+
+        // Cache snapshot and files into CentralDatabase
+        try centralDB.cacheSnapshotWithFiles(snap1, files: [file1, file2], forProfileId: profileId.uuidString)
+
+        // Query offline cached snapshots
+        let cachedSnaps = try centralDB.listCachedSnapshots(forProfileId: profileId.uuidString)
+        try assertEqual(cachedSnaps.count, 1)
+        try assertEqual(cachedSnaps.first?.id, "snap-offline-101")
+        try assertEqual(cachedSnaps.first?.totalBytes, 5000)
+
+        // Query offline cached files
+        let cachedFiles = try centralDB.listCachedFiles(forSnapshotId: "snap-offline-101", profileId: profileId.uuidString)
+        try assertEqual(cachedFiles.count, 2)
+        try assertTrue(cachedFiles.contains(where: { $0.relativePath == "Projects/otter-keep/README.md" }))
+
+        // Search cached relative paths
+        let searchedPaths = try centralDB.searchCachedRelativePaths(matching: "README", profileId: profileId.uuidString)
+        try assertEqual(searchedPaths.count, 1)
+        try assertEqual(searchedPaths.first, "Projects/otter-keep/README.md")
+
+        // Query cached point-in-time version history
+        let versions = try centralDB.listCachedVersions(ofRelativePath: "Projects/otter-keep/Package.swift", profileId: profileId.uuidString)
+        try assertEqual(versions.count, 1)
+        try assertEqual(versions.first?.snapshot.id, "snap-offline-101")
+        try assertEqual(versions.first?.file.fileSize, 3000)
+
+        // Clean up cached snapshot from CentralDatabase
+        try centralDB.deleteCachedSnapshot(id: "snap-offline-101", forProfileId: profileId.uuidString)
+        centralDB.close()
     }
 }

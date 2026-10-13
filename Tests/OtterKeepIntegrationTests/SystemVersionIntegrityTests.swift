@@ -1,11 +1,8 @@
 //
-//  Module01Tests.swift
+//  SystemVersionIntegrityTests.swift
 //  OtterKeepIntegrationTests
 //
-//  Module 1: System, Version & Subsystem SemVer Integrity
-//
-//  Every version expectation is derived from `version.json` (the repository's single
-//  version source) so this module detects drift instead of duplicating literals.
+//  System, Version & Subsystem SemVer Integrity Suite
 //
 
 import Foundation
@@ -24,8 +21,8 @@ import OtterKeepUI
 /// Executed serially: these tests exercise process-wide singletons and fixed paths.
 @MainActor
 @Suite(.serialized)
-struct Module01Tests {
-    @Test func test1_1_CoreEngineMetadata() throws {
+struct SystemVersionIntegrityTests {
+    @Test func test_CoreEngineMetadata() throws {
         let manifest = try VersionManifest.load()
         try assertEqual(CoreEngine.appName, "OtterKeep")
         try assertEqual(CoreEngine.bundleIdentifier, "com.otterkeep.desktop")
@@ -33,7 +30,7 @@ struct Module01Tests {
         try assertEqual(CoreEngine.buildNumber, manifest.build, "Build number must match version.json")
     }
 
-    @Test func test1_2_SemVerSubsystemMatrix() throws {
+    @Test func test_SemVerSubsystemMatrix() throws {
         let manifest = try VersionManifest.load()
         try assertEqual(
             CoreEngine.componentVersions,
@@ -48,7 +45,7 @@ struct Module01Tests {
         }
     }
 
-    @Test func test1_3_SemVerComparison() throws {
+    @Test func test_SemVerComparison() throws {
         try assertEqual(SoftwareUpdateCoordinator.compareVersions("2.3.4", "2.3.4"), .orderedSame)
         try assertEqual(SoftwareUpdateCoordinator.compareVersions("2.3.4", "2.3.5"), .orderedAscending)
         try assertEqual(SoftwareUpdateCoordinator.compareVersions("2.3.5", "2.3.4"), .orderedDescending)
@@ -58,7 +55,7 @@ struct Module01Tests {
         try assertEqual(SoftwareUpdateCoordinator.compareVersions("3.0.0", "2.99.99"), .orderedDescending)
     }
 
-    @Test func test1_4_SparkleAppcast() async throws {
+    @Test func test_SparkleAppcast() async throws {
         let manifest = try VersionManifest.load()
         let coordinator = SoftwareUpdateCoordinator()
         try assertEqual(coordinator.currentVersion, manifest.version)

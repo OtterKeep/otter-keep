@@ -1,9 +1,9 @@
 //
-//  Module07Tests.swift
+//  DiagnosticsLoggingTests.swift
 //  OtterKeepIntegrationTests
 //
-//  Module 7: Privacy-Preserving Observability & Diagnostics
-//  Migrated verbatim from the legacy OtterKeepTestRunner harness (module 7).
+//  Diagnostics & Observability: Privacy-Preserving Log Scrubbing,
+//  Path Masking, Dual-Tier Diagnostics, Apple Standard ~/Library/Logs Directory.
 //
 
 import Foundation
@@ -14,6 +14,8 @@ import CryptoKit
 import AppKit
 import SwiftUI
 import Testing
+import OtterKeepDomain
+import OtterKeepApplication
 import OtterKeepStorage
 import OtterKeepDatabase
 import OtterKeepCore
@@ -22,8 +24,8 @@ import OtterKeepUI
 /// Executed serially: these tests exercise process-wide singletons and fixed paths.
 @MainActor
 @Suite(.serialized)
-struct Module07Tests {
-    @Test func test7_1_LogPrivacyScrubbing() throws {
+struct DiagnosticsLoggingTests {
+    @Test func testLogPrivacyScrubbing() throws {
         let rawLog = "Error connecting to S3 with key AKIAIOSFODNN7EXAMPLE and secret https://api.endpoint.com?token=mySecretToken12345678"
         let sanitized = LogPrivacySanitizer.sanitize(rawLog)
         try assertFalse(sanitized.contains("AKIAIOSFODNN7EXAMPLE"), "AWS keys must be scrubbed")
@@ -31,7 +33,7 @@ struct Module07Tests {
         try assertTrue(sanitized.contains("<AWS_ACCESS_KEY_ID>"))
     }
 
-    @Test func test7_2_PathMasking() throws {
+    @Test func testPathMasking() throws {
         let rawPath = "/Users/john/Documents/Personal/FinancialReport_2026.pdf"
         let sanitized = LogPrivacySanitizer.sanitizeSinglePath(rawPath)
         try assertFalse(sanitized.contains("john"), "Usernames must be scrubbed")
@@ -39,7 +41,7 @@ struct Module07Tests {
         try assertTrue(sanitized.hasSuffix(".pdf"), "File extension must be preserved for diagnostic triage")
     }
 
-    @Test func test7_3_DualTierDiagnostics() throws {
+    @Test func testDualTierDiagnostics() throws {
         let logger = LogManager.shared
         logger.log("Info message test", level: .info, category: "Test")
         logger.log("Warning message test", level: .warning, category: "Test")
@@ -48,7 +50,7 @@ struct Module07Tests {
         try assertTrue(entries.contains(where: { $0.message.contains("Info message test") }))
     }
 
-    @Test func test7_4_DebugFileLoggerAppend() throws {
+    @Test func testDebugFileLoggerAppend() throws {
         let fileLogger = DebugFileLogger.shared
         let url = fileLogger.startSession()
         try assertTrue(FileManager.default.fileExists(atPath: url.path(percentEncoded: false)))
@@ -60,7 +62,7 @@ struct Module07Tests {
         try assertTrue(content.contains("Diagnostic checkpoint"))
     }
 
-    @Test func test7_5_AppleStandardLogDirectory() throws {
+    @Test func testAppleStandardLogDirectory() throws {
         let logsDir = DebugFileLogger.shared.logsDirectory
         try assertTrue(logsDir.path.contains("Library/Logs/OtterKeep"), "Logs directory must adhere to Apple native ~/Library/Logs/OtterKeep standard")
 

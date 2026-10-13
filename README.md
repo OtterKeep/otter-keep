@@ -114,12 +114,12 @@ otterkeep-cli snapshots list
 
 Explore our comprehensive technical and user documentation:
 
-### User Guides (`docs/userguide/`)
-- [**Getting Started**](docs/userguide/getting-started.md) — First-time setup, permissions (Full Disk Access), and quick configuration.
-- [**Backup & Restore**](docs/userguide/backup-and-restore.md) — Differential backup flows, snapshot browsing, and safe file restoration.
-- [**Remote Destinations**](docs/userguide/remote-destinations.md) — Configuring SFTP, NAS volumes, and S3-compatible cloud storage.
-- [**Photos Protection**](docs/userguide/photos-protection.md) — Apple Photos library backup, XMP sidecars, and iCloud eviction safeguards.
-- [**Frequently Asked Questions (FAQ)**](docs/userguide/faq.md) — Common questions, troubleshooting, and disk space management.
+### User Guides (`docs/userguide/en/`)
+- [**Getting Started**](docs/userguide/en/getting-started.md) — First-time setup, permissions (Full Disk Access), and quick configuration.
+- [**Backup & Restore**](docs/userguide/en/backup-and-restore.md) — Differential backup flows, snapshot browsing, and safe file restoration.
+- [**Remote Destinations**](docs/userguide/en/remote-destinations.md) — Configuring SFTP, NAS volumes, and S3-compatible cloud storage.
+- [**Photos Protection**](docs/userguide/en/photos-protection.md) — Apple Photos library backup, XMP sidecars, and iCloud eviction safeguards.
+- [**Frequently Asked Questions (FAQ)**](docs/userguide/en/faq.md) — Common questions, troubleshooting, and disk space management.
 
 ### Developer Guides (`docs/dev/`)
 - [**Architecture Blueprint**](docs/dev/architecture.md) — Actor isolation, multi-subsystem topology, and concurrency models.

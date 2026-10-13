@@ -11,7 +11,7 @@
 # Usage:
 #   scripts/test.sh                 # debug build, serial execution
 #   scripts/test.sh -c release      # release build (used by CI)
-#   scripts/test.sh --filter Module04Tests
+#   scripts/test.sh --filter BackupPipelineTests
 #
 set -euo pipefail
 

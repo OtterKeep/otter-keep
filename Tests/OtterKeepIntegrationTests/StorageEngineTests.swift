@@ -1,9 +1,8 @@
 //
-//  Module02Tests.swift
+//  StorageEngineTests.swift
 //  OtterKeepIntegrationTests
 //
-//  Module 2: APFS Copy-on-Write, Storage Drivers & Filesystem Fidelity
-//  Migrated verbatim from the legacy OtterKeepTestRunner harness (module 2).
+//  Storage Engine, APFS Copy-on-Write, Drivers & Filesystem Fidelity Suite
 //
 
 import Foundation
@@ -22,8 +21,8 @@ import OtterKeepUI
 /// Executed serially: these tests exercise process-wide singletons and fixed paths.
 @MainActor
 @Suite(.serialized)
-struct Module02Tests {
-    @Test func test2_1_VolumeCapabilities() async throws {
+struct StorageEngineTests {
+    @Test func test_VolumeCapabilities() async throws {
         let tempDir = try createTempDirectory(prefix: "Capabilities")
         defer { removeTempDirectory(tempDir) }
 
@@ -37,7 +36,7 @@ struct Module02Tests {
         try assertTrue(capacity.availableBytes > 0, "Available bytes should be greater than zero")
     }
 
-    @Test func test2_2_APFSClonefile() async throws {
+    @Test func test_APFSClonefile() async throws {
         let tempDir = try createTempDirectory(prefix: "CoWClone")
         defer { removeTempDirectory(tempDir) }
 
@@ -61,7 +60,7 @@ struct Module02Tests {
         try assertEqual(payload, postMutationCloneData, "CoW clone must remain isolated after source mutation")
     }
 
-    @Test func test2_3_HardlinkFallback() async throws {
+    @Test func test_HardlinkFallback() async throws {
         let tempDir = try createTempDirectory(prefix: "Hardlink")
         defer { removeTempDirectory(tempDir) }
 
@@ -78,7 +77,7 @@ struct Module02Tests {
         try assertEqual(meta1.inode, meta2.inode, "Hard links must share the identical filesystem inode")
     }
 
-    @Test func test2_4_ExtendedAttributes() throws {
+    @Test func test_ExtendedAttributes() throws {
         let tempDir = try createTempDirectory(prefix: "Xattr")
         defer { removeTempDirectory(tempDir) }
 
@@ -94,7 +93,7 @@ struct Module02Tests {
         try assertEqual(readBack[attrKey], attrValue, "Extended attribute must be preserved round-trip")
     }
 
-    @Test func test2_5_AtomicMove() async throws {
+    @Test func test_AtomicMove() async throws {
         let tempDir = try createTempDirectory(prefix: "AtomicMove")
         defer { removeTempDirectory(tempDir) }
 
@@ -111,7 +110,7 @@ struct Module02Tests {
         try assertTrue(FileManager.default.fileExists(atPath: dest.appendingPathComponent("file.txt").path))
     }
 
-    @Test func test2_6_FallbackStorageProvider() async throws {
+    @Test func test_FallbackStorageProvider() async throws {
         let tempDir = try createTempDirectory(prefix: "StreamCopyProvider")
         defer { removeTempDirectory(tempDir) }
 
@@ -126,7 +125,7 @@ struct Module02Tests {
         try assertEqual(data, "Stream Copy Data")
     }
 
-    @Test func test2_7_ExFATAndNTFSCapabilities() throws {
+    @Test func test_ExFATAndNTFSCapabilities() throws {
         let exfatCaps = FileSystemCapabilities(
             fsTypeName: "exfat",
             supportsAPFSClone: false,
@@ -153,7 +152,7 @@ struct Module02Tests {
         try assertTrue(ntfsCaps.isReadOnly)
     }
 
-    @Test func test2_8_DriverRegistryResolution() throws {
+    @Test func test_DriverRegistryResolution() throws {
         let registry = FileSystemDriverRegistry.shared
         let apfsDriver = registry.driver(forFSType: "apfs")
         try assertEqual(apfsDriver.fsTypeName, "apfs")
@@ -163,5 +162,48 @@ struct Module02Tests {
 
         let ntfsDriver = registry.driver(forFSType: "ntfs")
         try assertEqual(ntfsDriver.fsTypeName, "ntfs")
+    }
+
+    @Test func test_DefaultFileSystemProviderRouting() async throws {
+        let provider = DefaultFileSystemProvider()
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let caps = try await provider.capabilities(at: home)
+        try assertTrue(!caps.fsTypeName.isEmpty)
+
+        // Verify FileSystemDriverRegistry resolution
+        let resolved = FileSystemDriverRegistry.shared.driver(forFSType: caps.fsTypeName)
+        let regCaps = try await resolved.capabilities(at: home)
+        try assertEqual(caps.fsTypeName, regCaps.fsTypeName)
+    }
+
+    @Test func test_BackblazeB2Configuration() async throws {
+        let b2Config = B2Configuration(
+            keyId: "0040abc12345",
+            bucketName: "company-secure-vault",
+            region: "us-west-004",
+            customEndpoint: nil,
+            pathPrefix: "otterkeep/workstation"
+        )
+
+        // 1. Endpoint resolution
+        try assertEqual(b2Config.resolvedEndpoint, "https://s3.us-west-004.backblazeb2.com")
+
+        // 2. Custom endpoint resolution
+        var customB2 = b2Config
+        customB2.customEndpoint = "s3.eu-central-003.backblazeb2.com"
+        try assertEqual(customB2.resolvedEndpoint, "https://s3.eu-central-003.backblazeb2.com")
+
+        // 3. S3 Configuration conversion
+        let s3Config = b2Config.toS3Configuration()
+        try assertEqual(s3Config.endpoint, "https://s3.us-west-004.backblazeb2.com")
+        try assertEqual(s3Config.bucket, "company-secure-vault")
+        try assertEqual(s3Config.region, "us-west-004")
+        try assertEqual(s3Config.accessKeyId, "0040abc12345")
+        try assertEqual(s3Config.pathPrefix, "otterkeep/workstation")
+        try assertTrue(s3Config.forcePathStyle, "Backblaze B2 S3 API requires forcePathStyle = true")
+
+        // 4. Provider instantiation
+        let provider = B2StorageProvider(config: b2Config, applicationKey: "K004dummySecretKey123")
+        _ = provider
     }
 }

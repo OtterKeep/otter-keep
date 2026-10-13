@@ -1,9 +1,9 @@
 //
-//  Module09Tests.swift
+//  LocalizationTests.swift
 //  OtterKeepIntegrationTests
 //
-//  Module 9: Bilingual Localization Completeness & Parity
-//  Migrated verbatim from the legacy OtterKeepTestRunner harness (module 9).
+//  Localization & Bilingual Parity: Complete key parity between English and
+//  Hungarian, format specifier safety, and localized suffix formatting.
 //
 
 import Foundation
@@ -14,6 +14,8 @@ import CryptoKit
 import AppKit
 import SwiftUI
 import Testing
+import OtterKeepDomain
+import OtterKeepApplication
 import OtterKeepStorage
 import OtterKeepDatabase
 import OtterKeepCore
@@ -22,8 +24,8 @@ import OtterKeepUI
 /// Executed serially: these tests exercise process-wide singletons and fixed paths.
 @MainActor
 @Suite(.serialized)
-struct Module09Tests {
-    @Test func test9_1_LocalizationKeyParity() throws {
+struct LocalizationTests {
+    @Test func testLocalizationKeyParity() throws {
         let allKeys = L10n.Key.allCases
         try assertTrue(allKeys.count >= 200, "Localization dictionary should have comprehensive key coverage")
 
@@ -44,14 +46,14 @@ struct Module09Tests {
         }
     }
 
-    @Test func test9_2_LocalizationNonEmptyStrings() throws {
+    @Test func testLocalizationNonEmptyStrings() throws {
         try assertTrue(!L10n.t(.navDashboard, lang: .english).isEmpty)
         try assertTrue(!L10n.t(.navDashboard, lang: .hungarian).isEmpty)
         try assertTrue(!L10n.t(.feedbackSuccessTitle, lang: .hungarian).isEmpty)
         try assertTrue(!L10n.t(.feedbackSuccessTitle, lang: .english).isEmpty)
     }
 
-    @Test func test9_3_FormatSpecifierConsistency() throws {
+    @Test func testFormatSpecifierConsistency() throws {
         // Verify restore feedback message formatting in both languages without crashing
         let huRestore = L10n.format(.feedbackRestoreSuccessMessage, "snapshot_1", Int64(5), lang: .hungarian)
         let enRestore = L10n.format(.feedbackRestoreSuccessMessage, "snapshot_1", Int64(5), lang: .english)
@@ -80,7 +82,7 @@ struct Module09Tests {
         try assertTrue(enAlert.contains("5") && enAlert.contains("snap_01"))
     }
 
-    @Test func test9_4_RestoredSuffixParity() throws {
+    @Test func testRestoredSuffixParity() throws {
         let initialLang = LocalizationManager.shared.currentLanguage
         defer { LocalizationManager.shared.currentLanguage = initialLang }
 

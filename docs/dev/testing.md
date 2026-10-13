@@ -34,8 +34,8 @@ scripts/test.sh
 scripts/test.sh -c release
 
 # A single module or test (arguments are forwarded to `swift test`)
-scripts/test.sh --filter Module04Tests
-scripts/test.sh --filter test4_3_RansomwareAnomalyGuard
+scripts/test.sh --filter BackupPipelineTests
+scripts/test.sh --filter testRansomwareAnomalyGuard
 ```
 
 `swift test` also works with a Command Line Tools-only toolchain — `XCTest` is not required. Note a
@@ -47,34 +47,34 @@ still reported immediately.
 
 ---
 
-## 2. The 12 Test Modules
+## 2. The 12 Semantic Test Suites
 
-| Module | Focus |
+| Test Suite File | Subsystem & Focus |
 | :--- | :--- |
-| **1. System, Version & SemVer** | Version/sub-system matrix consistency against `version.json`, SemVer parsing, Sparkle appcast audit |
-| **2. APFS CoW & Storage Fidelity** | `clonefile(2)` block sharing, hardlink fallback, xattr preservation, atomic tree rename, driver registry |
-| **3. SQLite Engine & Crash Consistency** | WAL pragmas, batch cataloging, diff engine, timeline queries, connection closure, cascading deletes |
-| **4. Incremental Lifecycle & Change Detection** | GitIgnore glob parser, APFS nanosecond tolerances, ransomware guard, end-to-end backup/restore |
-| **5. Client-Side Cryptography** | OKENC2 (600,000 PBKDF2 rounds), DSENC1 legacy compatibility, tamper resistance, SHA-256 calculators |
-| **6. IPC & Process Security** | `AF_UNIX` buffer bounds, socket permissions (0600), `getpeereid` peer validation, message serialization |
-| **7. Observability & Diagnostics** | `LogPrivacySanitizer` scrubbing, path masking, dual-tier diagnostics, debug file logger append |
-| **8. Photos Backup & iCloud Eviction** | Export structures, metadata extraction, `EphemeralStorageGuard` buffering, coordinator initialization |
-| **9. Bilingual Localization** | Key coverage of the unified string table, non-empty translations, format-specifier parity |
-| **10. UI Design System & Error Recovery** | `OtterTheme` tokens, three-part error architecture, configuration archive serialization, multi-profile tracking |
-| **11. Modern Capabilities** | Side-by-side text/binary diff, data scrubber bit-rot detection, WORM immutability, B2 provider, catch-up replication |
-| **12. Backend Architecture & Layering** | Catalog services, compliance evaluation, layering invariants |
+| **`SystemVersionIntegrityTests.swift`** | Version/subsystem matrix consistency against `version.json`, SemVer parsing, Sparkle appcast audit |
+| **`StorageEngineTests.swift`** | APFS `clonefile(2)` block sharing, hardlink fallback, xattr preservation, atomic tree rename, driver registry, B2 configuration |
+| **`DatabaseEngineTests.swift`** | SQLite manifest WAL pragmas, batch cataloging, diff engine, timeline queries, connection closure, cascading deletes, text diff, offline inspection |
+| **`BackupPipelineTests.swift`** | Incremental backup lifecycle, GitIgnore glob parser, APFS nanosecond tolerances, ransomware guard, end-to-end backup/restore, WORM immutability, dataless iCloud, catalog services |
+| **`SecurityCryptographyTests.swift`** | OKENC2 (600,000 PBKDF2 rounds), DSENC1 legacy compatibility, tamper resistance, SHA-256 calculators, data scrubber bit-rot detection |
+| **`IPCProcessSecurityTests.swift`** | `AF_UNIX` buffer bounds, socket permissions (0700), peer credential validation, message serialization, SFTP injection defense |
+| **`DiagnosticsLoggingTests.swift`** | `LogPrivacySanitizer` scrubbing, path masking, dual-tier diagnostics, debug file logger append, native Apple `~/Library/Logs/OtterKeep` directory |
+| **`PhotosProtectionTests.swift`** | Export structures, metadata extraction, `EphemeralStorageGuard` buffering, coordinator initialization |
+| **`LocalizationTests.swift`** | Unified string table bilingual parity (English / Hungarian), non-empty translations, format-specifier safety, localized suffix formatting |
+| **`PresentationUITests.swift`** | `OtterTheme` tokens, three-part error architecture, configuration archive serialization, multi-profile tracking, settings side-effect propagation |
+| **`ReplicationAndComplianceTests.swift`** | 3-2-1 compliance evaluator rules, offsite remote copy jobs, catch-up replication coordination |
+| **`CleanArchitectureTests.swift`** | Pure Domain entities, Repository Ports & Adapters, DTO mappings across boundaries, Use Cases, CentralDatabase profiles & JSON export/import |
 
 ---
 
 ## 3. Adding a Test
 
-1. Add the test to the module file that matches the subsystem (`Module04Tests.swift`, …).
+1. Add the test to the module file that matches the subsystem (`BackupPipelineTests.swift`, …).
 2. Use a throwing `@Test` function (async when the code under test is async) and the shared
    assertion helpers.
 3. Keep hermetic fixtures: create temporary directories with `createTempDirectory(prefix:)` and
    clean them up with `defer { removeTempDirectory(url) }`.
 4. Avoid new version literals — load `VersionManifest` and assert against it.
-5. Run `swift test --filter <Module>` before opening a pull request.
+5. Run `scripts/test.sh --filter <SuiteName>` before opening a pull request.
 
 ---
 

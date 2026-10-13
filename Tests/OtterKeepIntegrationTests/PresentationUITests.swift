@@ -1,9 +1,10 @@
 //
-//  Module10Tests.swift
+//  PresentationUITests.swift
 //  OtterKeepIntegrationTests
 //
-//  Module 10: Modern UI Design System, Sanctuary Experience & Configuration
-//  Migrated verbatim from the legacy OtterKeepTestRunner harness (module 10).
+//  Presentation & UI Design System: Theme Tokens, Three-Part Error Reassurance,
+//  Configuration Export/Import Serialization, Multi-Profile Tracking, Version Metadata,
+//  Restore Modes and Feedback, and AppState Settings Side-Effects.
 //
 
 import Foundation
@@ -14,6 +15,8 @@ import CryptoKit
 import AppKit
 import SwiftUI
 import Testing
+import OtterKeepDomain
+import OtterKeepApplication
 import OtterKeepStorage
 import OtterKeepDatabase
 import OtterKeepCore
@@ -22,8 +25,8 @@ import OtterKeepUI
 /// Executed serially: these tests exercise process-wide singletons and fixed paths.
 @MainActor
 @Suite(.serialized)
-struct Module10Tests {
-    @Test func test10_1_OtterThemeTokens() throws {
+struct PresentationUITests {
+    @Test func testOtterThemeTokens() throws {
         let amber = OtterTheme.otterAmber
         let teal = OtterTheme.oceanicTeal
         let navy = OtterTheme.deepSeaNavy
@@ -37,7 +40,7 @@ struct Module10Tests {
         _ = green
     }
 
-    @Test func test10_2_ThreePartErrorArchitecture() throws {
+    @Test func testThreePartErrorArchitecture() throws {
         let dummyError = NSError(domain: NSPOSIXErrorDomain, code: Int(ENOSPC), userInfo: [NSLocalizedDescriptionKey: "No space left on device"])
         let analyzed = AppState.analyzeBackupError(dummyError, destinationURL: URL(fileURLWithPath: "/Volumes/ExternalSSD"), sourceURL: URL(fileURLWithPath: "/Users/user/Docs"))
 
@@ -49,7 +52,7 @@ struct Module10Tests {
         try assertTrue(!analyzed.detailedReason.isEmpty)
     }
 
-    @Test func test10_3_ConfigurationArchiveSerialization() throws {
+    @Test func testConfigurationArchiveSerialization() throws {
         let profile = BackupProfile(name: "Portable Profile", sourceURL: URL(fileURLWithPath: "/Users/test/Code"), destinationURL: URL(fileURLWithPath: "/Volumes/Backup/Code"))
         let settings = AppSettings(language: .english, launchAtLogin: true, startMinimized: false, debugFileLoggingEnabled: false, finderIntegrationEnabled: true, themeMode: .system)
         let archive = ConfigurationExportArchive(profiles: [profile], settings: settings, photosConfig: nil)
@@ -65,7 +68,7 @@ struct Module10Tests {
         try assertEqual(decoded.profiles.first?.name, "Portable Profile")
     }
 
-    @Test func test10_4_AppStateMultiProfileTracking() async throws {
+    @Test func testAppStateMultiProfileTracking() async throws {
         let appState = AppState()
         let p1 = UUID()
         let p2 = UUID()
@@ -74,25 +77,13 @@ struct Module10Tests {
         try assertFalse(appState.isBackupRunning(for: p2))
     }
 
-    @Test func test10_5_OtterAboutViewMetadata() throws {
+    @Test func testOtterAboutViewMetadata() throws {
         let manifest = try VersionManifest.load()
         try assertEqual(CoreEngine.version, manifest.version)
         try assertEqual(CoreEngine.buildNumber, manifest.build)
     }
 
-    @Test func test10_6_DefaultFileSystemProviderRouting() async throws {
-        let provider = DefaultFileSystemProvider()
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let caps = try await provider.capabilities(at: home)
-        try assertTrue(!caps.fsTypeName.isEmpty)
-
-        // Verify FileSystemDriverRegistry resolution
-        let resolved = FileSystemDriverRegistry.shared.driver(forFSType: caps.fsTypeName)
-        let regCaps = try await resolved.capabilities(at: home)
-        try assertEqual(caps.fsTypeName, regCaps.fsTypeName)
-    }
-
-    @Test func test10_7_RestoreOperationFeedbackAndModes() throws {
+    @Test func testRestoreOperationFeedbackAndModes() throws {
         // Test streamlined modes
         try assertEqual(RestoreBrowseMode.allCases.count, 3)
         try assertEqual(RestoreBrowseMode.snapshot.rawValue, "snapshot")
@@ -122,7 +113,7 @@ struct Module10Tests {
     /// Guards the `AppState` feature-store split: writing a settings property must still drive the
     /// subsystems that the pre-split `didSet` observers updated (theme/language propagation, debug
     /// logging session, Finder integration toggle).
-    @Test func test10_8_SettingsStateSideEffectPropagation() throws {
+    @Test func testSettingsStateSideEffectPropagation() throws {
         let appState = AppState()
         let originalLanguage = LocalizationManager.shared.currentLanguage
         let originalTheme = LocalizationManager.shared.currentTheme

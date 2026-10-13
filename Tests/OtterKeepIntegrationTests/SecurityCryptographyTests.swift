@@ -1,9 +1,9 @@
 //
-//  Module05Tests.swift
+//  SecurityCryptographyTests.swift
 //  OtterKeepIntegrationTests
 //
-//  Module 5: Client-Side Cryptography & Security Integrity
-//  Migrated verbatim from the legacy OtterKeepTestRunner harness (module 5).
+//  Security & Cryptography: Client-Side Envelope Encryption (OKENC2 / DSENC1),
+//  Tamper Resistance, Checksum Verification, and Bit-Rot Scrubbing.
 //
 
 import Foundation
@@ -14,6 +14,8 @@ import CryptoKit
 import AppKit
 import SwiftUI
 import Testing
+import OtterKeepDomain
+import OtterKeepApplication
 import OtterKeepStorage
 import OtterKeepDatabase
 import OtterKeepCore
@@ -22,8 +24,8 @@ import OtterKeepUI
 /// Executed serially: these tests exercise process-wide singletons and fixed paths.
 @MainActor
 @Suite(.serialized)
-struct Module05Tests {
-    @Test func test5_1_OKENC2Encryption() throws {
+struct SecurityCryptographyTests {
+    @Test func testOKENC2Encryption() throws {
         let plaintext = Data("Cherished OtterKeep Sanctuary Payload 2026".utf8)
         let passphrase = "Ollie-Super-Secret-Sanctuary-Passphrase"
 
@@ -35,7 +37,7 @@ struct Module05Tests {
         try assertEqual(decrypted, plaintext, "Decrypted data must match original plaintext")
     }
 
-    @Test func test5_2_DSENC1BackwardCompatibility() throws {
+    @Test func testDSENC1BackwardCompatibility() throws {
         let plaintext = Data("Legacy DataSquirrel Archive 1.0".utf8)
         let passphrase = "LegacyPassphrase123"
 
@@ -62,7 +64,7 @@ struct Module05Tests {
         try assertEqual(decrypted, plaintext, "DSENC1 legacy format must decrypt seamlessly through backward-compatibility path")
     }
 
-    @Test func test5_3_TamperResistance() throws {
+    @Test func testTamperResistance() throws {
         let plaintext = Data("Sensitive Data".utf8)
         let passphrase = "SafePassword"
         var encrypted = try ClientSideEncryptor.encrypt(data: plaintext, passphrase: passphrase)
@@ -88,7 +90,7 @@ struct Module05Tests {
         try assertTrue(threwTamper, "Tampered ciphertext must fail authenticated decryption")
     }
 
-    @Test func test5_4_HashCalculations() throws {
+    @Test func testHashCalculations() throws {
         let tempDir = try createTempDirectory(prefix: "HashTest")
         defer { removeTempDirectory(tempDir) }
 
@@ -101,5 +103,67 @@ struct Module05Tests {
 
         let sampleHash = try FastHashCalculator.computeSamplingHash(for: file)
         try assertEqual(sampleHash.count, 64, "Sampling hash must return valid SHA-256 hex")
+    }
+
+    @Test func testDataScrubberBitRotDetection() async throws {
+        let tempDir = try createTempDirectory(prefix: "Scrubber")
+        defer { removeTempDirectory(tempDir) }
+
+        let internalDir = tempDir.appendingPathComponent(".otterkeep")
+        try FileManager.default.createDirectory(at: internalDir, withIntermediateDirectories: true)
+        let dbPath = internalDir.appendingPathComponent("manifest.sqlite").standardizedFileURL.path(percentEncoded: false)
+
+        let db = DatabaseEngine()
+        try await db.open(at: dbPath)
+
+        let snapId = "2026-10-08_12-00-00"
+        let snapDir = tempDir.appendingPathComponent(snapId).appendingPathComponent("root")
+        try FileManager.default.createDirectory(at: snapDir, withIntermediateDirectories: true)
+
+        let fileURL = snapDir.appendingPathComponent("document.txt")
+        let originalContent = "Original authentic OtterKeep backup block data."
+        try originalContent.write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let originalChecksum = try ChecksumCalculator.computeSHA256(for: fileURL)
+
+        let snapRecord = SnapshotRecord(
+            id: snapId,
+            timestamp: Date(),
+            status: "completed",
+            totalFiles: 1,
+            totalBytes: Int64(originalContent.utf8.count),
+            snapshotPath: snapId,
+            backupType: "incremental"
+        )
+        try await db.insertSnapshot(snapRecord)
+
+        let fileRecord = FileCatalogRecord(
+            snapshotId: snapId,
+            relativePath: "document.txt",
+            fileSize: Int64(originalContent.utf8.count),
+            modificationTime: Date(),
+            inode: 9999,
+            checksum: originalChecksum,
+            isDirectory: false,
+            isSymlink: false
+        )
+        try await db.insertFileRecordsBatch([fileRecord])
+
+        // Initial scrub: clean pass
+        let scrubber = DataScrubberEngine(storage: DefaultFileSystemProvider(), database: db)
+        let cleanAudit = try await scrubber.performScrub(backupRootURL: tempDir)
+        try assertEqual(cleanAudit.status, "healthy")
+        try assertEqual(cleanAudit.corruptedFilesCount, 0)
+        try assertEqual(cleanAudit.checkedFilesCount, 1)
+
+        // Inject bit-rot by tampering with file content
+        let corruptedContent = "Corrupted manipulated data block with flipped bits!"
+        try corruptedContent.write(to: fileURL, atomically: true, encoding: .utf8)
+
+        // Scrubber pass should flag bit-rot
+        let corruptedAudit = try await scrubber.performScrub(backupRootURL: tempDir)
+        try assertEqual(corruptedAudit.status, "corruption_detected")
+        try assertEqual(corruptedAudit.corruptedFilesCount, 1)
+        try assertTrue(corruptedAudit.detailsJson?.contains("Bit-rot") == true, "Details must report bit-rot")
     }
 }

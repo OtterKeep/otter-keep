@@ -12,6 +12,12 @@ public struct ListSnapshotsUseCase: Sendable {
     public func execute() async throws -> [SnapshotRecord] {
         try await repository.listSnapshots()
     }
+
+    /// Executes query returning standardized Data Transfer Objects (DTOs) for presentation and external layers.
+    public func executeDTOs() async throws -> [SnapshotDTO] {
+        let entities = try await repository.listSnapshots()
+        return entities.map { SnapshotDTO(from: $0) }
+    }
 }
 
 /// Interactor / Use Case for retrieving a specific snapshot and its indexed files.
@@ -40,6 +46,15 @@ public struct GetSnapshotDetailsUseCase: Sendable {
         }
         let files = try await fileRepository.listFiles(forSnapshotId: snapshotId)
         return Result(snapshot: snapshot, files: files)
+    }
+
+    /// Executes query returning a composite SnapshotDetailsDTO across layer boundaries.
+    public func executeDTO(snapshotId: String) async throws -> SnapshotDetailsDTO? {
+        guard let snapshot = try await snapshotRepository.getSnapshot(id: snapshotId) else {
+            return nil
+        }
+        let files = try await fileRepository.listFiles(forSnapshotId: snapshotId)
+        return SnapshotDetailsDTO(snapshot: snapshot, files: files)
     }
 }
 

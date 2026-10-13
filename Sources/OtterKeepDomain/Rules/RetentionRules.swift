@@ -1,5 +1,7 @@
 import Foundation
 
+public typealias RetentionDecision = RetentionPolicyCalculator.Decision
+
 /// Pure domain rule evaluator executing Grandfather-Father-Son (GFS) snapshot retention decisions.
 ///
 /// Contains zero I/O or filesystem dependencies, guaranteeing deterministic retention pruning decisions.

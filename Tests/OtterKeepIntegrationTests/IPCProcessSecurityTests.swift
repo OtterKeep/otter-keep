@@ -1,9 +1,10 @@
 //
-//  Module06Tests.swift
+//  IPCProcessSecurityTests.swift
 //  OtterKeepIntegrationTests
 //
-//  Module 6: IPC, Process Security & Peer UID Validation
-//  Migrated verbatim from the legacy OtterKeepTestRunner harness (module 6).
+//  IPC, Process Security & Peer UID Validation: Unix domain socket bounds,
+//  secure POSIX socket directory permissions, single instance peer messaging,
+//  and command injection neutralization.
 //
 
 import Foundation
@@ -14,6 +15,8 @@ import CryptoKit
 import AppKit
 import SwiftUI
 import Testing
+import OtterKeepDomain
+import OtterKeepApplication
 import OtterKeepStorage
 import OtterKeepDatabase
 import OtterKeepCore
@@ -22,8 +25,8 @@ import OtterKeepUI
 /// Executed serially: these tests exercise process-wide singletons and fixed paths.
 @MainActor
 @Suite(.serialized)
-struct Module06Tests {
-    @Test func test6_1_AFUnixBufferBounds() throws {
+struct IPCProcessSecurityTests {
+    @Test func testAFUnixBufferBounds() throws {
         let addr = sockaddr_un()
         let maxLen = MemoryLayout.size(ofValue: addr.sun_path)
         try assertEqual(maxLen, 104, "Darwin sockaddr_un sun_path buffer must be 104 bytes")
@@ -35,7 +38,7 @@ struct Module06Tests {
         try assertTrue(pathExceedingBounds.utf8CString.count > maxLen)
     }
 
-    @Test func test6_2_SocketPermissions() throws {
+    @Test func testSocketPermissions() throws {
         let manager = SingleInstanceManager.shared
         manager.ensureDirectoryPermissions()
         let lockPath = manager.lockFilePath
@@ -53,7 +56,7 @@ struct Module06Tests {
         }
     }
 
-    @Test func test6_3_PeerUIDVerification() throws {
+    @Test func testPeerUIDVerification() throws {
         // Verify current process credentials
         let myUID = geteuid()
         let myGID = getegid()
@@ -61,7 +64,7 @@ struct Module06Tests {
         try assertTrue(myGID >= 0)
     }
 
-    @Test func test6_4_MessageSerialization() throws {
+    @Test func testMessageSerialization() throws {
         let msg = SingleInstanceMessage(action: .openVersionHistory, filePath: "/Users/test/Documents/report.pdf")
         let encoder = JSONEncoder()
         let data = try encoder.encode(msg)
@@ -72,7 +75,7 @@ struct Module06Tests {
         try assertEqual(decoded.filePath, "/Users/test/Documents/report.pdf")
     }
 
-    @Test func test6_5_SFTPInjectionNeutralization() throws {
+    @Test func testSFTPInjectionNeutralization() throws {
         let config = SFTPConfiguration(host: "nas.local", port: 22, username: "backupuser", remotePath: "/backups")
         try assertEqual(config.host, "nas.local")
         try assertEqual(config.port, 22)
