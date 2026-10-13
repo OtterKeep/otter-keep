@@ -59,4 +59,13 @@ struct Module07Tests {
         let content = try String(contentsOf: url, encoding: .utf8)
         try assertTrue(content.contains("Diagnostic checkpoint"))
     }
+
+    @Test func test7_5_AppleStandardLogDirectory() throws {
+        let logsDir = DebugFileLogger.shared.logsDirectory
+        try assertTrue(logsDir.path.contains("Library/Logs/OtterKeep"), "Logs directory must adhere to Apple native ~/Library/Logs/OtterKeep standard")
+
+        let managerLogDir = LogManager.shared.logDirectory
+        try assertEqual(managerLogDir.path, logsDir.path, "LogManager logDirectory must match DebugFileLogger logsDirectory")
+        try assertTrue(LogManager.shared.logFileURL.path.hasSuffix("Library/Logs/OtterKeep/logs.json"))
+    }
 }

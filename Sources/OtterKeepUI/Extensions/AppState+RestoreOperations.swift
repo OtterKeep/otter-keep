@@ -33,8 +33,15 @@ extension AppState {
 
         Task {
             do {
-                try await database.open(at: dbPath)
-                let list = try await database.listSnapshots()
+                let list: [SnapshotRecord]
+                if FileManager.default.fileExists(atPath: dbPath) {
+                    try await database.open(at: dbPath)
+                    list = try await database.listSnapshots()
+                    try? CentralDatabase.shared.cacheSnapshots(list, forProfileId: profile.id.uuidString)
+                } else {
+                    list = try CentralDatabase.shared.listCachedSnapshots(forProfileId: profile.id.uuidString)
+                }
+
                 Task { @MainActor in
                     let snapshotsChanged = profileChanged || (self.snapshots.map(\.id) != list.map(\.id))
                     if snapshotsChanged || self.snapshots.isEmpty {
@@ -74,18 +81,23 @@ extension AppState {
     public func preloadAllProfilesStatus() {
         for profile in profiles {
             let dbURL = profile.destinationURL.appendingPathComponent(".otterkeep/manifest.sqlite")
-            guard FileManager.default.fileExists(atPath: dbURL.path) else { continue }
-            Task {
-                let probeDB = DatabaseEngine()
-                do {
-                    try await probeDB.open(at: dbURL.path)
-                    let snaps = try await probeDB.listSnapshots()
-                    await probeDB.close()
-                    Task { @MainActor in
-                        self.profileLatestSnapshots[profile.id] = snaps.first
-                        self.profileSnapshotCounts[profile.id] = snaps.count
-                    }
-                } catch {}
+            if FileManager.default.fileExists(atPath: dbURL.path) {
+                Task {
+                    let probeDB = DatabaseEngine()
+                    do {
+                        try await probeDB.open(at: dbURL.path)
+                        let snaps = try await probeDB.listSnapshots()
+                        await probeDB.close()
+                        try? CentralDatabase.shared.cacheSnapshots(snaps, forProfileId: profile.id.uuidString)
+                        Task { @MainActor in
+                            self.profileLatestSnapshots[profile.id] = snaps.first
+                            self.profileSnapshotCounts[profile.id] = snaps.count
+                        }
+                    } catch {}
+                }
+            } else if let cached = try? CentralDatabase.shared.listCachedSnapshots(forProfileId: profile.id.uuidString), !cached.isEmpty {
+                self.profileLatestSnapshots[profile.id] = cached.first
+                self.profileSnapshotCounts[profile.id] = cached.count
             }
         }
     }
@@ -103,9 +115,17 @@ extension AppState {
             return
         }
 
+        let currentProfileId = selectedProfile?.id.uuidString ?? ""
+
         Task {
+            let isDbAvailable = await database.isOpen
             do {
-                let files = try await database.listFiles(forSnapshotId: snapshotId)
+                let files: [FileCatalogRecord]
+                if isDbAvailable {
+                    files = try await database.listFiles(forSnapshotId: snapshotId)
+                } else {
+                    files = try CentralDatabase.shared.listCachedFiles(forSnapshotId: snapshotId, profileId: currentProfileId)
+                }
                 let tree = FileTreeBuilder.buildTree(from: files)
                 Task { @MainActor in
                     self.loadedSnapshotId = snapshotId
@@ -137,9 +157,17 @@ extension AppState {
             return
         }
         self.timelineSearchQuery = query
+        let currentProfileId = selectedProfile?.id.uuidString ?? ""
+
         Task {
+            let isDbAvailable = await database.isOpen
             do {
-                let paths = try await database.searchDistinctRelativePaths(matching: query)
+                let paths: [String]
+                if isDbAvailable {
+                    paths = try await database.searchDistinctRelativePaths(matching: query)
+                } else {
+                    paths = try CentralDatabase.shared.searchCachedRelativePaths(matching: query, profileId: currentProfileId)
+                }
                 let tree = FileTreeBuilder.buildTree(from: paths)
                 Task { @MainActor in
                     self.timelinePaths = paths
@@ -168,9 +196,17 @@ extension AppState {
     @MainActor
     public func loadTimelineVersions(for relativePath: String) {
         self.selectedTimelinePath = relativePath
+        let currentProfileId = selectedProfile?.id.uuidString ?? ""
+
         Task {
+            let isDbAvailable = await database.isOpen
             do {
-                let versions = try await database.listVersions(ofRelativePath: relativePath)
+                let versions: [(snapshot: SnapshotRecord, file: FileCatalogRecord)]
+                if isDbAvailable {
+                    versions = try await database.listVersions(ofRelativePath: relativePath)
+                } else {
+                    versions = try CentralDatabase.shared.listCachedVersions(ofRelativePath: relativePath, profileId: currentProfileId)
+                }
                 Task { @MainActor in
                     self.selectedPathVersions = versions
                     self.selectedTimelineVersion = versions.first

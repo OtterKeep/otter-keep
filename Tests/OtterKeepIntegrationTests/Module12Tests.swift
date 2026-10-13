@@ -266,5 +266,152 @@ struct Module12Tests {
         try assertTrue(decision.pruneSnapshotIds.contains("snap-old-unlocked"))
         try assertFalse(decision.pruneSnapshotIds.contains("snap-old-locked"))
     }
+
+    @Test func test12_5_CentralDatabaseProfileStorageAndMigration() throws {
+        let tempDir = try createTempDirectory(prefix: "CentralDBProfileTest")
+        defer { removeTempDirectory(tempDir) }
+
+        let centralDBPath = tempDir.appendingPathComponent("central.sqlite").path
+        let centralDB = CentralDatabase(databasePath: centralDBPath)
+
+        // 1. Save and retrieve profiles in CentralDatabase
+        let profile1 = BackupProfile(
+            name: "Work Documents",
+            sourceURL: URL(fileURLWithPath: "/Users/test/Work"),
+            destinationURL: URL(fileURLWithPath: "/Volumes/ExtBackup/Work")
+        )
+        let profile2 = BackupProfile(
+            name: "Personal Photos",
+            sourceURL: URL(fileURLWithPath: "/Users/test/Pictures"),
+            destinationURL: URL(fileURLWithPath: "/Volumes/ExtBackup/Photos")
+        )
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let p1Data = try encoder.encode(profile1)
+        let p2Data = try encoder.encode(profile2)
+
+        let rec1 = CentralProfileRecord(id: profile1.id.uuidString, name: profile1.name, jsonData: String(data: p1Data, encoding: .utf8)!)
+        let rec2 = CentralProfileRecord(id: profile2.id.uuidString, name: profile2.name, jsonData: String(data: p2Data, encoding: .utf8)!)
+
+        try centralDB.saveProfileRecords([rec1, rec2])
+
+        let loaded = try centralDB.loadProfileRecords()
+        try assertEqual(loaded.count, 2)
+        try assertTrue(loaded.contains(where: { $0.id == profile1.id.uuidString && $0.name == "Work Documents" }))
+        try assertTrue(loaded.contains(where: { $0.id == profile2.id.uuidString && $0.name == "Personal Photos" }))
+
+        // 2. Test JSON export/import preservation
+        let exportURL = tempDir.appendingPathComponent("config_backup.json")
+        let settings = AppSettings(language: .english, launchAtLogin: false, startMinimized: false, debugFileLoggingEnabled: true, finderIntegrationEnabled: true, themeMode: .system)
+        try ConfigurationBackupManager.shared.exportConfiguration(
+            to: exportURL,
+            profiles: [profile1, profile2],
+            settings: settings
+        )
+
+        try assertTrue(FileManager.default.fileExists(atPath: exportURL.path))
+        let imported = try ConfigurationBackupManager.shared.parseArchive(from: exportURL)
+        try assertEqual(imported.profiles.count, 2)
+        try assertEqual(imported.profiles.map(\.name).sorted(), ["Personal Photos", "Work Documents"])
+        try assertTrue(imported.settings.debugFileLoggingEnabled)
+
+        // 3. Test delete cascade in CentralDatabase
+        try centralDB.deleteProfileRecord(id: profile1.id.uuidString)
+        let afterDelete = try centralDB.loadProfileRecords()
+        try assertEqual(afterDelete.count, 1)
+        try assertEqual(afterDelete.first?.id, profile2.id.uuidString)
+
+        centralDB.close()
+    }
+
+    @Test func test12_6_CentralDatabaseOfflineSnapshotInspection() async throws {
+        let tempDir = try createTempDirectory(prefix: "OfflineInspectionTest")
+        defer { removeTempDirectory(tempDir) }
+
+        let centralDBPath = tempDir.appendingPathComponent("central.sqlite").path
+        let centralDB = CentralDatabase(databasePath: centralDBPath)
+
+        let profileId = UUID()
+        let snap1 = SnapshotRecord(
+            id: "snap-offline-101",
+            timestamp: Date(),
+            status: "completed",
+            totalFiles: 2,
+            totalBytes: 5000,
+            snapshotPath: "2026-10-13-101",
+            backupType: "incremental"
+        )
+        let file1 = FileCatalogRecord(
+            snapshotId: "snap-offline-101",
+            relativePath: "Projects/otter-keep/README.md",
+            fileSize: 2000,
+            modificationTime: Date(),
+            inode: 5501,
+            checksum: "sha256-readme",
+            isDirectory: false,
+            isSymlink: false
+        )
+        let file2 = FileCatalogRecord(
+            snapshotId: "snap-offline-101",
+            relativePath: "Projects/otter-keep/Package.swift",
+            fileSize: 3000,
+            modificationTime: Date(),
+            inode: 5502,
+            checksum: "sha256-package",
+            isDirectory: false,
+            isSymlink: false
+        )
+
+        // Cache snapshot and files into CentralDatabase
+        try centralDB.cacheSnapshotWithFiles(snap1, files: [file1, file2], forProfileId: profileId.uuidString)
+
+        // Query offline cached snapshots
+        let cachedSnaps = try centralDB.listCachedSnapshots(forProfileId: profileId.uuidString)
+        try assertEqual(cachedSnaps.count, 1)
+        try assertEqual(cachedSnaps.first?.id, "snap-offline-101")
+        try assertEqual(cachedSnaps.first?.totalBytes, 5000)
+
+        // Query offline cached files
+        let cachedFiles = try centralDB.listCachedFiles(forSnapshotId: "snap-offline-101", profileId: profileId.uuidString)
+        try assertEqual(cachedFiles.count, 2)
+        try assertTrue(cachedFiles.contains(where: { $0.relativePath == "Projects/otter-keep/README.md" }))
+
+        // Search cached relative paths
+        let searchedPaths = try centralDB.searchCachedRelativePaths(matching: "README", profileId: profileId.uuidString)
+        try assertEqual(searchedPaths.count, 1)
+        try assertEqual(searchedPaths.first, "Projects/otter-keep/README.md")
+
+        // Query cached point-in-time version history
+        let versions = try centralDB.listCachedVersions(ofRelativePath: "Projects/otter-keep/Package.swift", profileId: profileId.uuidString)
+        try assertEqual(versions.count, 1)
+        try assertEqual(versions.first?.snapshot.id, "snap-offline-101")
+        try assertEqual(versions.first?.file.fileSize, 3000)
+
+        // Verify SnapshotCatalogService fallback when destination drive is disconnected
+        let detachedProfile = BackupProfile(
+            id: profileId,
+            name: "Detached External SSD",
+            sourceURL: tempDir.appendingPathComponent("src"),
+            destinationURL: tempDir.appendingPathComponent("nonexistent_unmounted_volume")
+        )
+
+        // Also cache into CentralDatabase.shared so SnapshotCatalogService can find it
+        try CentralDatabase.shared.cacheSnapshotWithFiles(snap1, files: [file1, file2], forProfileId: profileId.uuidString)
+
+        let offlineSnapshots = try await SnapshotCatalogService.shared.listSnapshots(for: detachedProfile)
+        try assertTrue(offlineSnapshots.contains(where: { $0.id == "snap-offline-101" }))
+
+        let offlineFiles = try await SnapshotCatalogService.shared.listFiles(forSnapshotId: "snap-offline-101", in: detachedProfile)
+        try assertEqual(offlineFiles.count, 2)
+
+        let offlineSpecific = try await SnapshotCatalogService.shared.getSnapshot(id: "snap-offline-101", in: detachedProfile)
+        try assertNotNil(offlineSpecific)
+        try assertEqual(offlineSpecific?.id, "snap-offline-101")
+
+        // Clean up cached snapshot from CentralDatabase.shared
+        try CentralDatabase.shared.deleteCachedSnapshot(id: "snap-offline-101", forProfileId: profileId.uuidString)
+        centralDB.close()
+    }
 }
 

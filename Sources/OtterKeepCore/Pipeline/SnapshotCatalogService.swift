@@ -51,11 +51,17 @@ public final class SnapshotCatalogService: Sendable {
         }
     }
 
-    /// Lists all snapshots recorded in the profile's SQLite manifest catalog.
+    /// Lists all snapshots recorded in the profile's SQLite manifest catalog, falling back to the central database offline cache if the destination volume is detached.
     /// - Parameter profile: The target backup profile.
     /// - Returns: Array of snapshot records sorted by timestamp descending.
     public func listSnapshots(for profile: BackupProfile) async throws -> [SnapshotRecord] {
-        try await ListSnapshotsUseCase(repository: snapshotRepository(for: profile)).execute()
+        if FileManager.default.fileExists(atPath: profile.manifestDatabasePath) {
+            let snaps = try await ListSnapshotsUseCase(repository: snapshotRepository(for: profile)).execute()
+            try? CentralDatabase.shared.cacheSnapshots(snaps, forProfileId: profile.id.uuidString)
+            return snaps
+        } else {
+            return try CentralDatabase.shared.listCachedSnapshots(forProfileId: profile.id.uuidString)
+        }
     }
 
     /// Retrieves a specific snapshot record by its unique ID.
@@ -64,7 +70,11 @@ public final class SnapshotCatalogService: Sendable {
     ///   - profile: The target backup profile.
     /// - Returns: The matching `SnapshotRecord`, or `nil` if not found.
     public func getSnapshot(id: String, in profile: BackupProfile) async throws -> SnapshotRecord? {
-        try await snapshotRepository(for: profile).getSnapshot(id: id)
+        if FileManager.default.fileExists(atPath: profile.manifestDatabasePath) {
+            return try await snapshotRepository(for: profile).getSnapshot(id: id)
+        } else {
+            return try CentralDatabase.shared.getCachedSnapshot(id: id, forProfileId: profile.id.uuidString)
+        }
     }
 
     /// Lists all file catalog records associated with a specific snapshot.
@@ -73,7 +83,11 @@ public final class SnapshotCatalogService: Sendable {
     ///   - profile: The target backup profile.
     /// - Returns: Array of indexed `FileCatalogRecord` entries.
     public func listFiles(forSnapshotId snapshotId: String, in profile: BackupProfile) async throws -> [FileCatalogRecord] {
-        try await fileCatalogRepository(for: profile).listFiles(forSnapshotId: snapshotId)
+        if FileManager.default.fileExists(atPath: profile.manifestDatabasePath) {
+            return try await fileCatalogRepository(for: profile).listFiles(forSnapshotId: snapshotId)
+        } else {
+            return try CentralDatabase.shared.listCachedFiles(forSnapshotId: snapshotId, profileId: profile.id.uuidString)
+        }
     }
 
     /// Queries the point-in-time version history for a specific relative file path across all snapshots.
@@ -85,7 +99,11 @@ public final class SnapshotCatalogService: Sendable {
         relativePath: String,
         in profile: BackupProfile
     ) async throws -> [(snapshot: SnapshotRecord, file: FileCatalogRecord)] {
-        try await fileCatalogRepository(for: profile).listVersions(ofRelativePath: relativePath)
+        if FileManager.default.fileExists(atPath: profile.manifestDatabasePath) {
+            return try await fileCatalogRepository(for: profile).listVersions(ofRelativePath: relativePath)
+        } else {
+            return try CentralDatabase.shared.listCachedVersions(ofRelativePath: relativePath, profileId: profile.id.uuidString)
+        }
     }
 
     /// Updates the WORM immutability lock date on a snapshot record and sets or clears BSD file flags.

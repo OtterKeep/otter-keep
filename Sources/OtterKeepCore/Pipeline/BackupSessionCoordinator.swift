@@ -724,6 +724,13 @@ public actor BackupSessionCoordinator {
         try await database.insertSnapshot(snapshotRecord)
         try await database.insertFileRecordsBatch(catalogRecordsToSave)
 
+        // Mirror snapshot and file records to Central SQLite Database for offline inspection
+        try? CentralDatabase.shared.cacheSnapshotWithFiles(
+            snapshotRecord,
+            files: catalogRecordsToSave,
+            forProfileId: profile.id.uuidString
+        )
+
         // 15. Automatic retention pruning (if enabled in profile)
         var autoPrunedCount = 0
         if profile.pruningPolicy.isAutoPruningEnabled {
@@ -732,6 +739,9 @@ public actor BackupSessionCoordinator {
                 logger.info("Running automatic retention pruning for profile '\(profile.name)' (Threshold: \(retainCount))...")
                 let deletedIds = try await retentionManager.applyRetentionPolicy(destinationURL: destinationURL, policy: profile.pruningPolicy)
                 autoPrunedCount = deletedIds.count
+                for prunedId in deletedIds {
+                    try? CentralDatabase.shared.deleteCachedSnapshot(id: prunedId, forProfileId: profile.id.uuidString)
+                }
                 if !deletedIds.isEmpty {
                     LogManager.shared.log("Auto-pruning completed for profile '\(profile.name)': \(deletedIds.count) older snapshots pruned (Pruned IDs: [\(deletedIds.joined(separator: ", "))]). Retained: \(retainCount) recent snapshots.", level: .info, category: "Retention")
                 } else {
