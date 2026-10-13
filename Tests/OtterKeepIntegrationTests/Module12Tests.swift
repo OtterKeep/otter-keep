@@ -14,6 +14,8 @@ import CryptoKit
 import AppKit
 import SwiftUI
 import Testing
+import OtterKeepDomain
+import OtterKeepApplication
 import OtterKeepStorage
 import OtterKeepDatabase
 import OtterKeepCore
@@ -133,4 +135,136 @@ struct Module12Tests {
         let unlockedSnap = try await SnapshotCatalogService.shared.getSnapshot(id: "2026-10-09-001", in: profile)
         try assertTrue(unlockedSnap?.isLocked == false)
     }
+
+    @Test func test12_3_CleanArchitecturePortsAndAdapters() async throws {
+        let tempDir = try createTempDirectory(prefix: "CleanArchPortsTest")
+        defer { removeTempDirectory(tempDir) }
+
+        let dbPath = tempDir.appendingPathComponent("manifest.sqlite").path
+
+        // Initialize SQLite database schema
+        let db = DatabaseEngine()
+        try await db.open(at: dbPath)
+        await db.close()
+
+        // Treat repositories strictly via abstract Clean Architecture ports
+        let snapshotPort: SnapshotRepositoryProtocol = SQLiteSnapshotRepository(databasePath: dbPath)
+        let fileCatalogPort: FileCatalogRepositoryProtocol = SQLiteFileCatalogRepository(databasePath: dbPath)
+
+        // Verify initial empty state through port
+        let initialList = try await snapshotPort.listSnapshots()
+        try assertEqual(initialList.count, 0)
+
+        // Insert snapshot record via port
+        let snap1 = SnapshotRecord(
+            id: "snap-clean-01",
+            timestamp: Date(),
+            status: "completed",
+            totalFiles: 2,
+            totalBytes: 2048,
+            snapshotPath: "snap-clean-01",
+            backupType: "incremental"
+        )
+        try await snapshotPort.insertSnapshot(snap1)
+
+        // Insert file catalog entries via port
+        let file1 = FileCatalogRecord(
+            snapshotId: "snap-clean-01",
+            relativePath: "Documents/notes.txt",
+            fileSize: 1024,
+            modificationTime: Date(),
+            inode: 1001,
+            checksum: "a1b2c3d4",
+            isDirectory: false,
+            isSymlink: false
+        )
+        let file2 = FileCatalogRecord(
+            snapshotId: "snap-clean-01",
+            relativePath: "Documents/summary.pdf",
+            fileSize: 1024,
+            modificationTime: Date(),
+            inode: 1002,
+            checksum: "e5f6g7h8",
+            isDirectory: false,
+            isSymlink: false
+        )
+        try await fileCatalogPort.insertBatch([file1, file2])
+
+        // Verify Use Case execution via injected ports
+        let listUseCase = ListSnapshotsUseCase(repository: snapshotPort)
+        let retrievedSnaps = try await listUseCase.execute()
+        try assertEqual(retrievedSnaps.count, 1)
+        try assertEqual(retrievedSnaps[0].id, "snap-clean-01")
+
+        let detailsUseCase = GetSnapshotDetailsUseCase(
+            snapshotRepository: snapshotPort,
+            fileRepository: fileCatalogPort
+        )
+        let details = try await detailsUseCase.execute(snapshotId: "snap-clean-01")
+        try assertNotNil(details)
+        try assertEqual(details?.snapshot.id, "snap-clean-01")
+        try assertEqual(details?.files.count, 2)
+
+        // Verify WORM lock mutation through port
+        let lockDate = Date().addingTimeInterval(3600)
+        try await snapshotPort.updateSnapshotLockedUntil(id: "snap-clean-01", lockedUntil: lockDate)
+        let locked = try await snapshotPort.getSnapshot(id: "snap-clean-01")
+        try assertTrue(locked?.isLocked == true)
+
+        // Verify search through port
+        let searchResults = try await fileCatalogPort.searchGlobal(query: "notes")
+        try assertEqual(searchResults.count, 1)
+        try assertEqual(searchResults[0].relativePath, "Documents/notes.txt")
+
+        // Verify snapshot deletion via port
+        try await snapshotPort.deleteSnapshot(id: "snap-clean-01")
+        let afterDelete = try await snapshotPort.listSnapshots()
+        try assertEqual(afterDelete.count, 0)
+    }
+
+    @Test func test12_4_RetentionPolicyDomainRules() throws {
+        let now = Date()
+        let snapNew = SnapshotRecord(
+            id: "snap-new",
+            timestamp: now,
+            status: "completed",
+            totalFiles: 1,
+            totalBytes: 100,
+            snapshotPath: "snap-new"
+        )
+        let snapOldUnlocked = SnapshotRecord(
+            id: "snap-old-unlocked",
+            timestamp: now.addingTimeInterval(-10 * 86400), // 10 days ago
+            status: "completed",
+            totalFiles: 1,
+            totalBytes: 100,
+            snapshotPath: "snap-old-unlocked",
+            lockedUntil: nil
+        )
+        let snapOldLocked = SnapshotRecord(
+            id: "snap-old-locked",
+            timestamp: now.addingTimeInterval(-10 * 86400), // 10 days ago
+            status: "completed",
+            totalFiles: 1,
+            totalBytes: 100,
+            snapshotPath: "snap-old-locked",
+            lockedUntil: now.addingTimeInterval(86400) // Locked for 1 more day
+        )
+
+        // Evaluate pure domain rules
+        let decision = RetentionPolicyCalculator.evaluate(
+            snapshots: [snapNew, snapOldUnlocked, snapOldLocked],
+            now: now,
+            keepDailyDays: 7
+        )
+
+        // Newest must be kept
+        try assertTrue(decision.keepSnapshotIds.contains("snap-new"))
+        // Locked must be kept even if older than keepDailyDays
+        try assertTrue(decision.keepSnapshotIds.contains("snap-old-locked"))
+        // Unlocked older than 7 days must be pruned
+        try assertTrue(decision.pruneSnapshotIds.contains("snap-old-unlocked"))
+        try assertFalse(decision.pruneSnapshotIds.contains("snap-old-locked"))
+    }
 }
+

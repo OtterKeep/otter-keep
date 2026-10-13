@@ -123,3 +123,46 @@ public final class DefaultFileSystemProvider: FileSystemProvider, Sendable {
         try registry.driver(for: url).isFileImmutable(at: url)
     }
 }
+
+import OtterKeepApplication
+
+// MARK: - Clean Architecture FileSystemPort Conformance
+extension DefaultFileSystemProvider: FileSystemPort {
+    public func fileExists(at url: URL) -> Bool {
+        FileManager.default.fileExists(atPath: url.path)
+    }
+
+    public func isDirectory(at url: URL) -> Bool {
+        var isDir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue
+    }
+
+    public func cloneFile(source: URL, destination: URL) throws {
+        if clonefile(source.path, destination.path, 0) != 0 {
+            let err = errno
+            if err == EXDEV || err == ENOTSUP {
+                try hardlink(source: source, destination: destination)
+            } else {
+                throw FileSystemError.cloneFailed(path: destination.path, errno: err, message: String(cString: strerror(err)))
+            }
+        }
+    }
+
+    public func hardlink(source: URL, destination: URL) throws {
+        if link(source.path, destination.path) != 0 {
+            let err = errno
+            throw FileSystemError.hardLinkFailed(path: destination.path, errno: err, message: String(cString: strerror(err)))
+        }
+    }
+
+    public func move(from source: URL, to destination: URL) throws {
+        if rename(source.path, destination.path) != 0 {
+            let err = errno
+            throw FileSystemError.atomicMoveFailed(source: source.path, destination: destination.path, errno: err, message: String(cString: strerror(err)))
+        }
+    }
+
+    public func remove(at url: URL) throws {
+        try removeItem(at: url)
+    }
+}

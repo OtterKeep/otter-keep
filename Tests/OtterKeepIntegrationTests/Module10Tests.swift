@@ -60,7 +60,7 @@ struct Module10Tests {
 
         let decoder = JSONDecoder()
         let decoded = try decoder.decode(ConfigurationExportArchive.self, from: data)
-        try assertEqual(decoded.appVersion, "1.7.1")
+        try assertEqual(decoded.appVersion, CoreEngine.version)
         try assertEqual(decoded.profiles.count, 1)
         try assertEqual(decoded.profiles.first?.name, "Portable Profile")
     }

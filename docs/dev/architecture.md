@@ -1,21 +1,23 @@
 # OtterKeep Architecture Blueprint
 
-This document specifies the technical architecture of OtterKeep v1.6.0, detailing concurrency boundaries, actor isolation, multi-subsystem topology, and modern data verification pipelines.
+This document specifies the technical architecture of OtterKeep v2.0.0, detailing concurrency boundaries, actor isolation, Clean Architecture (Ports & Adapters) layers, and modern data verification pipelines.
 
 ---
 
-## 1. Subsystem Decomposition
+## 1. Subsystem Decomposition & Clean Architecture Layers
 
-OtterKeep is partitioned into modular, decoupled Swift packages:
+OtterKeep conforms to a strict **Clean Architecture (Hexagonal / Ports & Adapters)** decomposition under Swift 6 Strict Concurrency:
 
-| Package | Purpose | Isolation & Concurrency |
+| Layer / Package | Purpose | Inward Dependencies |
 | :--- | :--- | :--- |
-| **`OtterKeepStorage`** | Low-level filesystem I/O, APFS `clonefile`, POSIX hardlinks, xattr, BSD `uchg`, SFTP, S3, Backblaze B2 | Actor-isolated providers (`APFSFileSystemProvider`, `B2StorageProvider`, `S3StorageProvider`, `SFTPStorageProvider`) |
-| **`OtterKeepDatabase`** | SQLite WAL cataloging, schema migrations, diffing, Myers LCS text diffing, timeline indexing | Actor-isolated `DatabaseEngine`, `SnapshotDiffEngine`, sendable `TextDiffEngine` |
-| **`OtterKeepCore`** | Backup session orchestration, background data scrubber, replication catch-up, anomaly guard, restore engine, encryption | Actor-isolated coordinators (`BackupSessionCoordinator`, `DataScrubberEngine`, `ReplicationCatchUpCoordinator`, `PhotosBackupCoordinator`) |
-| **`OtterKeepUI`** | SwiftUI sanctuary interface, menu bar popovers, side-by-side diff modal, timeline explorer | `@MainActor` isolated `AppState` and views |
-| **`OtterKeepCLI`** | Standalone command-line utility (`otterkeep`) | Headless Swift execution communicating via IPC or direct core engine |
-| **`OtterKeepFinderSyncExtension`**| Context-menu integration in macOS Finder | Sandboxed App Extension communicating over Darwin IPC |
+| **`OtterKeepDomain`** | Pure enterprise business rules: entities (`SnapshotRecord`, `FileCatalogRecord`, `PendingReplicationRecord`, `PhotosAssetRecord`), GFS retention calculator, and domain invariants. | Zero dependencies (pure Swift). |
+| **`OtterKeepApplication`** | Application business rules: abstract repository & storage ports (`SnapshotRepositoryProtocol`, `FileCatalogRepositoryProtocol`, `FileSystemPort`, `PlatformPorts`), and Use Cases (`ListSnapshotsUseCase`, `GetSnapshotDetailsUseCase`, `UpdateSnapshotLockUseCase`, `ApplyRetentionPruningUseCase`). | Depends strictly on `OtterKeepDomain`. |
+| **`OtterKeepStorage`** | Infrastructure adapter for filesystem & cloud I/O: APFS `clonefile`, POSIX hardlinks, xattr, BSD `uchg`, SFTP, S3, Backblaze B2, conforming to `FileSystemPort`. | Depends on `OtterKeepDomain`, `OtterKeepApplication`. |
+| **`OtterKeepDatabase`** | Infrastructure adapter for persistence: SQLite WAL cataloging, schema migrations, diffing engines, implementing `SQLiteSnapshotRepository` and `SQLiteFileCatalogRepository`. | Depends on `OtterKeepDomain`, `OtterKeepApplication`, `OtterKeepStorage`. |
+| **`OtterKeepCore`** | Domain services & application orchestration: backup coordination, background data scrubber, replication catch-up, anomaly guard, restore engine, encryption. | Depends on `OtterKeepDomain`, `OtterKeepApplication`, `OtterKeepStorage`, `OtterKeepDatabase`. |
+| **`OtterKeepUI`** | Presentation layer: SwiftUI sanctuary interface, menu bar popovers, side-by-side diff modal, timeline explorer. | `@MainActor` isolated `AppState` and views. |
+| **`OtterKeepCLI`** | Command-line utility (`otterkeep`): terminal commands invoking use cases through the composition root. | Headless Swift execution. |
+| **`OtterKeepFinderSyncExtension`**| Context-menu integration in macOS Finder. | Sandboxed App Extension communicating over Darwin IPC. |
 
 ---
 

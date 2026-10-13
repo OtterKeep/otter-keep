@@ -1,12 +1,13 @@
 import Foundation
 import os
+import OtterKeepDomain
+import OtterKeepApplication
 import OtterKeepStorage
 import OtterKeepDatabase
 
 /// Central domain service managing snapshot catalog operations, version histories, and immutability locks.
 ///
-/// Encapsulates SQLite database connection lifecycles, guaranteeing that every query, lock mutation,
-/// and diff evaluation strictly closes the database and truncates WAL logs via transactional closures.
+/// Encapsulates SQLite database connection lifecycles and provides clean repository port access.
 public final class SnapshotCatalogService: Sendable {
     /// Shared singleton instance.
     public static let shared = SnapshotCatalogService()
@@ -14,6 +15,16 @@ public final class SnapshotCatalogService: Sendable {
     private let logger = Logger(subsystem: "com.otterkeep", category: "SnapshotCatalogService")
 
     public init() {}
+
+    /// Factory creating a `SnapshotRepositoryProtocol` port instance for the given backup profile.
+    public func snapshotRepository(for profile: BackupProfile) -> SnapshotRepositoryProtocol {
+        SQLiteSnapshotRepository(databasePath: profile.manifestDatabasePath)
+    }
+
+    /// Factory creating a `FileCatalogRepositoryProtocol` port instance for the given backup profile.
+    public func fileCatalogRepository(for profile: BackupProfile) -> FileCatalogRepositoryProtocol {
+        SQLiteFileCatalogRepository(databasePath: profile.manifestDatabasePath)
+    }
 
     /// Executes an async block against an open `DatabaseEngine` connection, guaranteeing that
     /// `await db.close()` is always executed upon completion or error.
@@ -44,9 +55,7 @@ public final class SnapshotCatalogService: Sendable {
     /// - Parameter profile: The target backup profile.
     /// - Returns: Array of snapshot records sorted by timestamp descending.
     public func listSnapshots(for profile: BackupProfile) async throws -> [SnapshotRecord] {
-        try await withDatabase(for: profile, allowMissing: true, defaultValue: []) { db in
-            try await db.listSnapshots()
-        }
+        try await ListSnapshotsUseCase(repository: snapshotRepository(for: profile)).execute()
     }
 
     /// Retrieves a specific snapshot record by its unique ID.
@@ -55,10 +64,7 @@ public final class SnapshotCatalogService: Sendable {
     ///   - profile: The target backup profile.
     /// - Returns: The matching `SnapshotRecord`, or `nil` if not found.
     public func getSnapshot(id: String, in profile: BackupProfile) async throws -> SnapshotRecord? {
-        try await withDatabase(for: profile, allowMissing: true, defaultValue: nil) { db in
-            let snapshots = try await db.listSnapshots()
-            return snapshots.first(where: { $0.id == id })
-        }
+        try await snapshotRepository(for: profile).getSnapshot(id: id)
     }
 
     /// Lists all file catalog records associated with a specific snapshot.
@@ -67,9 +73,7 @@ public final class SnapshotCatalogService: Sendable {
     ///   - profile: The target backup profile.
     /// - Returns: Array of indexed `FileCatalogRecord` entries.
     public func listFiles(forSnapshotId snapshotId: String, in profile: BackupProfile) async throws -> [FileCatalogRecord] {
-        try await withDatabase(for: profile, allowMissing: true, defaultValue: []) { db in
-            try await db.listFiles(forSnapshotId: snapshotId)
-        }
+        try await fileCatalogRepository(for: profile).listFiles(forSnapshotId: snapshotId)
     }
 
     /// Queries the point-in-time version history for a specific relative file path across all snapshots.
@@ -81,9 +85,7 @@ public final class SnapshotCatalogService: Sendable {
         relativePath: String,
         in profile: BackupProfile
     ) async throws -> [(snapshot: SnapshotRecord, file: FileCatalogRecord)] {
-        try await withDatabase(for: profile, allowMissing: true, defaultValue: []) { db in
-            try await db.listVersions(ofRelativePath: relativePath)
-        }
+        try await fileCatalogRepository(for: profile).listVersions(ofRelativePath: relativePath)
     }
 
     /// Updates the WORM immutability lock date on a snapshot record and sets or clears BSD file flags.
@@ -98,11 +100,10 @@ public final class SnapshotCatalogService: Sendable {
         in profile: BackupProfile,
         storage: FileSystemProvider = DefaultFileSystemProvider()
     ) async throws {
-        try await withDatabase(for: profile) { db in
-            try await db.updateSnapshotLockedUntil(id: id, lockedUntil: lockedUntil)
-        }
+        let repo = snapshotRepository(for: profile)
+        try await repo.updateSnapshotLockedUntil(id: id, lockedUntil: lockedUntil)
 
-        let snapshots = try await listSnapshots(for: profile)
+        let snapshots = try await repo.listSnapshots()
         if let snap = snapshots.first(where: { $0.id == id }) {
             let snapURL = profile.destinationURL.appendingPathComponent(snap.snapshotPath)
             let isLockActive = (lockedUntil != nil && lockedUntil! > Date())
