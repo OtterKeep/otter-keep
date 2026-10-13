@@ -944,5 +944,19 @@ extension L10n {
         .menuBarExternalVolumeDisconnected: Translation(english: "Destination drive is not connected", hungarian: "A mentési meghajtó nincs csatlakoztatva"),
         .menuBarTargetVolumeLabel: Translation(english: "Target Volume", hungarian: "Célmeghajtó"),
         .errBackupInProgress: Translation(english: "Backup is currently in progress.", hungarian: "A mentés még folyamatban van."),
+        // MARK: - 2.0.0 UI/UX Modernization
+        .profileSettingsTitle: Translation(english: "Profile Settings", hungarian: "Profil beállítások"),
+        .profileSettingsButton: Translation(english: "Profile Settings...", hungarian: "Profil beállítások..."),
+        .lastBackupResultTitle: Translation(english: "Last Backup Outcome", hungarian: "Utolsó mentés eredménye"),
+        .lastBackupResultSubtitle: Translation(english: "Detailed operational telemetry for this profile", hungarian: "Részletes műveleti telemetria ehhez a profilhoz"),
+        .tabGeneral: Translation(english: "General", hungarian: "Általános"),
+        .tabFinderIntegration: Translation(english: "Finder Extension", hungarian: "Finder bővítmény"),
+        .tabStorageAndDb: Translation(english: "Storage & DB", hungarian: "Tárhely & Adatbázis"),
+        .tabDiagnosticsAndUpdates: Translation(english: "Diagnostics & Updates", hungarian: "Diagnosztika & Frissítések"),
+        .tabAbout: Translation(english: "About", hungarian: "Névjegy"),
+        .menuSystemLogs: Translation(english: "System Logs", hungarian: "Rendszer naplók"),
+        .welcomeSanctuaryTitle: Translation(english: "Welcome to OtterKeep Sanctuary", hungarian: "Üdvözlünk az OtterKeep szentélyben"),
+        .welcomeSanctuarySubtitle: Translation(english: "Your personal guardian for cherished files, photos, and projects. Create your first profile to begin.", hungarian: "Féltett fájljaid, fotóid és projektjeid személyes őrzője. Hozd létre az első profilodat a kezdéshez."),
+        .createFirstProfileButton: Translation(english: "Create First Backup Profile", hungarian: "Első mentési profil létrehozása"),
     ]
 }

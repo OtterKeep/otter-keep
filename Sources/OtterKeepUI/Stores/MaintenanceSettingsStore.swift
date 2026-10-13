@@ -58,6 +58,27 @@ public final class MaintenanceSettingsStore: Sendable {
     /// Controls presentation of the backup inspector modal.
     public var showInspectorModal: Bool = false
 
+    /// Controls presentation of the global preferences modal.
+    public var showPreferencesModal: Bool = false
+
+    /// Active tab in the preferences modal sheet.
+    public var activePreferencesTab: PreferencesTab = .general
+
+    /// Controls presentation of the system logs modal.
+    public var showSystemLogsModal: Bool = false
+
+    /// Controls presentation of the tabbed profile settings modal.
+    public var showProfileSettingsModal: Bool = false
+
+    /// Controls presentation of the last backup session summary modal.
+    public var showLastBackupSummaryModal: Bool = false
+
+    /// Controls presentation of the delete profile confirmation dialog.
+    public var showDeleteProfileConfirmation: Bool = false
+
+    /// Profile queued for deletion confirmation.
+    public var profilePendingDeletion: BackupProfile?
+
     /// Active tab of the backup inspector modal.
     public var inspectorSelectedTab: String = "summary"
 

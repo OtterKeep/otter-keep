@@ -21,6 +21,23 @@ public struct MainWindowView: View {
                 .background(Color(nsColor: .windowBackgroundColor))
                 .navigationTitle("")
         }
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    appState.showSystemLogsModal = true
+                } label: {
+                    Image(systemName: "terminal")
+                }
+                .help(L10n.t(.menuSystemLogs) + " (⌘L)")
+
+                Button {
+                    appState.showPreferencesModal = true
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .help(L10n.t(.menuPreferences) + " (⌘,)")
+            }
+        }
         .toolbar(removing: .sidebarToggle)
         .onAppear {
             appState.loadSnapshots()
@@ -32,6 +49,18 @@ public struct MainWindowView: View {
             appState.loadPhotosSnapshots()
         }
         .background(WindowTitleConfigurator(appState: appState))
+        .sheet(isPresented: Binding(
+            get: { appState.showPreferencesModal },
+            set: { appState.showPreferencesModal = $0 }
+        )) {
+            PreferencesModalView(appState: appState)
+        }
+        .sheet(isPresented: Binding(
+            get: { appState.showSystemLogsModal },
+            set: { appState.showSystemLogsModal = $0 }
+        )) {
+            SystemLogsModalView(appState: appState)
+        }
         .sheet(isPresented: Binding(
             get: { appState.showInspectorModal },
             set: { appState.showInspectorModal = $0 }
@@ -275,7 +304,9 @@ public struct MainWindowView: View {
 
                 // MARK: 3. System Section
                 Section {
-                    NavigationLink(value: NavigationSection.logs) {
+                    Button {
+                        appState.showSystemLogsModal = true
+                    } label: {
                         Label {
                             Text(L10n.t(.navLogs))
                         } icon: {
@@ -283,8 +314,11 @@ public struct MainWindowView: View {
                                 .foregroundStyle(OtterTheme.accentPurple)
                         }
                     }
+                    .buttonStyle(.plain)
 
-                    NavigationLink(value: NavigationSection.settings) {
+                    Button {
+                        appState.showPreferencesModal = true
+                    } label: {
                         Label {
                             Text(L10n.t(.navSettings))
                         } icon: {
@@ -292,6 +326,7 @@ public struct MainWindowView: View {
                                 .foregroundStyle(OtterTheme.oceanicTeal)
                         }
                     }
+                    .buttonStyle(.plain)
                 } header: {
                     Text(L10n.t(.sidebarSectionSystem))
                         .font(.caption.bold())
@@ -299,15 +334,6 @@ public struct MainWindowView: View {
                 }
             }
             .listStyle(.sidebar)
-
-            Spacer(minLength: 0)
-
-            Divider()
-                .padding(.horizontal, 10)
-
-            // Bottom Bar: Backup Inspector Trigger
-            sidebarInspectorButton
-                .padding(10)
         }
         .background(.ultraThinMaterial)
     }
@@ -358,32 +384,6 @@ public struct MainWindowView: View {
             .buttonStyle(.plain)
             .help(L10n.t(.newProfileButton))
         }
-    }
-
-    private var sidebarInspectorButton: some View {
-        Button {
-            appState.showInspectorModal = true
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "list.bullet.rectangle.portrait")
-                    .font(.caption)
-                    .foregroundStyle(OtterTheme.oceanicTeal)
-
-                Text(L10n.t(.inspectorTitle))
-                    .font(.caption.weight(.medium))
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .help(L10n.t(.inspectorSubtitle))
     }
 }
 

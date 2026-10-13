@@ -53,6 +53,20 @@ extension AppState {
     }
     /// Controls presentation of the backup inspector modal.
     public var showInspectorModal: Bool { get { maintenanceSettings.showInspectorModal } set { maintenanceSettings.showInspectorModal = newValue } }
+    /// Controls presentation of the global preferences modal.
+    public var showPreferencesModal: Bool { get { maintenanceSettings.showPreferencesModal } set { maintenanceSettings.showPreferencesModal = newValue } }
+    /// Active tab in the preferences modal sheet.
+    public var activePreferencesTab: PreferencesTab { get { maintenanceSettings.activePreferencesTab } set { maintenanceSettings.activePreferencesTab = newValue } }
+    /// Controls presentation of the system logs modal.
+    public var showSystemLogsModal: Bool { get { maintenanceSettings.showSystemLogsModal } set { maintenanceSettings.showSystemLogsModal = newValue } }
+    /// Controls presentation of the tabbed profile settings modal.
+    public var showProfileSettingsModal: Bool { get { maintenanceSettings.showProfileSettingsModal } set { maintenanceSettings.showProfileSettingsModal = newValue } }
+    /// Controls presentation of the last backup session summary modal.
+    public var showLastBackupSummaryModal: Bool { get { maintenanceSettings.showLastBackupSummaryModal } set { maintenanceSettings.showLastBackupSummaryModal = newValue } }
+    /// Controls presentation of the delete profile confirmation dialog.
+    public var showDeleteProfileConfirmation: Bool { get { maintenanceSettings.showDeleteProfileConfirmation } set { maintenanceSettings.showDeleteProfileConfirmation = newValue } }
+    /// Profile queued for deletion confirmation.
+    public var profilePendingDeletion: BackupProfile? { get { maintenanceSettings.profilePendingDeletion } set { maintenanceSettings.profilePendingDeletion = newValue } }
     /// Active tab of the backup inspector modal.
     public var inspectorSelectedTab: String { get { maintenanceSettings.inspectorSelectedTab } set { maintenanceSettings.inspectorSelectedTab = newValue } }
     /// Search query of the backup inspector modal.

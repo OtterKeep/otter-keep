@@ -84,18 +84,49 @@ public struct ProfileWorkspaceView: View {
 
             // Centered Segmented Workspace Tabs
             Picker("", selection: activeTabBinding) {
-                ForEach(ProfileWorkspaceTab.allCases) { tab in
+                ForEach([ProfileWorkspaceTab.overview, ProfileWorkspaceTab.timeMachine]) { tab in
                     Label(tab.localizedTitle, systemImage: tab.iconName).tag(tab)
                 }
             }
             .pickerStyle(.segmented)
             .controlSize(.regular)
-            .frame(maxWidth: 420)
+            .frame(maxWidth: 320)
 
             Spacer()
 
-            // Quick Action Buttons
+            // Profile Configuration & Quick Action Buttons
             HStack(spacing: 8) {
+                // Profile Settings Button
+                Button {
+                    appState.showProfileSettingsModal = true
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "slider.horizontal.3")
+                        Text(L10n.t(.profileSettingsButton))
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .help(L10n.t(.profileSettingsTitle))
+
+                // Delete Profile Button (only if multiple profiles exist)
+                if appState.profiles.count > 1 {
+                    Button(role: .destructive) {
+                        appState.profilePendingDeletion = profile
+                        appState.showDeleteProfileConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .foregroundStyle(OtterTheme.statusError)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .help(L10n.t(.deleteProfileButton))
+                    .disabled(appState.isBackupRunning(for: profile.id))
+                }
+
+                Divider()
+                    .frame(height: 18)
+
                 // Dry-Run Button
                 Button {
                     appState.performDryRun()
@@ -148,17 +179,40 @@ public struct ProfileWorkspaceView: View {
         .padding(.vertical, 12)
         .background(.ultraThinMaterial)
         .background {
-            // Invisible keyboard shortcut targets for ⌘1, ⌘2, ⌘3 tab switching
+            // Invisible keyboard shortcut targets for ⌘1, ⌘2 tab switching
             Group {
                 Button("") { appState.activeProfileTab = .overview }
                     .keyboardShortcut("1", modifiers: .command)
                 Button("") { appState.activeProfileTab = .timeMachine }
                     .keyboardShortcut("2", modifiers: .command)
-                Button("") { appState.activeProfileTab = .rulesAndMaintenance }
-                    .keyboardShortcut("3", modifiers: .command)
             }
             .opacity(0)
             .allowsHitTesting(false)
+        }
+        .sheet(isPresented: Binding(
+            get: { appState.showProfileSettingsModal },
+            set: { appState.showProfileSettingsModal = $0 }
+        )) {
+            ProfileSettingsModalView(appState: appState, profile: profile)
+        }
+        .confirmationDialog(
+            L10n.t(.deleteProfileConfirmTitle),
+            isPresented: Binding(
+                get: { appState.showDeleteProfileConfirmation },
+                set: { appState.showDeleteProfileConfirmation = $0 }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(L10n.t(.deleteProfileButton), role: .destructive) {
+                let targetId = appState.profilePendingDeletion?.id ?? profile.id
+                appState.deleteProfile(id: targetId)
+                appState.profilePendingDeletion = nil
+            }
+            Button(L10n.t(.cancel), role: .cancel) {
+                appState.profilePendingDeletion = nil
+            }
+        } message: {
+            Text(L10n.t(.deleteProfileConfirmMessage))
         }
     }
 }

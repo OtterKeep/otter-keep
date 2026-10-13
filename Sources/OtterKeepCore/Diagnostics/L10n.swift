@@ -1061,6 +1061,21 @@ public enum L10n {
         case menuBarExternalVolumeDisconnected
         case menuBarTargetVolumeLabel
         case errBackupInProgress
+
+        // MARK: - 2.0.0 UI/UX Modernization
+        case profileSettingsTitle
+        case profileSettingsButton
+        case lastBackupResultTitle
+        case lastBackupResultSubtitle
+        case tabGeneral
+        case tabFinderIntegration
+        case tabStorageAndDb
+        case tabDiagnosticsAndUpdates
+        case tabAbout
+        case menuSystemLogs
+        case welcomeSanctuaryTitle
+        case welcomeSanctuarySubtitle
+        case createFirstProfileButton
     }
 
 

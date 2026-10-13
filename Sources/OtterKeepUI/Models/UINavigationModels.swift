@@ -69,6 +69,37 @@ public enum ProfileMaintenanceSubTab: String, CaseIterable, Identifiable, Sendab
     }
 }
 
+/// Tabs within the general Preferences modal dialog.
+public enum PreferencesTab: String, CaseIterable, Identifiable, Sendable {
+    case general = "general"
+    case finder = "finder"
+    case storage = "storage"
+    case diagnostics = "diagnostics"
+    case about = "about"
+
+    public var id: String { rawValue }
+
+    public var localizedTitle: String {
+        switch self {
+        case .general: return L10n.t(.tabGeneral)
+        case .finder: return L10n.t(.tabFinderIntegration)
+        case .storage: return L10n.t(.tabStorageAndDb)
+        case .diagnostics: return L10n.t(.tabDiagnosticsAndUpdates)
+        case .about: return L10n.t(.tabAbout)
+        }
+    }
+
+    public var iconName: String {
+        switch self {
+        case .general: return "slider.horizontal.3"
+        case .finder: return "macwindow"
+        case .storage: return "cylinder.split.1x2"
+        case .diagnostics: return "stethoscope"
+        case .about: return "info.circle"
+        }
+    }
+}
+
 /// Tabs within the unified Photos Workspace.
 public enum PhotosWorkspaceTab: String, CaseIterable, Identifiable, Sendable {
     case syncAndBackup = "syncAndBackup"

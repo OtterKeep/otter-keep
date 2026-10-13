@@ -25,7 +25,7 @@ public struct OtterKeepMenuCommands: Commands {
 
         CommandGroup(replacing: .appSettings) {
             Button(L10n.t(.menuPreferences)) {
-                appState.activeNavigation = .settings
+                appState.showPreferencesModal = true
                 WindowManager.showAndFocusMainWindow()
             }
             .keyboardShortcut(",", modifiers: .command)
@@ -140,13 +140,9 @@ public struct OtterKeepMenuCommands: Commands {
             }
             .keyboardShortcut("2", modifiers: .command)
 
-            Button(L10n.t(.menuViewRulesMaintenance)) {
-                if let id = appState.selectedProfileId ?? appState.profiles.first?.id {
-                    appState.selectProfile(id: id)
-                    appState.activeProfileTab = .rulesAndMaintenance
-                    appState.activeNavigation = .profile(id)
-                    WindowManager.showAndFocusMainWindow()
-                }
+            Button(L10n.t(.profileSettingsTitle)) {
+                appState.showProfileSettingsModal = true
+                WindowManager.showAndFocusMainWindow()
             }
             .keyboardShortcut("3", modifiers: .command)
 
@@ -156,11 +152,11 @@ public struct OtterKeepMenuCommands: Commands {
             }
             .keyboardShortcut("4", modifiers: .command)
 
-            Button(L10n.t(.menuViewLogs)) {
-                appState.activeNavigation = .logs
+            Button(L10n.t(.menuSystemLogs)) {
+                appState.showSystemLogsModal = true
                 WindowManager.showAndFocusMainWindow()
             }
-            .keyboardShortcut("5", modifiers: .command)
+            .keyboardShortcut("l", modifiers: .command)
 
             Divider()
 

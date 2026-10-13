@@ -64,18 +64,6 @@ public struct MainDashboardView: View {
                         onRevealDestination: { NSWorkspace.shared.activateFileViewerSelecting([profile.destinationURL]) }
                     )
 
-                    // Storage Gauge Card
-                    if let capacity = appState.destinationStorageCapacity() {
-                        StorageGaugeBar(
-                            totalBytes: capacity.totalBytes,
-                            backupBytes: appState.totalBackupSize(),
-                            freeBytes: capacity.availableBytes,
-                            title: L10n.t(.destinationFolderTitle),
-                            subtitle: profile.destinationURL.lastPathComponent
-                        )
-                        .otterCard()
-                    }
-
                     // MARK: - Zone 3: Guardianship & Resilience
                     rule321ComplianceCard(profile: profile)
 
@@ -83,11 +71,36 @@ public struct MainDashboardView: View {
                     quickStatsSection(profile: profile)
 
                 } else {
-                    ContentUnavailableView(
-                        L10n.t(.noProfileSelectedTitle),
-                        systemImage: "folder.badge.questionmark",
-                        description: Text(L10n.t(.noProfileSelectedDesc))
-                    )
+                    VStack(spacing: 16) {
+                        OttieSanctuaryMascotView(mood: .safe, size: 104)
+
+                        VStack(spacing: 6) {
+                            Text(L10n.t(.welcomeSanctuaryTitle))
+                                .font(.title2.bold())
+                            Text(L10n.t(.welcomeSanctuarySubtitle))
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: 460)
+                        }
+
+                        Button {
+                            appState.resetNewProfileDraft()
+                            appState.showNewProfileSheet = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus.circle.fill")
+                                Text(L10n.t(.createFirstProfileButton))
+                            }
+                            .font(.headline)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(OtterTheme.otterAmber)
+                        .controlSize(.large)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 320)
+                    .padding(32)
+                    .otterCard()
                 }
             }
             .padding(20)
@@ -99,6 +112,14 @@ public struct MainDashboardView: View {
         )) {
             if let summary = appState.dryRunSummary {
                 DryRunModalView(appState: appState, summary: summary)
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { appState.showLastBackupSummaryModal },
+            set: { appState.showLastBackupSummaryModal = $0 }
+        )) {
+            if let summary = appState.selectedProfile.flatMap({ appState.lastStatusInfo(for: $0).lastSessionSummary }) ?? appState.lastSessionSummary {
+                LastBackupSessionModalView(appState: appState, summary: summary)
             }
         }
     }
@@ -232,18 +253,36 @@ public struct MainDashboardView: View {
 
                 VStack(alignment: .trailing, spacing: 8) {
                     if let sum = status.lastSessionSummary {
-                        VStack(alignment: .trailing, spacing: 2) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "clock")
-                                    .font(.caption2)
+                        Button {
+                            appState.showLastBackupSummaryModal = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: sum.errorCount == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(sum.errorCount == 0 ? OtterTheme.statusGreen : OtterTheme.statusWarning)
+
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(sum.errorCount == 0 ? L10n.t(.lastBackupSuccess) : L10n.t(.lastBackupWarning))
+                                        .font(.caption.bold())
+                                    HStack(spacing: 4) {
+                                        Text(String(format: "%.1fs", sum.durationSeconds))
+                                        Text("•")
+                                        Text(ByteCountFormatter.string(fromByteCount: sum.totalScannedBytes, countStyle: .file))
+                                    }
+                                    .font(.caption2.monospacedDigit())
                                     .foregroundStyle(.secondary)
-                                Text(String(format: "%.1fs", sum.durationSeconds))
-                                    .font(.caption.monospacedDigit().bold())
+                                }
+
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(.tertiary)
                             }
-                            Text(ByteCountFormatter.string(fromByteCount: sum.totalScannedBytes, countStyle: .file))
-                                .font(.caption2.monospacedDigit())
-                                .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }
+                        .buttonStyle(.plain)
+                        .help(L10n.t(.lastBackupResultSubtitle))
                     }
 
                     Button {
@@ -274,6 +313,20 @@ public struct MainDashboardView: View {
                 .padding(8)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(OtterTheme.statusError.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+            }
+
+            // Integrated Destination Storage Capacity Statistics
+            if let capacity = appState.destinationStorageCapacity() {
+                Divider()
+                    .padding(.vertical, 2)
+
+                StorageGaugeBar(
+                    totalBytes: capacity.totalBytes,
+                    backupBytes: appState.totalBackupSize(),
+                    freeBytes: capacity.availableBytes,
+                    title: L10n.t(.destinationFolderTitle),
+                    subtitle: profile.destinationURL.lastPathComponent
+                )
             }
         }
         .otterHeroCard(padding: 18)
@@ -464,33 +517,6 @@ public struct MainDashboardView: View {
         }
         .otterCard()
     }
-
-    private func lastSessionCard(summary: BackupSessionSummary) -> some View {
-        let isSuccess = summary.errorCount == 0
-        return HStack(spacing: 12) {
-            Image(systemName: isSuccess ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .foregroundStyle(isSuccess ? OtterTheme.statusGreen : OtterTheme.statusWarning)
-                .font(.title3)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(isSuccess ? L10n.t(.lastBackupSuccess) : L10n.t(.lastBackupWarning))
-                    .font(.subheadline.bold())
-                Text(L10n.format(.sessionSummaryStatsFormat, summary.totalScannedFiles, summary.copiedCount, summary.clonedCount, summary.durationSeconds))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Button(L10n.t(.details)) {
-                appState.showInspectorModal = true
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-        }
-        .otterCard(padding: OtterTheme.spacing12)
-    }
-
     // MARK: - 5. Quick Statistics
     private func quickStatsSection(profile: BackupProfile) -> some View {
         HStack(spacing: 14) {
