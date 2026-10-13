@@ -29,6 +29,10 @@ public struct OtterKeepMenuCommands: Commands {
                 WindowManager.showAndFocusMainWindow()
             }
             .keyboardShortcut(",", modifiers: .command)
+
+            Button(L10n.t(.aboutWindowTitle)) {
+                AboutWindowController.shared.show()
+            }
         }
 
         // MARK: - File (Fájl)

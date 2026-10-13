@@ -327,6 +327,18 @@ public struct MainWindowView: View {
                         }
                     }
                     .buttonStyle(.plain)
+
+                    Button {
+                        AboutWindowController.shared.show()
+                    } label: {
+                        Label {
+                            Text(L10n.t(.tabAbout))
+                        } icon: {
+                            Image(systemName: "info.circle.fill")
+                                .foregroundStyle(OtterTheme.otterAmber)
+                        }
+                    }
+                    .buttonStyle(.plain)
                 } header: {
                     Text(L10n.t(.sidebarSectionSystem))
                         .font(.caption.bold())

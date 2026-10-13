@@ -154,9 +154,6 @@ public struct SettingsView: View {
 
                 // 7. Software Updates Section (Sparkle 2.0 / Appcast)
                 softwareUpdatesSection
-
-                // 8. About Section
-                aboutSection
             }
             .padding(24)
         }

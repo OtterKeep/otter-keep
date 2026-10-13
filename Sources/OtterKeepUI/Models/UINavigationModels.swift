@@ -75,7 +75,6 @@ public enum PreferencesTab: String, CaseIterable, Identifiable, Sendable {
     case finder = "finder"
     case storage = "storage"
     case diagnostics = "diagnostics"
-    case about = "about"
 
     public var id: String { rawValue }
 
@@ -85,7 +84,6 @@ public enum PreferencesTab: String, CaseIterable, Identifiable, Sendable {
         case .finder: return L10n.t(.tabFinderIntegration)
         case .storage: return L10n.t(.tabStorageAndDb)
         case .diagnostics: return L10n.t(.tabDiagnosticsAndUpdates)
-        case .about: return L10n.t(.tabAbout)
         }
     }
 
@@ -95,7 +93,6 @@ public enum PreferencesTab: String, CaseIterable, Identifiable, Sendable {
         case .finder: return "macwindow"
         case .storage: return "cylinder.split.1x2"
         case .diagnostics: return "stethoscope"
-        case .about: return "info.circle"
         }
     }
 }

@@ -108,8 +108,6 @@ public struct PreferencesModalView: View {
                         storageTabContent
                     case .diagnostics:
                         diagnosticsTabContent
-                    case .about:
-                        aboutTabContent
                     }
                 }
                 .padding(24)
@@ -241,11 +239,5 @@ public struct PreferencesModalView: View {
     private var diagnosticsTabContent: some View {
         SettingsView(appState: appState).debugLoggingSection
         SettingsView(appState: appState).softwareUpdatesSection
-    }
-
-    // MARK: - 5. About Tab
-    @ViewBuilder
-    private var aboutTabContent: some View {
-        SettingsView(appState: appState).aboutSection
     }
 }
