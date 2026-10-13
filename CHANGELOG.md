@@ -8,6 +8,23 @@ All notable changes to OtterKeep are documented in this file in accordance with 
 
 ---
 
+## [2.0.0] - 2026-10-13 (Build 2000)
+
+### 🌟 Release Summary / Verzióösszefoglaló
+Version **2.0.0** initiates the Clean Architecture (Hexagonal / Ports & Adapters) transition for OtterKeep, establishing pure Domain and Application layers, abstract repository and storage interfaces, and dependency inversion across the entire subsystem topology.
+
+A **2.0.0-ás** verzió elindítja az OtterKeep Clean Architecture (Hexagonal / Ports & Adapters) átállását: tiszta Domain és Application rétegek, absztrakt repository és háttértár interface-ek, valamint szigorú függőség-megfordítás kialakításával a teljes alrendszer-topológiában.
+
+- **Subsystem SemVer Alignment**:
+  - `OtterKeepStorage`: `2.0.0`
+  - `OtterKeepDatabase`: `2.0.0`
+  - `OtterKeepCore`: `2.0.0`
+  - `OtterKeepUI`: `2.0.0`
+  - `OtterKeepCLI`: `2.0.0`
+  - `OtterKeepFinderSyncExtension`: `2.0.0`
+
+---
+
 ## [1.7.1] - 2026-10-13 (Build 1701)
 
 ### 🌟 Release Summary / Verzióösszefoglaló

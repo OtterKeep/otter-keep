@@ -10,8 +10,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIGURATION="${1:-release}"
 TARGET_DIR="${2:-$HOME/Applications}"
-APP_VERSION="${3:-1.7.1}"
-BUILD_VERSION="${4:-1701}"
+APP_VERSION="${3:-2.0.0}"
+BUILD_VERSION="${4:-2000}"
 
 
 echo "======================================================="

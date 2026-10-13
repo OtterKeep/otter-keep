@@ -1,12 +1,12 @@
 {
-  "version": "1.7.1",
-  "build": "1701",
+  "version": "2.0.0",
+  "build": "2000",
   "subsystems": {
-    "OtterKeepStorage": "1.3.0",
-    "OtterKeepDatabase": "1.3.1",
-    "OtterKeepCore": "1.7.1",
-    "OtterKeepUI": "1.7.1",
-    "OtterKeepCLI": "1.3.1",
-    "OtterKeepFinderSyncExtension": "1.0.1"
+    "OtterKeepStorage": "2.0.0",
+    "OtterKeepDatabase": "2.0.0",
+    "OtterKeepCore": "2.0.0",
+    "OtterKeepUI": "2.0.0",
+    "OtterKeepCLI": "2.0.0",
+    "OtterKeepFinderSyncExtension": "2.0.0"
   }
 }
