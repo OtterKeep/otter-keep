@@ -35,5 +35,17 @@ jobs:
       - name: Build all targets (Release)
         run: swift build -c release
 
-      - name: Run Test Runner & Benchmarks
-        run: swift run -c release OtterKeepTestRunner
+      - name: Verify version consistency
+        # Fails when version.json, CoreEngine.swift, package_app.sh and appcast.xml drift apart.
+        run: scripts/sync_version.sh --check
+
+      - name: Run Integration Test Suite
+        # Runs `swift test` serially: the 12 integration modules exercise process-wide singletons
+        # and fixed paths. The wrapper retries only the toolchain's TestingMacros plugin-loading
+        # failure (see scripts/test.sh) and reports real test failures immediately.
+        run: scripts/test.sh -c release
+
+      - name: Formatting report (advisory)
+        # The repository still carries ~2.7k pre-existing style violations, so this step
+        # reports them instead of failing. Use scripts/format.sh to fix touched files.
+        run: scripts/format.sh --lint || true

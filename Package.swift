@@ -13,7 +13,6 @@ let package = Package(
         .library(name: "OtterKeepUI", targets: ["OtterKeepUI"]),
         .executable(name: "OtterKeepFinderSyncExtension", targets: ["OtterKeepFinderSyncExtension"]),
         .executable(name: "otterkeep", targets: ["OtterKeepCLI"]),
-        .executable(name: "OtterKeepTestRunner", targets: ["OtterKeepTestRunner"]),
         .executable(name: "OtterKeepApp", targets: ["OtterKeepApp"])
     ],
     dependencies: [],
@@ -71,11 +70,11 @@ let package = Package(
             ]
         ),
 
-        // MARK: - Test & Benchmark Runner (CLT / Pure Swift)
-        .executableTarget(
-            name: "OtterKeepTestRunner",
+        // MARK: - Integration Test Suite (swift-testing, CLT-compatible)
+        .testTarget(
+            name: "OtterKeepIntegrationTests",
             dependencies: ["OtterKeepStorage", "OtterKeepDatabase", "OtterKeepCore", "OtterKeepUI"],
-            path: "Sources/OtterKeepTestRunner",
+            path: "Tests/OtterKeepIntegrationTests",
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency")
             ]

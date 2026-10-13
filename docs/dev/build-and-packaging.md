@@ -19,9 +19,19 @@ Compile all targets in debug mode:
 swift build
 ```
 
-Run test suite:
+Run the integration test suite:
 ```bash
-swift run OtterKeepTestRunner
+scripts/test.sh
+```
+
+Verify that every derived version literal matches `version.json`:
+```bash
+scripts/sync_version.sh --check
+```
+
+Synchronize them after a version bump:
+```bash
+scripts/sync_version.sh
 ```
 
 ---
@@ -41,3 +51,6 @@ OtterKeep provides an automated build and release packaging script:
 4. Creates a compressed DMG archive: `.build/dist/OtterKeep-1.4.0.dmg`.
 5. Computes cryptographic SHA-256 checksums.
 6. Generates Sparkle 2.0 appcast entries.
+
+> Version literals are derived from `version.json` (see `scripts/sync_version.sh`). Bump the
+> manifest first, run the synchronization script, and commit the derived files together.

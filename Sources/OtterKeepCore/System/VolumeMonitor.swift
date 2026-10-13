@@ -1,5 +1,4 @@
 import Foundation
-import AppKit
 import Darwin
 import OtterKeepStorage
 
@@ -174,13 +173,15 @@ public final class VolumeMonitor: @unchecked Sendable {
     public typealias AutoBackupTriggerHandler = @Sendable (_ profile: BackupProfile) -> Void
 
     private let lock = NSLock()
-    private var mountObserver: NSObjectProtocol?
-    private var unmountObserver: NSObjectProtocol?
+    private let observer: VolumeObserving
     private var handlers: [VolumeChangeHandler] = []
     private var autoBackupHandler: AutoBackupTriggerHandler?
     private var lastTriggeredPerVolume: [String: Date] = [:]
 
-    private init() {
+    /// Creates a monitor driven by the given platform observer.
+    /// - Parameter observer: Platform mount/unmount observer; defaults to the AppKit-backed observer.
+    public init(observer: VolumeObserving = SystemVolumeObserver()) {
+        self.observer = observer
         startListening()
     }
 
@@ -258,39 +259,21 @@ public final class VolumeMonitor: @unchecked Sendable {
     }
 
     private func startListening() {
-        let center = NSWorkspace.shared.notificationCenter
-
-        mountObserver = center.addObserver(
-            forName: NSWorkspace.didMountNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] notif in
-            guard let self = self else { return }
-            let mountedURL = notif.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL
-            LogManager.shared.log("Volume mounted: \(mountedURL?.path ?? "unknown")", level: .info, category: "Storage")
-            self.notifyHandlers(with: mountedURL)
-        }
-
-        unmountObserver = center.addObserver(
-            forName: NSWorkspace.didUnmountNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] notif in
-            guard let self = self else { return }
-            let unmountedURL = notif.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL
-            LogManager.shared.log("Volume unmounted: \(unmountedURL?.path ?? "unknown")", level: .warning, category: "Storage")
-            self.notifyHandlers(with: nil)
-        }
+        observer.startObserving(
+            onMount: { [weak self] mountedURL in
+                guard let self = self else { return }
+                LogManager.shared.log("Volume mounted: \(mountedURL?.path ?? "unknown")", level: .info, category: "Storage")
+                self.notifyHandlers(with: mountedURL)
+            },
+            onUnmount: { [weak self] unmountedURL in
+                guard let self = self else { return }
+                LogManager.shared.log("Volume unmounted: \(unmountedURL?.path ?? "unknown")", level: .warning, category: "Storage")
+                self.notifyHandlers(with: nil)
+            }
+        )
     }
 
     private func stopListening() {
-        if let obs = mountObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(obs)
-        }
-        if let obs = unmountObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(obs)
-        }
-        mountObserver = nil
-        unmountObserver = nil
+        observer.stopObserving()
     }
 }

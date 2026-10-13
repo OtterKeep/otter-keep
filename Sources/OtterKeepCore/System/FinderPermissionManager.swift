@@ -1,5 +1,4 @@
 import Foundation
-import AppKit
 
 /// Permission and system registration status for OtterKeep Finder Integration.
 public struct FinderPermissionStatus: Sendable, Equatable {
@@ -24,7 +23,13 @@ public final class FinderPermissionManager: @unchecked Sendable {
 
     public static let extensionBundleId = "com.otterkeep.OtterKeepApp.FinderSync"
 
-    private init() {}
+    private let settingsOpener: FinderSettingsOpening
+
+    /// Creates the manager.
+    /// - Parameter settingsOpener: Platform System Settings opener; defaults to the AppKit-backed opener.
+    private init(settingsOpener: FinderSettingsOpening = SystemFinderSettingsOpener()) {
+        self.settingsOpener = settingsOpener
+    }
 
     /// Evaluates the complete permission status for the Finder extension and configured profile directories.
     public func evaluateStatus(for profiles: [BackupProfile]) -> FinderPermissionStatus {
@@ -119,7 +124,7 @@ public final class FinderPermissionManager: @unchecked Sendable {
         ].compactMap { $0 }
 
         for url in candidateURLs {
-            if NSWorkspace.shared.open(url) {
+            if settingsOpener.openSettingsURL(url) {
                 return true
             }
         }
@@ -130,7 +135,7 @@ public final class FinderPermissionManager: @unchecked Sendable {
     @discardableResult
     public func openFullDiskAccessSettings() -> Bool {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
-            return NSWorkspace.shared.open(url)
+            return settingsOpener.openSettingsURL(url)
         }
         return false
     }

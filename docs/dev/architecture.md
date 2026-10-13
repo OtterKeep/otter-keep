@@ -124,3 +124,56 @@ Designed according to macOS Human Interface Guidelines and the Sanctuary Princip
 - **Direct Pipeline Action Integration**: Source and destination directory management (`change`, `reveal`) is embedded directly into `BackupPipelineView`, eliminating duplicate bottom cards.
 - **Software Update Dispatch**: System update notifications are broadcast via `UNUserNotificationCenter` with audible feedback and foreground activation.
 
+
+---
+
+## 11. Layering Invariants & Single Sources of Truth
+
+### Versioning
+`version.json` is the only authored version source. `scripts/sync_version.sh` derives the
+`CoreEngine` constants, the `scripts/package_app.sh` defaults and the newest Sparkle
+`Distribution/appcast.xml` item from it; `scripts/sync_version.sh --check` fails the build when the
+derived values drift apart.
+
+### Localization
+`Sources/OtterKeepCore/Diagnostics/L10n+Strings.swift` holds every key exactly once as a
+`L10n.Translation(english:hungarian:)` pair. Both languages therefore cannot diverge structurally,
+and the `L10n.t(_:lang:)` API stays unchanged. The legacy per-language dictionaries were removed.
+
+### Platform boundaries
+The backup pipeline depends only on the `VolumeEjecting` protocol
+(`Sources/OtterKeepCore/Pipeline/VolumeEjecting.swift`). The AppKit implementation lives in
+`SystemVolumeEjector`, and the shells (GUI, CLI) inject it when constructing a
+`BackupSessionCoordinator`. The pipeline itself no longer imports AppKit and can run without a
+window-server session.
+
+### Replication pipeline
+All 3-2-1 destinations are driven by a single orchestration routine over the `ReplicationSink`
+protocol (`Sources/OtterKeepCore/Replication/`). Sinks describe per-file deltas only; snapshot
+records, file records, progress emission, logging and `DestinationSyncResult` construction are owned
+once by the shared pipeline.
+
+### Verification
+The integration suite is a `swift-testing` target (`Tests/OtterKeepIntegrationTests`, 12 modules)
+executed through `swift test`; see [testing.md](./testing.md).
+
+### Feature state stores
+`AppState` is a thin composition root: it owns the profile list, navigation and the engine instances,
+and forwards feature state to `@MainActor @Observable` stores in `Sources/OtterKeepUI/Stores/`
+(`BackupRuntimeStore`, `RestoreTimelineStore`, `PhotosStore`, `ReplicationDestinationStore`,
+`MaintenanceSettingsStore`). The forwarding accessors keep every view call site unchanged, and views
+observe the store directly.
+
+### Platform capability seams
+AppKit is confined to four leaf adapters — `SystemVolumeEjector`, `SystemVolumeObserver`,
+`SystemFinderSettingsOpener` and `SystemNotificationPresenter` — which implement the
+`VolumeEjecting`, `VolumeObserving`, `FinderSettingsOpening` and `NotificationPresenting` protocols
+consumed by the core. `Pipeline` is AppKit-free and the remaining services can be driven headlessly
+by injecting their no-op/default implementations; the shells leave the defaults in place so runtime
+behavior is unchanged.
+
+### Known follow-ups
+- A headless/daemon build could exclude the four AppKit adapter files by injecting no-op
+  implementations; that requires a build configuration (or separate target) rather than code changes.
+- The repository still carries a pre-existing `swift-format` backlog, so the CI lint step is advisory;
+  enabling a strict gate needs a one-time repo-wide `scripts/format.sh` run.

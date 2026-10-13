@@ -4,6 +4,63 @@ All notable changes to OtterKeep are documented in this file in accordance with 
 
 ---
 
+## [Unreleased]
+
+---
+
+## [1.7.1] - 2026-10-13 (Build 1701)
+
+### 🌟 Release Summary / Verzióösszefoglaló
+Version **1.7.1** is a comprehensive architectural modularization, subsystem decomposition, and verification hardening release for OtterKeep. Monolithic files exceeding 800–3,200 lines across all core subsystems have been decoupled into focused, single-responsibility components and domain stores under strict Swift 6 concurrency, with zero regression in functionality or performance:
+
+Az **1.7.1-es** verzió egy átfogó architekturális modularizációs, alrendszer-dekompozíciós és megbízhatósági mérföldkő az OtterKeep ökoszisztémában. A korábbi 800–3200 soros monolitikus fájlok szigorú Swift 6 konkurens elvek mentén önálló, egyetlen felelősséggel bíró komponensekre, protokoll-alapú platformadapterekre és dedikált állapottárakra (Stores) lettek szétbontva – funkcióvesztés vagy sebességcsökkenés nélkül:
+
+- **🏛️ Platform-függetlenítés és Headless működés (Platform Boundaries & Headless Hardening)**:
+  - Szigorú réteghatárok a háttérfolyamatokban: a mentési mag (`OtterKeepCore/Pipeline`) teljesen mentesült a közvetlen AppKit és `NSWorkspace` függőségektől.
+  - A kötetkezelés és lecsatolás a közös `VolumeEjecting` protokollon keresztül valósul meg (`OtterKeepCore/System/VolumeEjecting.swift`), az AppKit-alapú megvalósítás (`SystemVolumeEjector`) pedig izoláltan injektálódik.
+  - A rendszerfigyelés, értesítéskezelés és Finder-beállítások kezelése tiszta protokoll-absztrakciók mögé került (`VolumeObserving`, `NotificationPresenting`, `FinderSettingsOpening`), amelyek platform-adapterei (`SystemVolumeObserver`, `SystemNotificationPresenter`, `SystemFinderSettingsOpener`) `#if canImport(AppKit)` védelemmel vannak ellátva, garantálva a tiszta Darwin / headless CLI és daemon futtathatóságot.
+
+- **🌐 Egyetlen forrású típusbiztos lokalizáció (Single Source of Truth Localization)**:
+  - A korábbi különálló `L10n+English.swift` és `L10n+Hungarian.swift` szótárak összevonásra kerültek a `L10n+Strings.swift` táblába, ahol minden kulcshoz egymás mellett definiált a magyar és angol fordítás (`Translation`), megszüntetve a hiányzó fordítások és runtime fallback hibák kockázatát.
+  - Szigorított `hasExplicitTranslation(for:in:)` ellenőrzés: automatikusan feloldja a rendszer nyelvét (`.system`) az effektív nyelvre, és ellenőrzi a nem-üres szövegtartalmat.
+
+- **🔄 Egységesített 3-2-1 replikációs motor (Unified Replication Pipeline)**:
+  - A WebDAV, SFTP, S3 és helyi/SMB replikáció 850+ sornyi redundáns állapotkezelése és ciklusszervezése felszámolásra került.
+  - A háttértárak a közös `ReplicationSink` protokollt valósítják meg, míg a tranzakciós pillanatkép-rekordok, a fájl-nyilvántartás (`recordReplicationFile`), a folyamat-visszajelzés (progress emission) és a hibakezelés egyetlen központi futtató motorban (`executeReplicationPipeline`) összpontosul.
+
+- **🖥️ SwiftUI felület és állapotkezelés dekompozíciója (UI & State Modularization)**:
+  - Az `AppState.swift` monolit (több mint 3000 sor) 456 sorra csökkent. A logikai állapotok 5 dedikált `@Observable` Store-ba kerültek: `RestoreTimelineStore`, `PhotosStore`, `ReplicationDestinationStore`, `MaintenanceSettingsStore` és `BackupRuntimeStore`.
+  - A nagyméretű nézetek fókuszált kártya- és szekció-kiterjesztésekre lettek bontva:
+    - `RemoteDestinationEditorModalView.swift` (975 → 194 sor)
+    - `MenuBarContentView.swift` (753 → 54 sor)
+    - `SettingsView.swift` (752 → 169 sor)
+    - `PhotosBackupView.swift` (550 → 46 sor)
+    - `RestoreExplorerView.swift` (1266 → 205 sor)
+    - `ProfileRulesView.swift` (1067 → 102 sor)
+
+- **🗄️ Adatbázis- és CLI-architektúra modularizációja (Database & CLI Decoupling)**:
+  - A `DatabaseEngine.swift` (1592 sor) szétbontásra került: `DatabaseRecords.swift`, `DatabaseEngine+Snapshots.swift`, `DatabaseEngine+FileCatalog.swift`, `DatabaseEngine+Replication.swift`, és `DatabaseEngine+ScrubbingAndPhotos.swift`.
+  - Az `OtterKeepCLI/main.swift` (1323 sor) fókuszált parancsmodulokra tagolódott: `BackupCommands.swift`, `ProfileCommands.swift`, `MaintenanceCommands.swift`, `ReplicationAndPhotosCommands.swift`, `SystemCommands.swift`, és `CLIHelpers.swift`.
+
+- **🧪 Hivatalos Swift-Testing integrációs tesztcsomag (Official Swift-Testing Suite)**:
+  - A korábbi 1,748 soros kézi CLI futtató (`OtterKeepTestRunner`) leváltásra került egy hivatalos `swift-testing` integrációs targetre (`Tests/OtterKeepIntegrationTests`, 12 modul, 62 teszt).
+  - A tesztek közvetlenül a `swift test` paranccsal és az Xcode-ból futtathatók és szűrhetők (`--filter`).
+  - A `scripts/test.sh` felkészítésre került a Command Line Tools `TestingMacros` fordítópluginjának automatikus feloldására és a stabil futtatásra.
+
+- **📌 Központi verziókezelési manifeszt (Single Version Manifest)**:
+  - Bevezetésre került a `version.json` és a `scripts/sync_version.sh` eszköz, amely egyetlen forrásból származtatja a `CoreEngine` konstansait, a `package_app.sh` alapértelmezéseit és a Sparkle `appcast.xml` metaadatait, megszüntetve a korábbi dokumentációs és verzió-eltéréseket.
+
+- **Subsystem SemVer Alignment**:
+  - `OtterKeepStorage`: `1.3.0`
+  - `OtterKeepDatabase`: `1.3.1` (Patch refactor)
+  - `OtterKeepCore`: `1.7.1` (Patch refactor)
+  - `OtterKeepUI`: `1.7.1` (Patch refactor)
+  - `OtterKeepCLI`: `1.3.1` (Patch refactor)
+  - `OtterKeepFinderSyncExtension`: `1.0.1`
+  - Teljes tesztcsomag ellenőrizve: 62/62 integrációs teszt 100%-os sikerességgel lefut.
+
+---
+
 ## [1.7.0] - 2026-10-09 (Build 1700)
 
 ### 🌟 Release Summary / Verzióösszefoglaló
