@@ -45,7 +45,7 @@ extension AppState {
 
     @MainActor
     public func savePhotosConfig() {
-        try? PhotosProfileStore.shared.saveConfiguration(self.photosConfig)
+        photosStore.saveConfiguration()
     }
 
     @MainActor

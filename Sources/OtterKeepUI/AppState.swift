@@ -25,36 +25,64 @@ public final class AppState: Sendable {
     /// Currently active tab within the Apple Photos workspace.
     public var activePhotosTab: PhotosWorkspaceTab = .syncAndBackup
 
+    // MARK: - Feature Stores
+    /// Maintenance, diagnostics and settings state (modals, alerts, logs, preferences, draft forms).
+    let maintenanceSettings = MaintenanceSettingsStore()
+    /// 3-2-1 replication runtime state and every remote destination editor field.
+    let replicationDestinations = ReplicationDestinationStore()
+    /// Restore, timeline and diff comparison state.
+    let restoreTimeline = RestoreTimelineStore()
+    /// Photos backup and browsing state; its persisted configuration is loaded in `init()`.
+    let photosStore: PhotosStore
+
     // MARK: - Per-Profile Parallel Backup Operations State (1.3.1)
+    /// Per-profile runtime state (tasks, progress, summaries, snapshot caches).
+    let backupRuntime = BackupRuntimeStore()
+
     /// Active background backup tasks keyed by profile UUID.
-    var activeBackupTasks: [UUID: Task<Void, Never>] = [:]
+    var activeBackupTasks: [UUID: Task<Void, Never>] {
+        get { backupRuntime.activeBackupTasks }
+        set { backupRuntime.activeBackupTasks = newValue }
+    }
 
     /// Live telemetry progress states keyed by profile UUID.
-    public internal(set) var profileProgressStates: [UUID: BackupProgressState] = [:]
+    public internal(set) var profileProgressStates: [UUID: BackupProgressState] {
+        get { backupRuntime.progressStates }
+        set { backupRuntime.progressStates = newValue }
+    }
 
     /// Last session summaries keyed by profile UUID.
-    public internal(set) var profileLastSummaries: [UUID: BackupSessionSummary] = [:]
+    public internal(set) var profileLastSummaries: [UUID: BackupSessionSummary] {
+        get { backupRuntime.lastSummaries }
+        set { backupRuntime.lastSummaries = newValue }
+    }
 
     /// Indicates whether a backup operation is currently executing for any profile.
     public var isBackupRunning: Bool {
-        !activeBackupTasks.isEmpty
+        backupRuntime.isRunning
     }
 
     /// Checks if a specific profile is currently backing up.
     public func isBackupRunning(for profileId: UUID) -> Bool {
-        activeBackupTasks[profileId] != nil
+        backupRuntime.isRunning(for: profileId)
     }
 
     /// Retrieves the live progress state for a specific profile (or idle if not running).
     public func progressState(for profileId: UUID) -> BackupProgressState {
-        profileProgressStates[profileId] ?? BackupProgressState(phase: .idle)
+        backupRuntime.progressState(for: profileId)
     }
 
     // MARK: - Per-Profile Historical Status & Snapshot Cache (1.6.0)
     /// Latest snapshot records cached per profile UUID to preserve status across profile switching.
-    public internal(set) var profileLatestSnapshots: [UUID: SnapshotRecord] = [:]
+    public internal(set) var profileLatestSnapshots: [UUID: SnapshotRecord] {
+        get { backupRuntime.latestSnapshots }
+        set { backupRuntime.latestSnapshots = newValue }
+    }
     /// Total snapshot counts cached per profile UUID.
-    public internal(set) var profileSnapshotCounts: [UUID: Int] = [:]
+    public internal(set) var profileSnapshotCounts: [UUID: Int] {
+        get { backupRuntime.snapshotCounts }
+        set { backupRuntime.snapshotCounts = newValue }
+    }
 
     public struct ProfileBackupStatusInfo: Sendable {
         public let profileId: UUID
@@ -217,288 +245,32 @@ public final class AppState: Sendable {
         self.isSystemDarkMode = isDark
     }
 
-    // MARK: - Modal Operation Feedback State (1.3.1)
-    public var activeFeedback: OperationFeedback? = nil
-    public var showFeedbackModal: Bool = false
-
-    // MARK: - 3-2-1 Replication State
-    public var isReplicationRunning: Bool = false
-    public var replicationProgressState: ReplicationProgressState = ReplicationProgressState()
-    public var lastReplicationSummary: ReplicationJobSummary?
-
-    // MARK: - Remote Destination Editor Sheet State
-    public var showRemoteDestinationEditorSheet: Bool = false
-    public var destinationEditorTargetId: UUID? = nil
-    public var destinationEditorName: String = ""
-    public var destinationEditorTypeIndex: Int = 0 // 0: S3, 1: SMB, 2: WebDAV, 3: SFTP, 4: Backblaze B2
-    public var destinationEditorS3Endpoint: String = "https://s3.amazonaws.com"
-    public var destinationEditorS3Bucket: String = ""
-    public var destinationEditorS3Region: String = "eu-central-1"
-    public var destinationEditorS3AccessKeyId: String = ""
-    public var destinationEditorS3SecretAccessKey: String = ""
-    public var destinationEditorS3PathPrefix: String = "otterkeep"
-    public var destinationEditorS3ForcePathStyle: Bool = true
-    public var destinationEditorSmbShareURL: String = "smb://nas.local/backups"
-    public var destinationEditorSmbMountPath: String = "/Volumes/backups"
-    public var destinationEditorSmbUsername: String = ""
-    public var destinationEditorSmbPassword: String = ""
-    public var destinationEditorWebDAVURL: String = "https://nas.local:5006"
-    public var destinationEditorWebDAVPath: String = "/backups"
-    public var destinationEditorWebDAVUsername: String = ""
-    public var destinationEditorWebDAVPassword: String = ""
-    public var destinationEditorSFTPHost: String = "nas.local"
-    public var destinationEditorSFTPPort: Int = 22
-    public var destinationEditorSFTPUsername: String = ""
-    public var destinationEditorSFTPPasswordOrKey: String = ""
-    public var destinationEditorSFTPAuthModeIndex: Int = 0
-    public var destinationEditorSFTPPath: String = "/var/backups/otterkeep"
-    public var destinationEditorB2KeyId: String = ""
-    public var destinationEditorB2AppKey: String = ""
-    public var destinationEditorB2BucketName: String = ""
-    public var destinationEditorB2Region: String = "us-west-004"
-    public var destinationEditorB2CustomEndpoint: String = ""
-    public var destinationEditorB2PathPrefix: String = "otterkeep"
-    public var destinationEditorArchivePackagingEnabled: Bool = false
-    public var destinationEditorArchiveCompressionLevel: Int = 3
-    public var destinationEditorIsClientEncryptionEnabled: Bool = true
-    public var destinationEditorIsEnabled: Bool = true
-    public var destinationEditorIsTesting: Bool = false
-    public var destinationEditorTestSuccessMessage: String? = nil
-    public var destinationEditorTestErrorMessage: String? = nil
-
-    // MARK: - Software Updates State
-    public var isCheckingForSoftwareUpdates: Bool = false
-    public var softwareUpdateStatusMessage: String? = nil
-    public var softwareUpdateAvailableInfo: SoftwareUpdateInfo? = nil
-
-    // MARK: - Photos Backup State
-    public var photosConfig: PhotosBackupConfiguration
-    public var isPhotosBackupRunning: Bool = false
-    public var photosProgressState: PhotosBackupProgressState = PhotosBackupProgressState()
-    public var lastPhotosSessionSummary: PhotosSessionSummary?
-    public var photosAuthorizationStatus: PHAuthorizationStatus = .notDetermined
-    public var loadedPhotosSnapshotId: String? = nil
-    public var photosSnapshots: [SnapshotRecord] = []
-    public var selectedPhotosSnapshotId: String?
-    public var photosAssets: [PhotosAssetRecord] = []
-    public var selectedPhotosAsset: PhotosAssetRecord?
-    public var photosLibraryTotalCount: Int = 0
-    public var isScanningPhotosLibrary: Bool = false
-
-    // MARK: - Pre-backup Simulation (Dry-Run)
-    public var isDryRunRunning: Bool = false
-    public var dryRunSummary: DryRunSummary?
-    public var showDryRunModal: Bool = false
-    public var dryRunSelectedCategory: String = "all"
-
-    // MARK: - Backup Inspector Modal
-    public var lastSessionSummary: BackupSessionSummary?
-    public var showInspectorModal: Bool = false
-    public var inspectorSelectedTab: String = "summary"
-    public var inspectorSearchQuery: String = ""
-
-    // MARK: - Profile Management Dialogs
-    public var showNewProfileSheet: Bool = false
-    public var newProfileName: String = ""
-    public var newProfileSourceURL: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents")
-    public var newProfileDestinationURL: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("OtterKeep_Backups")
-    public var newProfileIsDestinationCustomized: Bool = false
-    public var newProfileExcludePatterns: [String] = ["*.tmp", ".DS_Store", "node_modules", "DerivedData"]
-    public var newProfileEnableIgnoreFiles: Bool = true
-    public var newProfileRespectGitIgnore: Bool = false
-    public var newProfileBackupOnVolumeMount: Bool = false
-    public var newProfileAutoEjectOnCompletion: Bool = false
-    public var selectedPresetTag: String? = nil
-
-    public var showRenameProfileSheet: Bool = false
-    public var renameProfileName: String = ""
-
-    // MARK: - Cross-Snapshot Global Search State
-    public var globalSearchQuery: String = ""
-    public var globalSearchResults: [GlobalSearchResult] = []
-    public var selectedGlobalSearchResult: GlobalSearchResult? = nil
-    public var isGlobalSearching: Bool = false
-
+    // MARK: - New Profile Draft Helpers
     public func resetNewProfileDraft() {
-        newProfileName = ""
-        newProfileSourceURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents")
-        newProfileDestinationURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("OtterKeep_Backups")
-        newProfileIsDestinationCustomized = false
-        newProfileExcludePatterns = ["*.tmp", ".DS_Store", "node_modules", "DerivedData"]
-        newProfileEnableIgnoreFiles = true
-        newProfileRespectGitIgnore = false
-        newProfileBackupOnVolumeMount = false
-        newProfileAutoEjectOnCompletion = false
-        selectedPresetTag = nil
+        maintenanceSettings.resetNewProfileDraft()
     }
 
     public func applyDeveloperPreset() {
-        selectedPresetTag = "developer"
-        newProfileName = "Development"
-        let devURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Development")
-        let projURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Projects")
-        if FileManager.default.fileExists(atPath: devURL.path) {
-            newProfileSourceURL = devURL
-        } else if FileManager.default.fileExists(atPath: projURL.path) {
-            newProfileSourceURL = projURL
-        } else {
-            newProfileSourceURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/Projects")
-        }
-        updateNewProfileName("Development")
-        newProfileExcludePatterns = ["node_modules", ".build", "target", ".venv", "Pods", "DerivedData", ".gradle", "vendor", "*.pyc"]
-        newProfileEnableIgnoreFiles = true
-        newProfileRespectGitIgnore = true
+        maintenanceSettings.applyDeveloperPreset()
     }
 
     public func applyDocumentsPreset() {
-        selectedPresetTag = "documents"
-        newProfileName = "Documents"
-        newProfileSourceURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents")
-        updateNewProfileName("Documents")
-        newProfileExcludePatterns = ["*.tmp", "~*", "*.crdownload"]
-        newProfileEnableIgnoreFiles = true
-        newProfileRespectGitIgnore = false
+        maintenanceSettings.applyDocumentsPreset()
     }
 
     public func applyCreativePreset() {
-        selectedPresetTag = "creative"
-        newProfileName = "Photos & Media"
-        newProfileSourceURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Pictures")
-        updateNewProfileName("Photos & Media")
-        newProfileExcludePatterns = ["*.tmp"]
-        newProfileEnableIgnoreFiles = true
-        newProfileRespectGitIgnore = false
+        maintenanceSettings.applyCreativePreset()
     }
 
     public func updateNewProfileName(_ newName: String) {
-        newProfileName = newName
-        if !newProfileIsDestinationCustomized {
-            let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-            let suffix = trimmed.isEmpty ? "" : "_\(trimmed.replacingOccurrences(of: " ", with: "_"))"
-            newProfileDestinationURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("OtterKeep_Backups\(suffix)")
-        }
+        maintenanceSettings.updateNewProfileName(newName)
     }
-
-    // MARK: - Snapshot Browsing & File Tree
-    public var loadedProfileId: UUID? = nil
-    public var loadedSnapshotId: String? = nil
-    public var snapshots: [SnapshotRecord] = []
-    public var selectedSnapshotId: String?
-    public var snapshotFiles: [FileCatalogRecord] = []
-    public var snapshotTreeNodes: [FileTreeNode] = []
-    public var selectedTreeNode: FileTreeNode?
-    public var selectedFile: FileCatalogRecord?
-
-    // MARK: - File Timeline & Tree Structure
-    public var restoreBrowseMode: RestoreBrowseMode = .snapshot
-    public var timelineSearchQuery: String = ""
-    public var timelinePaths: [String] = []
-    public var timelineTreeNodes: [FileTreeNode] = []
-    public var selectedTimelinePath: String?
-    public var selectedPathVersions: [(snapshot: SnapshotRecord, file: FileCatalogRecord)] = []
-    public var selectedTimelineVersion: (snapshot: SnapshotRecord, file: FileCatalogRecord)?
-    public var versionToRestore: (snapshot: SnapshotRecord, file: FileCatalogRecord)?
-
-    // MARK: - Snapshot Diff & What Changed State
-    public var selectedDiffTargetSnapshotId: String?
-    public var selectedDiffBaseSnapshotId: String?
-    public var snapshotDiffReport: SnapshotDiffReport?
-    public var isLoadingDiff: Bool = false
-    public var diffFilterType: DiffChangeType? = nil
-    public var diffSearchQuery: String = ""
-    public var showDiffSheet: Bool = false
-
-    // MARK: - Side-by-Side Snapshot File Diff (1.5.0)
-    public var showSideBySideDiffModal: Bool = false
-    public var activeSideBySideDiffItem: SnapshotDiffItem? = nil
-    public var activeSideBySideDiffComparison: FileComparisonResult? = nil
-    public var isLoadingSideBySideDiff: Bool = false
-
-    // MARK: - Data Integrity Scrubber State (1.5.0)
-    public var isDataScrubInProgress: Bool = false
-    public var scrubProgress: ScrubRunProgress? = nil
-
-    // MARK: - Storage Capacity Forecast & Quota Alerts
-    public var storageForecastReport: StorageForecastReport?
-    public var isLoadingForecast: Bool = false
-    public var webhookTestingStatus: (isTesting: Bool, message: String?, isSuccess: Bool) = (false, nil, false)
-
-    // MARK: - Wi-Fi Filter Input State
-    public var newAllowedWiFiSSID: String = ""
-    public var newDisallowedWiFiSSID: String = ""
-
-
-    // MARK: - Direct File Version History & Finder In-Place Restore
-
-    public var showFileVersionHistoryModal: Bool = false
-    public var activeVersionHistoryFile: URL? = nil
-    public var activeVersionHistoryProfile: BackupProfile? = nil
-    public var activeVersionHistoryRecords: [(snapshot: SnapshotRecord, file: FileCatalogRecord)] = []
-    public var isLoadingFileVersions: Bool = false
-    public var selectedFileVersionHistoryRecord: (snapshot: SnapshotRecord, file: FileCatalogRecord)? = nil
-    public var versionForInPlaceRestore: (snapshot: SnapshotRecord, file: FileCatalogRecord)? = nil
-    public var showConfirmInPlaceRestore: Bool = false
-    public var inPlaceRestoreCollisionChoice: CollisionResolution = .overwrite
-
-    // MARK: - Volume & CoW Capability Evaluation
-    public var volumeEvaluation: VolumeEvaluationResult?
-
-    // MARK: - Quick Look
-    public var quickLookURL: URL?
-
-    public var logEntries: [LogEntry] = []
-    public var alertMessage: String?
-    public var showAlert: Bool = false
-
-    // MARK: - UI Interaction State
-    public var newExcludePattern: String = ""
-    public var searchFilter: String = ""
-    public var showRestoreDialog: Bool = false
-    public var showRestoreSnapshotDialog: Bool = false
-    public var snapshotToRestoreEntirely: SnapshotRecord? = nil
-    public var isSnapshotRestoreInProgress: Bool = false
-    public var snapshotRestoreProgress: RestoreProgressState? = nil
-    public var collisionChoice: CollisionResolution = .keepBoth
-    public var maxSnapshotsToKeep: Int = 5
-    public var showConfirmPrune: Bool = false
-    public var showConfirmRebuild: Bool = false
-    public var showConfirmFullBackup: Bool = false
-    public var selectedLogLevel: LogEntry.LogLevel? = nil
-    public var logFilterQuery: String = ""
 
     // MARK: - Language, Theme & Settings State
-    public internal(set) var isSystemDarkMode: Bool = false
-
-    /// Computes the active SwiftUI color scheme, dynamically synchronizing system mode with the OS interface style.
-    public var effectiveColorScheme: ColorScheme {
-        switch currentTheme {
-        case .light:
-            return .light
-        case .dark:
-            return .dark
-        case .system:
-            return isSystemDarkMode ? .dark : .light
-        }
-    }
 
     /// Evaluates the true operating system appearance setting.
     public func updateSystemDarkMode() {
-        let isDark: Bool
-        if let match = NSApplication.shared.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) {
-            isDark = (match == .darkAqua)
-        } else if let style = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") {
-            isDark = (style.caseInsensitiveCompare("Dark") == .orderedSame)
-        } else {
-            isDark = false
-        }
-        self.isSystemDarkMode = isDark
-    }
-
-    public var currentTheme: AppThemeMode = LocalizationManager.shared.currentTheme {
-        didSet {
-            LocalizationManager.shared.currentTheme = currentTheme
-            applyThemeAppearance(currentTheme)
-        }
+        maintenanceSettings.updateSystemDarkMode()
     }
 
     /// Synchronizes the global macOS application appearance with the selected theme mode.
@@ -520,54 +292,7 @@ public final class AppState: Sendable {
         }
     }
 
-    public var currentLanguage: AppLanguage = LocalizationManager.shared.currentLanguage {
-        didSet {
-            LocalizationManager.shared.currentLanguage = currentLanguage
-            let targetName = L10n.t(.defaultProfileName, lang: currentLanguage)
-            let otherName = currentLanguage == .hungarian ? "Default profile" : "Alapértelmezett profil"
-            if let defaultProf = profiles.first(where: { $0.name == otherName }) {
-                renameProfile(id: defaultProf.id, newName: targetName)
-            }
-        }
-    }
-
-    public var launchAtLoginEnabled: Bool = LaunchAtLoginManager.shared.isEnabled {
-        didSet {
-            LaunchAtLoginManager.shared.isEnabled = launchAtLoginEnabled
-        }
-    }
-
-    public var startMinimized: Bool = LocalizationManager.shared.startMinimized {
-        didSet {
-            LocalizationManager.shared.startMinimized = startMinimized
-        }
-    }
-
-    public var isFinderIntegrationEnabled: Bool = FinderIntegrationStore.shared.isEnabled {
-        didSet {
-            FinderIntegrationStore.shared.setEnabled(isFinderIntegrationEnabled)
-            if isFinderIntegrationEnabled {
-                refreshFinderPermissionStatus()
-            }
-        }
-    }
-
-    public var isDebugFileLoggingEnabled: Bool = LogManager.shared.isDebugFileLoggingEnabled {
-        didSet {
-            if isDebugFileLoggingEnabled {
-                self.currentDebugLogFileURL = LogManager.shared.enableDebugFileLogging(persistSetting: true)
-            } else {
-                LogManager.shared.disableDebugFileLogging(persistSetting: true)
-                self.currentDebugLogFileURL = nil
-            }
-        }
-    }
-
-    public var currentDebugLogFileURL: URL? = LogManager.shared.currentDebugLogFileURL
-
-    public var finderPermissionStatus: FinderPermissionStatus?
-    public var isCheckingFinderPermissions: Bool = false
-
+    // MARK: - Finder Integration State
     /// Re-evaluates macOS permissions and extension state for the Finder integration.
     public func refreshFinderPermissionStatus() {
         self.finderPermissionStatus = FinderPermissionManager.shared.evaluateStatus(for: profiles)
@@ -587,7 +312,12 @@ public final class AppState: Sendable {
         self.storage = storage
         self.database = database
         self.retentionManager = retentionManager
-        self.coordinator = BackupSessionCoordinator(storage: storage, database: database, retentionManager: retentionManager)
+        self.coordinator = BackupSessionCoordinator(
+            storage: storage,
+            database: database,
+            retentionManager: retentionManager,
+            volumeEjector: SystemVolumeEjector()
+        )
         self.restoreEngine = RestoreEngine(storage: storage, database: database)
         self.photosCoordinator = PhotosBackupCoordinator(storage: storage, dbEngine: database)
 
@@ -602,7 +332,7 @@ public final class AppState: Sendable {
         }
 
         // Load Photos backup configuration
-        self.photosConfig = PhotosProfileStore.shared.loadConfiguration()
+        self.photosStore = PhotosStore(config: PhotosProfileStore.shared.loadConfiguration())
 
         // Rename default profile if required by the effective language
         let currentEffective = LocalizationManager.shared.effectiveLanguage

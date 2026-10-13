@@ -88,7 +88,8 @@ extension AppState {
         let sessionCoordinator = BackupSessionCoordinator(
             storage: self.storage,
             database: sessionDb,
-            retentionManager: sessionRetention
+            retentionManager: sessionRetention,
+            volumeEjector: SystemVolumeEjector()
         )
 
         let task = Task { [weak self] in

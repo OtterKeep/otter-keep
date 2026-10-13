@@ -334,11 +334,7 @@ extension AppState {
 
     @MainActor
     public func urlForVersionHistoryRecord(_ record: (snapshot: SnapshotRecord, file: FileCatalogRecord)) -> URL? {
-        guard let profile = activeVersionHistoryProfile else { return nil }
-        return profile.destinationURL
-            .appendingPathComponent(record.snapshot.snapshotPath)
-            .appendingPathComponent("root")
-            .appendingPathComponent(record.file.relativePath)
+        restoreTimeline.url(forVersionHistoryRecord: record)
     }
 
     @MainActor
@@ -479,14 +475,12 @@ extension AppState {
 
     @MainActor
     public func showError(_ message: String) {
-        self.alertMessage = message
-        self.showAlert = true
+        maintenanceSettings.showError(message)
     }
 
     @MainActor
     public func showSuccess(_ message: String) {
-        self.alertMessage = message
-        self.showAlert = true
+        maintenanceSettings.showSuccess(message)
     }
 
 
