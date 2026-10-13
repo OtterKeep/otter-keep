@@ -3,17 +3,17 @@ import Foundation
 /// Core namespace and versioning umbrella for the OtterKeep engine.
 public struct CoreEngine: Sendable {
     /// Semantic version identifier of the OtterKeep application (main product version).
-    public static let version = "1.7.0"
+    public static let version = "1.7.1"
 
     /// Internal build sequence number.
-    public static let buildNumber = "1700"
+    public static let buildNumber = "1701"
 
     /// Subsystem versions:
     public static let storageVersion = "1.3.0"
-    public static let databaseVersion = "1.3.0"
-    public static let coreVersion = "1.7.0"
-    public static let uiVersion = "1.7.0"
-    public static let cliVersion = "1.3.0"
+    public static let databaseVersion = "1.3.1"
+    public static let coreVersion = "1.7.1"
+    public static let uiVersion = "1.7.1"
+    public static let cliVersion = "1.3.1"
     public static let finderSyncVersion = "1.0.1"
 
     /// Structured dictionary of all subsystem components and their respective SemVer versions.

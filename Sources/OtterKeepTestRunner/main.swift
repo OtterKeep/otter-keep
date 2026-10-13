@@ -124,13 +124,13 @@ final class OtterKeepTestSuite {
 
     public func executeAllTests() async -> Bool {
         print("\n" + String(repeating: "=", count: 80))
-        print("🦦 OTTERKEEP 1.7.0 (BUILD 1700) SYSTEM INTEGRATION TEST SUITE & BENCHMARK")
+        print("🦦 OTTERKEEP 1.7.1 (BUILD 1701) SYSTEM INTEGRATION TEST SUITE & BENCHMARK")
         print(String(repeating: "=", count: 80))
 
         // Module 1
         print("\n🔹 Module 1: System, Version & Subsystem SemVer Integrity")
         await runTest("1.1 CoreEngine Metadata, Slogans & Bundle Identifier", test1_1_CoreEngineMetadata)
-        await runTest("1.2 SemVer Subsystem Matrix Alignment (1.7.0 / 1700)", test1_2_SemVerSubsystemMatrix)
+        await runTest("1.2 SemVer Subsystem Matrix Alignment (1.7.1 / 1701)", test1_2_SemVerSubsystemMatrix)
         await runTest("1.3 Semantic Version Parser & Comparison", test1_3_SemVerComparison)
         await runTest("1.4 Sparkle Appcast Coordinator Logic & Feed Audit", test1_4_SparkleAppcast)
 
@@ -206,7 +206,7 @@ final class OtterKeepTestSuite {
         await runTest("10.2 Three-Part Error Architecture Formatting in analyzeBackupError", test10_2_ThreePartErrorArchitecture)
         await runTest("10.3 Configuration Archive Round-Trip JSON Serialization", test10_3_ConfigurationArchiveSerialization)
         await runTest("10.4 AppState Multi-Profile Parallel Tracking & Lockout", test10_4_AppStateMultiProfileTracking)
-        await runTest("10.5 OtterAboutView Brand Metadata & Version Display (v1.7.0)", test10_5_OtterAboutViewMetadata)
+        await runTest("10.5 OtterAboutView Brand Metadata & Version Display (v1.7.1)", test10_5_OtterAboutViewMetadata)
         await runTest("10.6 DefaultFileSystemProvider Registry Routing & Dynamic Resolution", test10_6_DefaultFileSystemProviderRouting)
         await runTest("10.7 Restore OperationFeedback & Streamlined Browse Modes", test10_7_RestoreOperationFeedbackAndModes)
 
@@ -252,39 +252,39 @@ final class OtterKeepTestSuite {
     private func test1_1_CoreEngineMetadata() throws {
         try assertEqual(CoreEngine.appName, "OtterKeep")
         try assertEqual(CoreEngine.bundleIdentifier, "com.otterkeep.desktop")
-        try assertEqual(CoreEngine.version, "1.7.0", "CoreEngine version must be exactly 1.7.0")
-        try assertEqual(CoreEngine.buildNumber, "1700", "Build number must be 1700 for release 1.7.0")
+        try assertEqual(CoreEngine.version, "1.7.1", "CoreEngine version must be exactly 1.7.1")
+        try assertEqual(CoreEngine.buildNumber, "1701", "Build number must be 1701 for release 1.7.1")
     }
 
     private func test1_2_SemVerSubsystemMatrix() throws {
         let matrix = CoreEngine.componentVersions
         try assertEqual(matrix["OtterKeepStorage"], "1.3.0", "OtterKeepStorage must be 1.3.0")
-        try assertEqual(matrix["OtterKeepDatabase"], "1.3.0", "OtterKeepDatabase must be 1.3.0")
-        try assertEqual(matrix["OtterKeepCore"], "1.7.0", "OtterKeepCore must be 1.7.0")
-        try assertEqual(matrix["OtterKeepUI"], "1.7.0", "OtterKeepUI must be 1.7.0")
-        try assertEqual(matrix["OtterKeepCLI"], "1.3.0", "OtterKeepCLI must be 1.3.0")
+        try assertEqual(matrix["OtterKeepDatabase"], "1.3.1", "OtterKeepDatabase must be 1.3.1")
+        try assertEqual(matrix["OtterKeepCore"], "1.7.1", "OtterKeepCore must be 1.7.1")
+        try assertEqual(matrix["OtterKeepUI"], "1.7.1", "OtterKeepUI must be 1.7.1")
+        try assertEqual(matrix["OtterKeepCLI"], "1.3.1", "OtterKeepCLI must be 1.3.1")
         try assertEqual(matrix["OtterKeepFinderSyncExtension"], "1.0.1", "OtterKeepFinderSyncExtension must be 1.0.1")
 
         let summary = CoreEngine.componentVersionsFormatted
-        try assertTrue(summary.contains("v1.3.0"), "Summary must reflect subsystem versions")
-        try assertTrue(summary.contains("v1.7.0"), "Summary must reflect core version")
+        try assertTrue(summary.contains("v1.3.1"), "Summary must reflect subsystem versions")
+        try assertTrue(summary.contains("v1.7.1"), "Summary must reflect core version")
     }
 
     private func test1_3_SemVerComparison() throws {
-        try assertEqual(SoftwareUpdateCoordinator.compareVersions("1.7.0", "1.7.0"), .orderedSame)
-        try assertEqual(SoftwareUpdateCoordinator.compareVersions("1.6.0", "1.7.0"), .orderedAscending)
-        try assertEqual(SoftwareUpdateCoordinator.compareVersions("1.7.0", "1.6.0"), .orderedDescending)
-        try assertEqual(SoftwareUpdateCoordinator.compareVersions("v1.7.0", "1.7.0"), .orderedSame)
-        try assertEqual(SoftwareUpdateCoordinator.compareVersions("1.10.0", "1.7.0"), .orderedDescending)
+        try assertEqual(SoftwareUpdateCoordinator.compareVersions("1.7.1", "1.7.1"), .orderedSame)
+        try assertEqual(SoftwareUpdateCoordinator.compareVersions("1.7.0", "1.7.1"), .orderedAscending)
         try assertEqual(SoftwareUpdateCoordinator.compareVersions("1.7.1", "1.7.0"), .orderedDescending)
+        try assertEqual(SoftwareUpdateCoordinator.compareVersions("v1.7.1", "1.7.1"), .orderedSame)
+        try assertEqual(SoftwareUpdateCoordinator.compareVersions("1.10.0", "1.7.1"), .orderedDescending)
+        try assertEqual(SoftwareUpdateCoordinator.compareVersions("1.7.2", "1.7.1"), .orderedDescending)
     }
 
     private func test1_4_SparkleAppcast() async throws {
         let coordinator = SoftwareUpdateCoordinator()
         let currentVer = coordinator.currentVersion
         let currentBld = coordinator.currentBuild
-        try assertEqual(currentVer, "1.7.0")
-        try assertEqual(currentBld, "1700")
+        try assertEqual(currentVer, "1.7.1")
+        try assertEqual(currentBld, "1701")
 
         // Parse and validate Distribution/appcast.xml in repository root
         let projectRoot = URL(fileURLWithPath: #file)
@@ -298,9 +298,9 @@ final class OtterKeepTestSuite {
             guard let latest = await coordinator.parseAppcastXML(data: data) else {
                 throw TestFailure(message: "Expected parsed update info in appcast", file: #file, line: #line)
             }
-            try assertEqual(latest.version, "1.7.0", "Latest appcast version should be 1.7.0")
-            try assertEqual(latest.buildNumber, "1700", "Latest appcast build number should be 1700")
-            try assertTrue(latest.downloadURL.absoluteString.contains("OtterKeep-1.7.0.zip"))
+            try assertEqual(latest.version, "1.7.1", "Latest appcast version should be 1.7.1")
+            try assertEqual(latest.buildNumber, "1701", "Latest appcast build number should be 1701")
+            try assertTrue(latest.downloadURL.absoluteString.contains("OtterKeep-1.7.1.zip"))
         }
     }
 
@@ -1188,7 +1188,7 @@ final class OtterKeepTestSuite {
 
         let decoder = JSONDecoder()
         let decoded = try decoder.decode(ConfigurationExportArchive.self, from: data)
-        try assertEqual(decoded.appVersion, "1.7.0")
+        try assertEqual(decoded.appVersion, "1.7.1")
         try assertEqual(decoded.profiles.count, 1)
         try assertEqual(decoded.profiles.first?.name, "Portable Profile")
     }
@@ -1203,8 +1203,8 @@ final class OtterKeepTestSuite {
     }
 
     private func test10_5_OtterAboutViewMetadata() throws {
-        try assertEqual(CoreEngine.version, "1.7.0")
-        try assertEqual(CoreEngine.buildNumber, "1700")
+        try assertEqual(CoreEngine.version, "1.7.1")
+        try assertEqual(CoreEngine.buildNumber, "1701")
     }
 
     private func test10_6_DefaultFileSystemProviderRouting() async throws {

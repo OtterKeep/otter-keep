@@ -5,8 +5,8 @@
 
 [![macOS](https://img.shields.io/badge/macOS-15.0%2B%20%28Sequoia%29-blue.svg)](https://apple.com/macos)
 [![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org)
-[![Version](https://img.shields.io/badge/version-1.7.0-emerald.svg)](https://github.com/richardeszeshu/otter-keep/releases)
-[![Build](https://img.shields.io/badge/build-1700-cyan.svg)](https://github.com/richardeszeshu/otter-keep)
+[![Version](https://img.shields.io/badge/version-1.7.1-emerald.svg)](https://github.com/richardeszeshu/otter-keep/releases)
+[![Build](https://img.shields.io/badge/build-1701-cyan.svg)](https://github.com/richardeszeshu/otter-keep)
 [![Tests](https://img.shields.io/badge/tests-61%2F61%20passed-brightgreen.svg)](https://github.com/richardeszeshu/otter-keep)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)](LICENSE)
 [![Hungarian](https://img.shields.io/badge/Magyar%20nyelv-README.hu.md-red.svg)](README.hu.md)

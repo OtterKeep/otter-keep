@@ -4,6 +4,62 @@ All notable changes to OtterKeep are documented in this file in accordance with 
 
 ---
 
+## [1.7.1] - 2026-10-13 (Build 1701)
+
+### 🌟 Release Summary / Verzióösszefoglaló
+Version **1.7.1** is a comprehensive architectural modularization and decomposition release for OtterKeep. Monolithic files exceeding 800–3,200 lines across core subsystems have been decoupled into focused, single-responsibility files and domain-specific extensions under strict Swift 6 concurrency, with zero regression in functionality or performance:
+- **`OtterKeepCore` Diagnostics & Localization Decomposition**:
+  - Decomposed 3,249-line `Localization.swift` monolith into distinct files:
+    - `L10n.swift` (Key enumerations and default catalog routing)
+    - `L10n+Hungarian.swift` (Hungarian translation dictionary)
+    - `L10n+English.swift` (English translation dictionary)
+    - `LocalizationManager.swift` (Runtime localization state actor)
+    - `AppSettings.swift` (Decoupled settings domain model)
+- **`OtterKeepDatabase` Engine Decomposition**:
+  - Decomposed 1,592-line `DatabaseEngine.swift` monolith into:
+    - `DatabaseRecords.swift` (Catalog models and schema definitions)
+    - `DatabaseEngine.swift` (Core connection initialization, WAL configuration, and query execution)
+    - `DatabaseEngine+Snapshots.swift` (Snapshot lifecycle and metadata operations)
+    - `DatabaseEngine+FileCatalog.swift` (File indexing and differential queries)
+    - `DatabaseEngine+Replication.swift` (Replication tracking and mirror cataloging)
+    - `DatabaseEngine+ScrubbingAndPhotos.swift` (Data scrubbing bit-rot checks and photos metadata)
+- **`OtterKeepCLI` Command Architecture Modularization**:
+  - Decomposed 1,323-line `OtterKeepCLI/main.swift` into modular command dispatchers:
+    - `main.swift` (Clean root command routing and help)
+    - `CLIHelpers.swift` (Terminal formatting, output helpers, and error formatting)
+    - `BackupCommands.swift` (`backup`, `restore`, `timeline`, `diff`)
+    - `ProfileCommands.swift` (`list`, `create`, `delete`, `export`, `import`)
+    - `MaintenanceCommands.swift` (`prune`, `scrub`, `compliance`, `verify`)
+    - `ReplicationAndPhotosCommands.swift` (`replicate`, `photos`)
+    - `SystemCommands.swift` (`status`, `doctor`, `update`)
+- **`OtterKeepCore` Pipeline & Replication Decoupling**:
+  - Decomposed `BackupSessionCoordinator.swift` (1,401 lines) into:
+    - `BackupSessionModels.swift` (Session metrics, progress states, and run options)
+    - `BackupSessionCoordinator+DryRun.swift` (Dry-run simulation logic)
+    - `BackupSessionCoordinator+Hooks.swift` (Pre/post execution hook handling)
+    - `BackupSessionCoordinator.swift` (Core pipeline coordination)
+  - Decomposed `BackupCopyJobCoordinator.swift` (812 lines) into:
+    - `ReplicationModels.swift` (Replication status models and options)
+    - `BackupCopyJobCoordinator+Providers.swift` (Local, S3, WebDAV, SFTP replication workers)
+    - `BackupCopyJobCoordinator.swift` (Core copy coordinator)
+- **`OtterKeepUI` State & View Decomposition**:
+  - Decomposed `AppState.swift` (3,044 lines) into domain extensions:
+    - `AppState.swift` (Pure state properties and reactive publishers)
+    - `UINavigationModels.swift` (Navigation tabs and modal states)
+    - `AppState+ProfileOperations.swift`, `AppState+BackupOperations.swift`, `AppState+RestoreOperations.swift`
+    - `AppState+Replication.swift`, `AppState+MaintenanceOperations.swift`, `AppState+PhotosOperations.swift`, `AppState+Configuration.swift`
+  - Decomposed monolithic views:
+    - `RestoreExplorerView.swift` (1,266 lines → 205 lines) into `RestoreExplorerView+Toolbars.swift`, `+Browser.swift`, `+Modals.swift`
+    - `ProfileRulesView.swift` (1,067 lines → 102 lines) into `ProfileRulesView+Header.swift`, `+FilterTabs.swift`, `+RuleCards.swift`, `+Modals.swift`
+- **Subsystem SemVer Alignment**:
+  - `OtterKeepDatabase`: `1.3.1` (Patch refactor)
+  - `OtterKeepCore`: `1.7.1` (Patch refactor)
+  - `OtterKeepUI`: `1.7.1` (Patch refactor)
+  - `OtterKeepCLI`: `1.3.1` (Patch refactor)
+  - Full suite verified: 61/61 system integration tests passing with 100% success rate.
+
+---
+
 ## [1.7.0] - 2026-10-09 (Build 1700)
 
 ### 🌟 Release Summary / Verzióösszefoglaló
