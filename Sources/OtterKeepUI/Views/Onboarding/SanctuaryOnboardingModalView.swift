@@ -333,6 +333,8 @@ public struct SanctuaryOnboardingModalView: View {
             }
 
             Button(L10n.t(.onboardingSkip)) {
+                UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+                appState.showOnboardingModal = false
                 dismiss()
             }
             .buttonStyle(.plain)
@@ -417,7 +419,12 @@ public struct SanctuaryOnboardingModalView: View {
             enableCanaryTraps: appState.maintenanceSettings.onboardingEnableCanaryTraps
         )
 
-        appState.profiles.append(profile)
+        let defaultName = L10n.t(.defaultProfileName)
+        if appState.profiles.count == 1 && (appState.profiles[0].name == defaultName || appState.profiles[0].name == "Default profile" || appState.profiles[0].name == "Alapértelmezett profil") {
+            appState.profiles = [profile]
+        } else {
+            appState.profiles.append(profile)
+        }
         appState.saveProfiles()
         appState.selectedProfileId = profile.id
         appState.activeNavigation = .profile(profile.id)

@@ -934,6 +934,7 @@ public enum L10n {
         case menuRefreshData
         case menuMainWindow
         case menuDocumentation
+        case menuWelcomeGuide
         case menuReleaseNotes
         case menuRevealLogs
         case menuReportIssue

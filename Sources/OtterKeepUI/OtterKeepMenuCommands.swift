@@ -198,6 +198,11 @@ public struct OtterKeepMenuCommands: Commands {
             }
             .keyboardShortcut("?", modifiers: .command)
 
+            Button(L10n.t(.menuWelcomeGuide)) {
+                appState.maintenanceSettings.onboardingCurrentStep = 0
+                appState.showOnboardingModal = true
+            }
+
             Button(L10n.t(.menuReleaseNotes)) {
                 if let url = URL(string: "https://github.com/OtterKeep/otter-keep/releases") {
                     NSWorkspace.shared.open(url)

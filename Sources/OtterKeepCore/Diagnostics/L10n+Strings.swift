@@ -824,6 +824,7 @@ extension L10n {
         .menuRefreshData: Translation(english: "Refresh Data & Snapshots", hungarian: "Adatok és pillanatképek frissítése"),
         .menuMainWindow: Translation(english: "OtterKeep Main Window", hungarian: "OtterKeep főablak"),
         .menuDocumentation: Translation(english: "OtterKeep Documentation", hungarian: "OtterKeep dokumentáció"),
+        .menuWelcomeGuide: Translation(english: "Welcome Guide & Onboarding...", hungarian: "Kezdő útmutató és beállítás..."),
         .menuReleaseNotes: Translation(english: "Release Notes", hungarian: "Kiadási megjegyzések"),
         .menuRevealLogs: Translation(english: "Reveal Logs in Finder", hungarian: "Naplófájlok megnyitása Finderben"),
         .menuReportIssue: Translation(english: "Report an Issue on GitHub", hungarian: "Hibajelentés küldése (GitHub)"),

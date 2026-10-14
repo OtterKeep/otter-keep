@@ -369,7 +369,7 @@ private struct MainWindowLifecycleModifier: ViewModifier {
                 appState.refreshLogs()
 
                 let hasCompleted = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
-                if !hasCompleted && appState.profiles.isEmpty {
+                if !hasCompleted {
                     appState.showOnboardingModal = true
                 }
             }
