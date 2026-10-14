@@ -270,6 +270,9 @@ codesign --force --sign "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/MacOS/otterkeep"
 codesign --force --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
 rm -f "$TEMP_ENTITLEMENTS"
 
+# Strip quarantine attributes so locally packaged application launches without unidentified developer warnings
+xattr -cr "$APP_BUNDLE" 2>/dev/null || true
+
 echo "🐚 7. Generating shell completions..."
 mkdir -p "$PROJECT_ROOT/Distribution/completions"
 "$CLI_BINARY" --generate-completion-script zsh > "$PROJECT_ROOT/Distribution/completions/_otterkeep" 2>/dev/null || true

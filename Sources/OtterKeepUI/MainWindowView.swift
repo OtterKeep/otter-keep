@@ -22,145 +22,32 @@ public struct MainWindowView: View {
                 .navigationTitle("")
         }
         .toolbar {
-            ToolbarItemGroup(placement: .navigation) {
-                Button {
-                    appState.showSystemLogsModal = true
-                } label: {
-                    Image(systemName: "terminal")
-                }
-                .help(L10n.t(.menuSystemLogs) + " (⌘L)")
-
-                Button {
-                    appState.showPreferencesModal = true
-                } label: {
-                    Image(systemName: "gearshape")
-                }
-                .help(L10n.t(.menuPreferences) + " (⌘,)")
-            }
+            windowToolbar
         }
-        .onAppear {
-            appState.loadSnapshots()
-            appState.loadPhotosSnapshots()
-            appState.refreshLogs()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            appState.loadSnapshots()
-            appState.loadPhotosSnapshots()
-        }
-        .background(WindowTitleConfigurator(appState: appState))
-        .sheet(isPresented: Binding(
-            get: { appState.showPreferencesModal },
-            set: { appState.showPreferencesModal = $0 }
-        )) {
-            PreferencesModalView(appState: appState)
-        }
-        .sheet(isPresented: Binding(
-            get: { appState.showSystemLogsModal },
-            set: { appState.showSystemLogsModal = $0 }
-        )) {
-            SystemLogsModalView(appState: appState)
-        }
-        .sheet(isPresented: Binding(
-            get: { appState.showInspectorModal },
-            set: { appState.showInspectorModal = $0 }
-        )) {
-            BackupInspectorModalView(appState: appState)
-        }
-        .sheet(isPresented: Binding(
-            get: { appState.showFileVersionHistoryModal },
-            set: { appState.showFileVersionHistoryModal = $0 }
-        )) {
-            FileVersionHistoryModalView(appState: appState)
-        }
-        .sheet(isPresented: Binding(
-            get: { appState.showRemoteDestinationEditorSheet },
-            set: { appState.showRemoteDestinationEditorSheet = $0 }
-        )) {
-            RemoteDestinationEditorModalView(appState: appState)
-        }
-        .onOpenURL { url in
-            if url.scheme == "otterkeep" && url.host == "restore-versions" {
-                if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-                   let pathItem = components.queryItems?.first(where: { $0.name == "path" })?.value {
-                    let fileURL = URL(fileURLWithPath: pathItem)
-                    appState.openVersionHistory(for: fileURL)
-                }
-            }
-        }
-        .alert("OtterKeep", isPresented: Binding(get: { appState.showAlert }, set: { appState.showAlert = $0 })) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(appState.alertMessage ?? "")
-        }
-        .sheet(isPresented: Binding(
-            get: { appState.showNewProfileSheet },
-            set: { appState.showNewProfileSheet = $0 }
-        )) {
-            NewProfileModalView(appState: appState)
-        }
-        .sheet(isPresented: Binding(
-            get: { appState.showFeedbackModal },
-            set: { appState.showFeedbackModal = $0 }
-        )) {
-            if let feedback = appState.activeFeedback {
-                OperationFeedbackModalView(
-                    feedback: feedback,
-                    onDismiss: {
-                        appState.showFeedbackModal = false
-                        appState.activeFeedback = nil
-                    },
-                    onViewDetails: {
-                        appState.showFeedbackModal = false
-                        appState.showInspectorModal = true
-                    },
-                    onViewLogs: {
-                        appState.showFeedbackModal = false
-                        appState.activeNavigation = .logs
-                    }
-                )
-            }
-        }
-        .sheet(isPresented: Binding(
-            get: { appState.showProfileSettingsModal },
-            set: { appState.showProfileSettingsModal = $0 }
-        )) {
-            if let profile = appState.selectedProfile {
-                ProfileSettingsModalView(appState: appState, profile: profile)
-            }
-        }
-        .sheet(isPresented: Binding(
-            get: { appState.showDeleteProfileConfirmation },
-            set: { appState.showDeleteProfileConfirmation = $0 }
-        )) {
-            DeleteProfileConfirmationModalView(appState: appState)
-        }
-        .sheet(isPresented: Binding(
-            get: { appState.showOnboardingModal },
-            set: { appState.showOnboardingModal = $0 }
-        )) {
-            SanctuaryOnboardingModalView(appState: appState)
-        }
-        .alert(L10n.t(.renameProfileSheetTitle), isPresented: Binding(
-            get: { appState.showRenameProfileSheet },
-            set: { appState.showRenameProfileSheet = $0 }
-        )) {
-            TextField(L10n.t(.renameProfileSheetPrompt), text: Binding(
-                get: { appState.renameProfileName },
-                set: { appState.renameProfileName = $0 }
-            ))
-            Button(L10n.t(.save)) {
-                if let id = appState.selectedProfileId {
-                    appState.renameProfile(id: id, newName: appState.renameProfileName)
-                }
-                appState.renameProfileName = ""
-            }
-            Button(L10n.t(.cancel), role: .cancel) {
-                appState.renameProfileName = ""
-            }
-        } message: {
-            Text(L10n.t(.renameProfileSheetPrompt))
-        }
+        .modifier(MainWindowLifecycleModifier(appState: appState))
+        .modifier(MainWindowSystemSheetsModifier(appState: appState))
+        .modifier(MainWindowProfileSheetsModifier(appState: appState))
+        .modifier(MainWindowAlertsModifier(appState: appState))
         .preferredColorScheme(appState.effectiveColorScheme)
+    }
+
+    @ToolbarContentBuilder
+    private var windowToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigation) {
+            Button {
+                appState.showSystemLogsModal = true
+            } label: {
+                Image(systemName: "terminal")
+            }
+            .help(L10n.t(.menuSystemLogs) + " (⌘L)")
+
+            Button {
+                appState.showPreferencesModal = true
+            } label: {
+                Image(systemName: "gearshape")
+            }
+            .help(L10n.t(.menuPreferences) + " (⌘,)")
+        }
     }
 
     // MARK: - Detail Content Routing
@@ -466,5 +353,161 @@ public struct WindowTitleConfigurator: NSViewRepresentable {
             Self.hasPerformedInitialMinimization = true
             window.orderOut(nil)
         }
+    }
+}
+
+// MARK: - Modifiers for Type-Checker Complexity Isolation
+
+private struct MainWindowLifecycleModifier: ViewModifier {
+    let appState: AppState
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                appState.loadSnapshots()
+                appState.loadPhotosSnapshots()
+                appState.refreshLogs()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                appState.loadSnapshots()
+                appState.loadPhotosSnapshots()
+            }
+            .background(WindowTitleConfigurator(appState: appState))
+            .onOpenURL { url in
+                if url.scheme == "otterkeep" && url.host == "restore-versions" {
+                    if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                       let pathItem = components.queryItems?.first(where: { $0.name == "path" })?.value {
+                        let fileURL = URL(fileURLWithPath: pathItem)
+                        appState.openVersionHistory(for: fileURL)
+                    }
+                }
+            }
+    }
+}
+
+private struct MainWindowSystemSheetsModifier: ViewModifier {
+    let appState: AppState
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(isPresented: Binding(
+                get: { appState.showPreferencesModal },
+                set: { appState.showPreferencesModal = $0 }
+            )) {
+                PreferencesModalView(appState: appState)
+            }
+            .sheet(isPresented: Binding(
+                get: { appState.showSystemLogsModal },
+                set: { appState.showSystemLogsModal = $0 }
+            )) {
+                SystemLogsModalView(appState: appState)
+            }
+            .sheet(isPresented: Binding(
+                get: { appState.showInspectorModal },
+                set: { appState.showInspectorModal = $0 }
+            )) {
+                BackupInspectorModalView(appState: appState)
+            }
+            .sheet(isPresented: Binding(
+                get: { appState.showFileVersionHistoryModal },
+                set: { appState.showFileVersionHistoryModal = $0 }
+            )) {
+                FileVersionHistoryModalView(appState: appState)
+            }
+            .sheet(isPresented: Binding(
+                get: { appState.showOnboardingModal },
+                set: { appState.showOnboardingModal = $0 }
+            )) {
+                SanctuaryOnboardingModalView(appState: appState)
+            }
+    }
+}
+
+private struct MainWindowProfileSheetsModifier: ViewModifier {
+    let appState: AppState
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(isPresented: Binding(
+                get: { appState.showRemoteDestinationEditorSheet },
+                set: { appState.showRemoteDestinationEditorSheet = $0 }
+            )) {
+                RemoteDestinationEditorModalView(appState: appState)
+            }
+            .sheet(isPresented: Binding(
+                get: { appState.showNewProfileSheet },
+                set: { appState.showNewProfileSheet = $0 }
+            )) {
+                NewProfileModalView(appState: appState)
+            }
+            .sheet(isPresented: Binding(
+                get: { appState.showProfileSettingsModal },
+                set: { appState.showProfileSettingsModal = $0 }
+            )) {
+                if let profile = appState.selectedProfile {
+                    ProfileSettingsModalView(appState: appState, profile: profile)
+                }
+            }
+            .sheet(isPresented: Binding(
+                get: { appState.showDeleteProfileConfirmation },
+                set: { appState.showDeleteProfileConfirmation = $0 }
+            )) {
+                DeleteProfileConfirmationModalView(appState: appState)
+            }
+            .sheet(isPresented: Binding(
+                get: { appState.showFeedbackModal },
+                set: { appState.showFeedbackModal = $0 }
+            )) {
+                if let feedback = appState.activeFeedback {
+                    OperationFeedbackModalView(
+                        feedback: feedback,
+                        onDismiss: {
+                            appState.showFeedbackModal = false
+                            appState.activeFeedback = nil
+                        },
+                        onViewDetails: {
+                            appState.showFeedbackModal = false
+                            appState.showInspectorModal = true
+                        },
+                        onViewLogs: {
+                            appState.showFeedbackModal = false
+                            appState.activeNavigation = .logs
+                        }
+                    )
+                }
+            }
+    }
+}
+
+private struct MainWindowAlertsModifier: ViewModifier {
+    let appState: AppState
+
+    func body(content: Content) -> some View {
+        content
+            .alert("OtterKeep", isPresented: Binding(get: { appState.showAlert }, set: { appState.showAlert = $0 })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(appState.alertMessage ?? "")
+            }
+            .alert(L10n.t(.renameProfileSheetTitle), isPresented: Binding(
+                get: { appState.showRenameProfileSheet },
+                set: { appState.showRenameProfileSheet = $0 }
+            )) {
+                TextField(L10n.t(.renameProfileSheetPrompt), text: Binding(
+                    get: { appState.renameProfileName },
+                    set: { appState.renameProfileName = $0 }
+                ))
+                Button(L10n.t(.save)) {
+                    if let id = appState.selectedProfileId {
+                        appState.renameProfile(id: id, newName: appState.renameProfileName)
+                    }
+                    appState.renameProfileName = ""
+                }
+                Button(L10n.t(.cancel), role: .cancel) {
+                    appState.renameProfileName = ""
+                }
+            } message: {
+                Text(L10n.t(.renameProfileSheetPrompt))
+            }
     }
 }
