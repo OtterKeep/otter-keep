@@ -552,10 +552,103 @@ extension ProfileRulesView {
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 220)
                     }
+
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L10n.t(.sparsebundlePasswordLabel))
+                                .font(.body)
+                            Text(L10n.t(.sparsebundlePasswordHint))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        SecureField(L10n.t(.sparsebundlePasswordPlaceholder), text: Binding(
+                            get: {
+                                KeychainManager.getSecret(for: "sparsebundle_\(profile.id.uuidString)")
+                                    ?? KeychainManager.getPassphrase(for: profile.id)
+                                    ?? ""
+                            },
+                            set: { newPass in
+                                guard !newPass.isEmpty else { return }
+                                try? KeychainManager.saveSecret(newPass, for: "sparsebundle_\(profile.id.uuidString)")
+                                try? KeychainManager.savePassphrase(newPass, for: profile.id)
+                            }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 220)
+                    }
                 }
             }
         }
         .otterCard()
     }
 
+    // MARK: - 13. Multi-Drive Rotation
+    func multiDriveRotationSection(profile: BackupProfile) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label(L10n.t(.multiDriveRotationTitle), systemImage: "externaldrive.connected.to.line.below")
+                    .font(.headline)
+                    .foregroundStyle(OtterTheme.oceanicTeal)
+                Spacer()
+                Text(L10n.t(.multiDriveRotationDesc))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                if profile.destinationVolumeUUIDs.isEmpty {
+                    Text(L10n.t(.noRotationVolumes))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 4)
+                } else {
+                    ForEach(profile.destinationVolumeUUIDs, id: \.self) { uuid in
+                        HStack(spacing: 8) {
+                            Image(systemName: "externaldrive.fill")
+                                .foregroundStyle(OtterTheme.oceanicTeal)
+                            Text(uuid)
+                                .font(.callout.monospaced())
+                                .lineLimit(1)
+                            Spacer()
+                            Button {
+                                var updated = profile
+                                updated.destinationVolumeUUIDs.removeAll { $0 == uuid }
+                                appState.selectedProfile = updated
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.caption)
+                                    .foregroundStyle(OtterTheme.statusError)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(8)
+                        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                    }
+                }
+
+                HStack {
+                    Spacer()
+                    Button {
+                        if let uuid = (try? profile.destinationURL.resourceValues(forKeys: [.volumeUUIDStringKey]))?.volumeUUIDString,
+                           !uuid.isEmpty,
+                           !profile.destinationVolumeUUIDs.contains(uuid) {
+                            var updated = profile
+                            updated.destinationVolumeUUIDs.append(uuid)
+                            appState.selectedProfile = updated
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus.circle")
+                            Text(L10n.t(.addVolumeToRotation))
+                        }
+                        .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+        }
+        .otterCard()
+    }
 }

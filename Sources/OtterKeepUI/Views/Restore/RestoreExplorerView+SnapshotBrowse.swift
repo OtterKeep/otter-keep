@@ -224,6 +224,14 @@ extension RestoreExplorerView {
                 .foregroundStyle(node.isDirectory ? OtterTheme.oceanicTeal : .secondary)
                 .font(.body)
 
+            if !node.isDirectory {
+                let status = appState.snapshotFileDiffStatuses[node.relativePath] ?? .unchanged
+                Circle()
+                    .fill(diffStatusColor(status))
+                    .frame(width: 7, height: 7)
+                    .help(diffStatusTooltip(status))
+            }
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(node.name)
                     .font(.body.weight(node.isDirectory ? .semibold : .regular))
@@ -334,6 +342,22 @@ extension RestoreExplorerView {
         }
     }
 
-    // MARK: - 2. File Timeline View with Directory Tree
+    private func diffStatusColor(_ status: DiffChangeType) -> Color {
+        switch status {
+        case .added: return OtterTheme.statusGreen
+        case .modified: return OtterTheme.otterAmber
+        case .unchanged: return Color.secondary.opacity(0.4)
+        case .deleted: return OtterTheme.statusError
+        }
+    }
+
+    private func diffStatusTooltip(_ status: DiffChangeType) -> String {
+        switch status {
+        case .added: return L10n.t(.diffTabAdded)
+        case .modified: return L10n.t(.diffTabModified)
+        case .unchanged: return L10n.t(.timelineUnmodifiedCoW)
+        case .deleted: return L10n.t(.diffTabDeleted)
+        }
+    }
 
 }

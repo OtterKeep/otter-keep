@@ -67,6 +67,9 @@ public struct MainDashboardView: View {
                     // MARK: - Zone 3: Guardianship & Resilience
                     rule321ComplianceCard(profile: profile)
 
+                    // Storage Capacity Depletion Forecast
+                    StorageForecastCardView(appState: appState)
+
                     // Quick Statistics
                     quickStatsSection(profile: profile)
 
@@ -219,18 +222,22 @@ public struct MainDashboardView: View {
                     }
 
                     // S.M.A.R.T. Drive Health & Mode Badge
+                    let isDriveHealthy = appState.volumeEvaluation?.isTargetReadOnly != true &&
+                                         status.lastSessionSummary?.errorCount == 0 &&
+                                         forecast?.isQuotaExceeded != true
+
                     HStack(spacing: 8) {
                         HStack(spacing: 4) {
-                            Image(systemName: "checkmark.shield.fill")
+                            Image(systemName: isDriveHealthy ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
                                 .font(.system(size: 10))
-                                .foregroundStyle(OtterTheme.statusGreen)
-                            Text(L10n.t(.smartHeroHealthy))
+                                .foregroundStyle(isDriveHealthy ? OtterTheme.statusGreen : OtterTheme.statusWarning)
+                            Text(isDriveHealthy ? L10n.t(.smartHeroHealthy) : L10n.t(.smartHeroWarning))
                                 .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(OtterTheme.statusGreen)
+                                .foregroundStyle(isDriveHealthy ? OtterTheme.statusGreen : OtterTheme.statusWarning)
                         }
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(OtterTheme.statusGreen.opacity(0.12), in: Capsule())
+                        .background((isDriveHealthy ? OtterTheme.statusGreen : OtterTheme.statusWarning).opacity(0.12), in: Capsule())
 
                         if profile.executionMode.isContinuous {
                             HStack(spacing: 4) {

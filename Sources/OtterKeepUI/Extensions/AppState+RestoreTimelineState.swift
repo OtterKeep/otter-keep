@@ -24,6 +24,8 @@ extension AppState {
     public var selectedTreeNode: FileTreeNode? { get { restoreTimeline.selectedTreeNode } set { restoreTimeline.selectedTreeNode = newValue } }
     /// Currently selected file catalog record.
     public var selectedFile: FileCatalogRecord? { get { restoreTimeline.selectedFile } set { restoreTimeline.selectedFile = newValue } }
+    /// Differential status for files in the selected snapshot relative to previous snapshot.
+    public var snapshotFileDiffStatuses: [String: DiffChangeType] { get { restoreTimeline.snapshotFileDiffStatuses } set { restoreTimeline.snapshotFileDiffStatuses = newValue } }
 
     // MARK: - File Timeline & Tree Structure
     /// Active browsing mode (snapshot catalog or timeline).

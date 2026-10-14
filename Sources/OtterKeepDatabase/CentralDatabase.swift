@@ -165,6 +165,23 @@ public final class CentralDatabase: @unchecked Sendable {
 
         CREATE INDEX IF NOT EXISTS idx_cached_files_prof_snap ON cached_file_records(profile_id, snapshot_id);
         CREATE INDEX IF NOT EXISTS idx_cached_files_prof_path ON cached_file_records(profile_id, relative_path);
+
+        CREATE TABLE IF NOT EXISTS canary_registry (
+            id TEXT PRIMARY KEY,
+            profile_id TEXT NOT NULL,
+            file_name TEXT NOT NULL,
+            expected_sha256 TEXT NOT NULL,
+            created_at REAL NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_canary_prof ON canary_registry(profile_id);
+
+        CREATE TABLE IF NOT EXISTS maintenance_telemetry (
+            key TEXT PRIMARY KEY,
+            int_value INTEGER,
+            double_value REAL,
+            text_value TEXT
+        );
         """
         try executeUnlocked(query: sql)
     }
@@ -824,4 +841,157 @@ public final class CentralDatabase: @unchecked Sendable {
         try? executeUnlocked(query: "VACUUM;")
         logger.info("Central database self-healing maintenance and VACUUM completed.")
     }
+
+    // MARK: - Canary Trap Registry
+
+    public struct CentralCanaryRecord: Sendable, Equatable {
+        public let id: String
+        public let profileId: String
+        public let fileName: String
+        public let expectedSHA256: String
+        public let createdAt: Date
+
+        public init(
+            id: String = UUID().uuidString,
+            profileId: String,
+            fileName: String,
+            expectedSHA256: String,
+            createdAt: Date = Date()
+        ) {
+            self.id = id
+            self.profileId = profileId
+            self.fileName = fileName
+            self.expectedSHA256 = expectedSHA256
+            self.createdAt = createdAt
+        }
+    }
+
+    /// Stores or updates an anti-ransomware canary decoy record.
+    public func saveCanaryRecord(_ record: CentralCanaryRecord) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        try ensureConnectedUnlocked()
+
+        guard let db = db else { return }
+        let sql = """
+        INSERT OR REPLACE INTO canary_registry (id, profile_id, file_name, expected_sha256, created_at)
+        VALUES (?, ?, ?, ?, ?);
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.prepareFailed(sql, String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_text(stmt, 1, (record.id as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(stmt, 2, (record.profileId as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(stmt, 3, (record.fileName as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(stmt, 4, (record.expectedSHA256 as NSString).utf8String, -1, nil)
+        sqlite3_bind_double(stmt, 5, record.createdAt.timeIntervalSince1970)
+
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw DatabaseError.stepFailed(sql, String(cString: sqlite3_errmsg(db)))
+        }
+    }
+
+    /// Retrieves all registered canary records for a given backup profile.
+    public func loadCanaryRecords(profileId: String) throws -> [CentralCanaryRecord] {
+        lock.lock()
+        defer { lock.unlock() }
+        try ensureConnectedUnlocked()
+
+        guard let db = db else { return [] }
+        let sql = "SELECT id, profile_id, file_name, expected_sha256, created_at FROM canary_registry WHERE profile_id = ?;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.prepareFailed(sql, String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_text(stmt, 1, (profileId as NSString).utf8String, -1, nil)
+
+        var records: [CentralCanaryRecord] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let id = columnText(stmt, 0)
+            let profId = columnText(stmt, 1)
+            let fileName = columnText(stmt, 2)
+            let sha = columnText(stmt, 3)
+            let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 4))
+            records.append(CentralCanaryRecord(id: id, profileId: profId, fileName: fileName, expectedSHA256: sha, createdAt: createdAt))
+        }
+        return records
+    }
+
+    /// Deletes canary records for a profile.
+    public func deleteCanaryRecords(profileId: String) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        try ensureConnectedUnlocked()
+
+        guard let db = db else { return }
+        let sql = "DELETE FROM canary_registry WHERE profile_id = ?;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.prepareFailed(sql, String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_text(stmt, 1, (profileId as NSString).utf8String, -1, nil)
+        _ = sqlite3_step(stmt)
+    }
+
+    // MARK: - Automated Maintenance Scheduling (Every 20 cycles or 7 days)
+
+    /// Inkrements the backup completion cycle counter and performs self-healing if threshold reached.
+    public func recordBackupCompletionAndCheckMaintenance() {
+        lock.lock()
+        defer { lock.unlock() }
+        try? ensureConnectedUnlocked()
+        guard let db = db else { return }
+
+        // Read current cycle count and last maintenance timestamp
+        var count = 0
+        var lastMaintenance = Date.distantPast
+
+        let sqlRead = "SELECT key, int_value, double_value FROM maintenance_telemetry WHERE key IN ('cycle_count', 'last_maintenance');"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sqlRead, -1, &stmt, nil) == SQLITE_OK {
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                let key = columnText(stmt, 0)
+                if key == "cycle_count" {
+                    count = Int(sqlite3_column_int64(stmt, 1))
+                } else if key == "last_maintenance" {
+                    let ts = sqlite3_column_double(stmt, 2)
+                    if ts > 0 { lastMaintenance = Date(timeIntervalSince1970: ts) }
+                }
+            }
+            sqlite3_finalize(stmt)
+        }
+
+        count += 1
+        let now = Date()
+        let sevenDaysPassed = now.timeIntervalSince(lastMaintenance) >= (7 * 86400)
+        let twentyCyclesReached = count >= 20
+
+        if twentyCyclesReached || sevenDaysPassed {
+            logger.info("Automated maintenance triggered (cycles: \(count), 7-day interval: \(sevenDaysPassed)). Executing self-healing...")
+            let healthy = performIntegrityCheckUnlocked()
+            if !healthy {
+                try? executeUnlocked(query: "REINDEX;")
+            }
+            try? executeUnlocked(query: "PRAGMA optimize;")
+            try? executeUnlocked(query: "VACUUM;")
+            count = 0
+            lastMaintenance = now
+        }
+
+        // Save updated telemetry
+        let updateSQL = """
+        INSERT OR REPLACE INTO maintenance_telemetry (key, int_value, double_value) VALUES
+        ('cycle_count', \(count), NULL),
+        ('last_maintenance', NULL, \(lastMaintenance.timeIntervalSince1970));
+        """
+        try? executeUnlocked(query: updateSQL)
+    }
 }
+

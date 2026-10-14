@@ -221,6 +221,47 @@ public struct NewProfileModalView: View {
                 .padding(.horizontal, 4)
             }
 
+            // Execution Mode Card (Scheduled vs Continuous FSEvents)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label(L10n.t(.executionModeScheduled) + " / " + L10n.t(.executionModeContinuous), systemImage: "clock.arrow.2.circlepath")
+                        .font(.caption.bold())
+                        .foregroundStyle(OtterTheme.oceanicTeal)
+                    Spacer()
+                    Picker("", selection: Binding(
+                        get: { appState.newProfileIsContinuous },
+                        set: { appState.newProfileIsContinuous = $0 }
+                    )) {
+                        Text(L10n.t(.executionModeScheduled)).tag(false)
+                        Text(L10n.t(.executionModeContinuous)).tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 220)
+                }
+
+                if appState.newProfileIsContinuous {
+                    HStack(spacing: 8) {
+                        Text(L10n.t(.continuousDebounceLabel) + ":")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Slider(
+                            value: Binding(
+                                get: { Double(appState.newProfileDebouncingSeconds) },
+                                set: { appState.newProfileDebouncingSeconds = Int($0) }
+                            ),
+                            in: 5...300,
+                            step: 5
+                        )
+                        Text("\(appState.newProfileDebouncingSeconds)s")
+                            .font(.caption.monospacedDigit().bold())
+                            .frame(width: 40, alignment: .trailing)
+                    }
+                    .padding(.top, 2)
+                }
+            }
+            .padding(10)
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+
             // Advanced Options: File Filtering & Hardware Automation
             HStack(alignment: .top, spacing: 14) {
                 // 1. Ignore rules group

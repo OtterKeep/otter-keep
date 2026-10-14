@@ -1,11 +1,18 @@
 import Foundation
 import CryptoKit
 import Darwin
+import OtterKeepDatabase
 
 /// Anti-ransomware canary trap coordinator that plants decoy files and monitors them for external tampering.
 public final class CanaryTrapMonitor: @unchecked Sendable {
     public static let canaryPrefix = ".otterkeep_canary_"
     public static let canaryExtension = ".dat"
+
+    /// Seductive decoy file names according to system specification
+    public static let attractiveDecoyNames = [
+        ".otterkeep_canary_financials.docx",
+        ".otterkeep_canary_vault.pdf"
+    ]
 
     /// Error thrown when a canary decoy file has been altered, encrypted, or destroyed.
     public struct CanaryTrapTriggeredError: Error, CustomStringConvertible, Sendable {
@@ -29,6 +36,7 @@ public final class CanaryTrapMonitor: @unchecked Sendable {
     private var isArmed = false
     private let queue = DispatchQueue(label: "com.otterkeep.canarytrap", qos: .userInitiated)
     private let onTripwire: @Sendable (CanaryTrapTriggeredError) -> Void
+    public var onEmergencyHalt: (@Sendable () -> Void)?
 
     /// Initializes a CanaryTrapMonitor.
     /// - Parameter onTripwire: Closure invoked immediately upon canary file tampering.
@@ -36,12 +44,15 @@ public final class CanaryTrapMonitor: @unchecked Sendable {
         self.onTripwire = onTripwire
     }
 
-    /// Plants a canary trap decoy file in the specified directory.
-    /// - Parameter directoryURL: Target folder where the canary token should be deposited.
+    /// Plants a canary trap decoy file in the specified directory, optionally registering it in CentralDatabase.
+    /// - Parameters:
+    ///   - directoryURL: Target folder where the canary token should be deposited.
+    ///   - profileId: Optional backup profile UUID.
+    ///   - customName: Optional custom file name for the canary.
     /// - Returns: Planted canary file URL.
     @discardableResult
-    public func plantCanary(in directoryURL: URL) throws -> URL {
-        let canaryName = "\(Self.canaryPrefix)\(UUID().uuidString.prefix(8))\(Self.canaryExtension)"
+    public func plantCanary(in directoryURL: URL, profileId: UUID? = nil, customName: String? = nil) throws -> URL {
+        let canaryName = customName ?? "\(Self.canaryPrefix)\(UUID().uuidString.prefix(8))\(Self.canaryExtension)"
         let fileURL = directoryURL.appendingPathComponent(canaryName)
 
         // Generate distinctive non-empty decoy content
@@ -51,20 +62,49 @@ public final class CanaryTrapMonitor: @unchecked Sendable {
 
         let hash = SHA256.hash(data: data).compactMap { String(format: "%02x", $0) }.joined()
 
+        if let pid = profileId {
+            let record = CentralDatabase.CentralCanaryRecord(
+                profileId: pid.uuidString,
+                fileName: canaryName,
+                expectedSHA256: hash
+            )
+            try? CentralDatabase.shared.saveCanaryRecord(record)
+        }
+
         lock.lock()
+        records.removeAll(where: { $0.url.path == fileURL.path })
         records.append(CanaryRecord(url: fileURL, expectedSHA256: hash, dispatchSource: nil, fileDescriptor: nil))
         lock.unlock()
 
         return fileURL
     }
 
-    /// Scans a directory for existing canary files and arms monitoring.
-    /// - Parameter rootURL: Directory URL to search and arm.
-    public func arm(in rootURL: URL) {
+    /// Plants all standard seductive decoy canaries in the specified directory.
+    public func plantAttractiveDecoys(in directoryURL: URL, profileId: UUID) throws {
+        for name in Self.attractiveDecoyNames {
+            try plantCanary(in: directoryURL, profileId: profileId, customName: name)
+        }
+    }
+
+    /// Scans a directory for existing canary files, loads authentic fingerprints from database, and arms monitoring.
+    /// - Parameters:
+    ///   - rootURL: Directory URL to search and arm.
+    ///   - profileId: Optional profile UUID to verify against persisted signatures.
+    public func arm(in rootURL: URL, profileId: UUID? = nil) {
         lock.lock()
         defer { lock.unlock() }
 
         guard !isArmed else { return }
+
+        // If profileId is given, load known golden fingerprints from CentralDatabase
+        var dbFingerprints: [String: String] = [:]
+        if let pid = profileId {
+            if let dbRecords = try? CentralDatabase.shared.loadCanaryRecords(profileId: pid.uuidString) {
+                for r in dbRecords {
+                    dbFingerprints[r.fileName] = r.expectedSHA256
+                }
+            }
+        }
 
         // Discover any pre-existing canary files in the root folder
         if let enumerator = FileManager.default.enumerator(
@@ -74,9 +114,20 @@ public final class CanaryTrapMonitor: @unchecked Sendable {
         ) {
             for case let fileURL as URL in enumerator {
                 let name = fileURL.lastPathComponent
-                if name.hasPrefix(Self.canaryPrefix) && name.hasSuffix(Self.canaryExtension) {
+                let isCanary = name.hasPrefix(Self.canaryPrefix) || Self.attractiveDecoyNames.contains(name)
+                if isCanary {
                     if !records.contains(where: { $0.url.path == fileURL.path }) {
-                        if let data = try? Data(contentsOf: fileURL) {
+                        if let expected = dbFingerprints[name] {
+                            // Check immediately against golden signature in database
+                            if let data = try? Data(contentsOf: fileURL) {
+                                let hash = SHA256.hash(data: data).compactMap { String(format: "%02x", $0) }.joined()
+                                if hash != expected {
+                                    onEmergencyHalt?()
+                                    onTripwire(CanaryTrapTriggeredError(canaryPath: fileURL.path, reason: "Pre-existing canary signature mismatch (tampered prior to arming)"))
+                                }
+                            }
+                            records.append(CanaryRecord(url: fileURL, expectedSHA256: expected, dispatchSource: nil, fileDescriptor: nil))
+                        } else if let data = try? Data(contentsOf: fileURL) {
                             let hash = SHA256.hash(data: data).compactMap { String(format: "%02x", $0) }.joined()
                             records.append(CanaryRecord(url: fileURL, expectedSHA256: hash, dispatchSource: nil, fileDescriptor: nil))
                         }
@@ -165,11 +216,12 @@ public final class CanaryTrapMonitor: @unchecked Sendable {
         }
     }
 
-    /// Sets the macOS immutability flag (`uchg`) on a path to protect it from alteration.
+    /// Sets the macOS immutability flag (`uchg`) and read-only permissions (`0555`) to protect target from alteration.
     /// - Parameter url: Filesystem URL to lock immutably.
     public static func lockImmutably(at url: URL) {
         let path = url.path(percentEncoded: false)
         _ = chflags(path, UInt32(UF_IMMUTABLE))
+        _ = chmod(path, 0o555)
     }
 
     /// Removes the macOS immutability flag (`uchg`) on a path.
@@ -177,6 +229,7 @@ public final class CanaryTrapMonitor: @unchecked Sendable {
     public static func unlockImmutability(at url: URL) {
         let path = url.path(percentEncoded: false)
         _ = chflags(path, 0)
+        _ = chmod(path, 0o755)
     }
 
     // MARK: - Internal Verification
@@ -184,12 +237,14 @@ public final class CanaryTrapMonitor: @unchecked Sendable {
     private func verifyCanary(at url: URL, expectedHash: String) {
         let path = url.path(percentEncoded: false)
         guard FileManager.default.fileExists(atPath: path) else {
+            onEmergencyHalt?()
             let error = CanaryTrapTriggeredError(canaryPath: path, reason: "Canary token deleted or renamed in real-time")
             onTripwire(error)
             return
         }
 
         guard let data = try? Data(contentsOf: url) else {
+            onEmergencyHalt?()
             let error = CanaryTrapTriggeredError(canaryPath: path, reason: "Canary token I/O read failure during modification")
             onTripwire(error)
             return
@@ -197,6 +252,7 @@ public final class CanaryTrapMonitor: @unchecked Sendable {
 
         let hash = SHA256.hash(data: data).compactMap { String(format: "%02x", $0) }.joined()
         if hash != expectedHash {
+            onEmergencyHalt?()
             let error = CanaryTrapTriggeredError(canaryPath: path, reason: "Canary token content modified/encrypted in real-time")
             onTripwire(error)
         }

@@ -425,6 +425,8 @@ public struct SanctuaryOnboardingModalView: View {
         // Stamp zero-config profile metadata
         DriveProfileMetadata.write(for: profile, to: dst)
 
+        UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+        appState.showOnboardingModal = false
         dismiss()
     }
 }

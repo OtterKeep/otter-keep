@@ -426,7 +426,57 @@ public final class AppState: Sendable {
             }
         }
 
+        // Listen for unadopted profile metadata discovered on mounted drives
+        VolumeMonitor.shared.onUnadoptedDriveDetected = { [weak self] metadata, volumeURL in
+            Task { @MainActor [weak self] in
+                self?.handleUnadoptedDriveDiscovered(metadata: metadata, volumeURL: volumeURL)
+            }
+        }
+
         startScheduler()
+    }
+
+    // MARK: - Zero-Config Unadopted Drive Adoption
+    public var discoveredUnadoptedMetadata: DriveProfileMetadata? = nil
+    public var discoveredUnadoptedVolumeURL: URL? = nil
+    public var showUnadoptedDriveModal: Bool = false
+
+    public func handleUnadoptedDriveDiscovered(metadata: DriveProfileMetadata, volumeURL: URL) {
+        self.discoveredUnadoptedMetadata = metadata
+        self.discoveredUnadoptedVolumeURL = volumeURL
+        self.showUnadoptedDriveModal = true
+    }
+
+    public func adoptDiscoveredDrive() {
+        guard let meta = discoveredUnadoptedMetadata, let volumeURL = discoveredUnadoptedVolumeURL else { return }
+        let defaultSource = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(meta.sourceRelativePath.isEmpty ? "Documents" : meta.sourceRelativePath)
+        let destURL = volumeURL.appendingPathComponent(meta.profileName.replacingOccurrences(of: " ", with: "_"))
+
+        let adoptedProfile = BackupProfile(
+            id: meta.profileId,
+            name: meta.profileName,
+            sourceURL: defaultSource,
+            destinationURL: destURL,
+            excludePatterns: meta.excludePatterns,
+            executionMode: meta.isContinuous ? .continuous(debouncingSeconds: 30) : .scheduled(BackupSchedule())
+        )
+
+        profiles.append(adoptedProfile)
+        saveProfiles()
+        selectedProfileId = adoptedProfile.id
+        activeNavigation = .profile(adoptedProfile.id)
+        loadSnapshots()
+        refreshVolumeEvaluation()
+
+        showUnadoptedDriveModal = false
+        discoveredUnadoptedMetadata = nil
+        discoveredUnadoptedVolumeURL = nil
+    }
+
+    public func dismissDiscoveredDrive() {
+        showUnadoptedDriveModal = false
+        discoveredUnadoptedMetadata = nil
+        discoveredUnadoptedVolumeURL = nil
     }
 
     public var selectedProfile: BackupProfile? {

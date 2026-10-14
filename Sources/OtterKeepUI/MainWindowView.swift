@@ -367,6 +367,11 @@ private struct MainWindowLifecycleModifier: ViewModifier {
                 appState.loadSnapshots()
                 appState.loadPhotosSnapshots()
                 appState.refreshLogs()
+
+                let hasCompleted = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+                if !hasCompleted && appState.profiles.isEmpty {
+                    appState.showOnboardingModal = true
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 appState.loadSnapshots()
@@ -419,6 +424,12 @@ private struct MainWindowSystemSheetsModifier: ViewModifier {
                 set: { appState.showOnboardingModal = $0 }
             )) {
                 SanctuaryOnboardingModalView(appState: appState)
+            }
+            .sheet(isPresented: Binding(
+                get: { appState.showUnadoptedDriveModal },
+                set: { appState.showUnadoptedDriveModal = $0 }
+            )) {
+                UnadoptedDriveModalView(appState: appState)
             }
     }
 }

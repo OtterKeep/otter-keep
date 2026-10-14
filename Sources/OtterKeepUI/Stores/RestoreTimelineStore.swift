@@ -38,6 +38,9 @@ public final class RestoreTimelineStore: Sendable {
     /// Currently selected file catalog record.
     public var selectedFile: FileCatalogRecord?
 
+    /// Differential status for files in the selected snapshot relative to previous snapshot.
+    public var snapshotFileDiffStatuses: [String: DiffChangeType] = [:]
+
     // MARK: - File Timeline & Tree Structure
 
     /// Active browsing mode (snapshot catalog or timeline).

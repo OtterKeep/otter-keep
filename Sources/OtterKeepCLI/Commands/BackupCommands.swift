@@ -7,9 +7,14 @@ extension OtterKeepCLI {
     static func handleBackup(_ args: [String]) async {
         let isDryRun = args.contains("--dry-run")
         let isFull = args.contains("--full")
-        let backupMode: BackupMode = isFull ? .full : .incremental
+        let isContinuous = args.contains("--continuous")
         let profileName = getOption("--profile", from: args)
-        let profile = resolveProfile(target: profileName)
+        await runBackup(profileTarget: profileName, isDryRun: isDryRun, isFull: isFull, isContinuous: isContinuous)
+    }
+
+    static func runBackup(profileTarget: String?, isDryRun: Bool, isFull: Bool, isContinuous: Bool) async {
+        let backupMode: BackupMode = isFull ? .full : .incremental
+        let profile = resolveProfile(target: profileTarget)
 
         let storage = DefaultFileSystemProvider()
         let database = DatabaseEngine()
@@ -22,9 +27,9 @@ extension OtterKeepCLI {
         )
 
         let modeLabel = isFull ? " [\(L10n.t(.backupTypeFull).uppercased())]" : ""
-        LogManager.shared.log("CLI backup initiated for profile '\(profile.name)' [UUID: \(profile.id.uuidString)] (DryRun: \(isDryRun), Full: \(isFull), Continuous: \(args.contains("--continuous")))", level: .info, category: "CLI")
+        LogManager.shared.log("CLI backup initiated for profile '\(profile.name)' [UUID: \(profile.id.uuidString)] (DryRun: \(isDryRun), Full: \(isFull), Continuous: \(isContinuous))", level: .info, category: "CLI")
 
-        if args.contains("--continuous") {
+        if isContinuous {
             let debounce = profile.executionMode.debouncingSeconds
             print("⚡️ Starting continuous real-time backup watcher for '\(profile.name)' (quiet window: \(debounce)s)...")
             print("📁 \(L10n.t(.activeProfileLabel)): \(profile.name)")

@@ -127,10 +127,46 @@ extension AppState {
                     files = try CentralDatabase.shared.listCachedFiles(forSnapshotId: snapshotId, profileId: currentProfileId)
                 }
                 let tree = FileTreeBuilder.buildTree(from: files)
+
+                let previousSnapshot = self.snapshots.drop(while: { $0.id != snapshotId }).dropFirst().first
+                var statuses: [String: DiffChangeType] = [:]
+                if let prevSnap = previousSnapshot {
+                    let prevFiles: [FileCatalogRecord]
+                    if isDbAvailable {
+                        prevFiles = (try? await database.listFiles(forSnapshotId: prevSnap.id)) ?? []
+                    } else {
+                        prevFiles = (try? CentralDatabase.shared.listCachedFiles(forSnapshotId: prevSnap.id, profileId: currentProfileId)) ?? []
+                    }
+                    var prevMap: [String: FileCatalogRecord] = [:]
+                    prevMap.reserveCapacity(prevFiles.count)
+                    for f in prevFiles { prevMap[f.relativePath] = f }
+
+                    for f in files {
+                        if let prev = prevMap[f.relativePath] {
+                            let hasDifferentSize = prev.fileSize != f.fileSize
+                            let hasDifferentHash = (f.checksum != nil && prev.checksum != nil && f.checksum != prev.checksum)
+                            let hasDifferentMtime = abs(f.modificationTime.timeIntervalSince(prev.modificationTime)) > 0.001
+                            let hasDifferentSample = (f.sampleHash != nil && prev.sampleHash != nil && f.sampleHash != prev.sampleHash)
+                            if hasDifferentSize || hasDifferentHash || hasDifferentSample || (!f.isDirectory && hasDifferentMtime) {
+                                statuses[f.relativePath] = .modified
+                            } else {
+                                statuses[f.relativePath] = .unchanged
+                            }
+                        } else {
+                            statuses[f.relativePath] = .added
+                        }
+                    }
+                } else {
+                    for f in files {
+                        statuses[f.relativePath] = .added
+                    }
+                }
+
                 Task { @MainActor in
                     self.loadedSnapshotId = snapshotId
                     self.snapshotFiles = files
                     self.snapshotTreeNodes = tree
+                    self.snapshotFileDiffStatuses = statuses
                     let previousSelectedPath = self.selectedFile?.relativePath
                     if let previousSelectedPath = previousSelectedPath,
                        let matching = files.first(where: { $0.relativePath == previousSelectedPath }) {

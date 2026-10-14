@@ -9,6 +9,7 @@ extension BackupSessionCoordinator {
             let reason = check.reason ?? "Power or thermal conditions warrant postponement."
             logger.warning("Backup postponed by Power & Thermal Governor: \(reason)")
             LogManager.shared.log("Backup postponed by Governor for profile '\(profile.name)': \(reason)", level: .warning, category: "Power")
+            NotificationDeliveryService.shared.notifyGovernorPaused(profileName: profile.name, reason: reason)
             throw FileSystemError.unknown("Backup paused: \(reason)")
         }
     }
@@ -20,22 +21,27 @@ extension BackupSessionCoordinator {
         let monitor = CanaryTrapMonitor { [weak self] error in
             self?.logger.error("🚨 CANARY TRIPWIRE DETECTED: \(error.description)")
             LogManager.shared.log("🚨 CANARY TRIPWIRE DETECTED for profile '\(profile.name)': \(error.reason)", level: .error, category: "Security")
+            
+            // Immediate lockdown: set uchg immutability flag on target backup destination
+            CanaryTrapMonitor.lockImmutably(at: profile.destinationURL)
+            
             NotificationDeliveryService.shared.notifyRansomwareAlert(
                 profileName: profile.name,
                 reason: "Canary decoy tampering detected: \(error.reason)"
             )
         }
 
-        // Ensure at least one decoy token is planted in source directory
-        let hasCanary = (try? FileManager.default.contentsOfDirectory(atPath: profile.sourceURL.path(percentEncoded: false)))?
-            .contains(where: { $0.hasPrefix(CanaryTrapMonitor.canaryPrefix) }) ?? false
+        // Ensure seductive decoy tokens are planted in source directory and registered in database
+        let sourcePath = profile.sourceURL.path(percentEncoded: false)
+        let hasCanary = (try? FileManager.default.contentsOfDirectory(atPath: sourcePath))?
+            .contains(where: { CanaryTrapMonitor.attractiveDecoyNames.contains($0) || $0.hasPrefix(CanaryTrapMonitor.canaryPrefix) }) ?? false
 
         if !hasCanary {
-            _ = try? monitor.plantCanary(in: profile.sourceURL)
-            logger.info("Planted new canary decoy file in \(profile.sourceURL.path)")
+            try? monitor.plantAttractiveDecoys(in: profile.sourceURL, profileId: profile.id)
+            logger.info("Planted new attractive canary decoy tokens in \(profile.sourceURL.path)")
         }
 
-        monitor.arm(in: profile.sourceURL)
+        monitor.arm(in: profile.sourceURL, profileId: profile.id)
         return monitor
     }
 
@@ -51,7 +57,20 @@ extension BackupSessionCoordinator {
         let container = SparsebundleContainer()
         let containerName = enc.containerName.isEmpty ? "OtterKeepSanctuary" : enc.containerName
         let containerFileURL = baseDestinationURL.appendingPathComponent("\(containerName).sparsebundle")
-        let passphrase = enc.keychainKeyIdentifier ?? "OtterKeepVaultPassword"
+        
+        // Retrieve passphrase from secure macOS Keychain
+        let account = "sparsebundle_\(profile.id.uuidString)"
+        let passphrase: String
+        if let stored = KeychainManager.getSecret(for: account) {
+            passphrase = stored
+        } else if let customKey = enc.keychainKeyIdentifier, let storedCustom = KeychainManager.getSecret(for: customKey) {
+            passphrase = storedCustom
+        } else {
+            // Auto-provision secure master key in Keychain if missing
+            let generatedKey = UUID().uuidString + "-" + UUID().uuidString
+            try? KeychainManager.saveSecret(generatedKey, for: account)
+            passphrase = generatedKey
+        }
 
         // Create container if it does not already exist
         if !FileManager.default.fileExists(atPath: containerFileURL.path(percentEncoded: false)) {

@@ -82,6 +82,9 @@ public struct ProfileRulesView: View {
                     // 6. External Drive Automation
                     externalDriveSection(profile: profile)
 
+                    // 6b. Multi-Drive Rotation (Alternate external drives)
+                    multiDriveRotationSection(profile: profile)
+
                     // 7. Power & Thermal Governor
                     powerGovernorSection(profile: profile)
                 }

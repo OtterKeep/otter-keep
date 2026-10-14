@@ -65,6 +65,24 @@ jobs:
           echo "zip_sha256=$ZIP_SHA256" >> "$GITHUB_OUTPUT"
           echo "ZIP SHA-256: $ZIP_SHA256"
 
+      - name: Sign Sparkle Update (Ed25519)
+        id: sparkle_sign
+        if: env.SPARKLE_ED_KEY != ''
+        env:
+          SPARKLE_ED_KEY: ${{ secrets.SPARKLE_ED_KEY }}
+        run: |
+          ZIP_PATH=".build/dist/OtterKeep-${{ steps.vars.outputs.version }}.zip"
+          if [ -f "$ZIP_PATH" ]; then
+            echo "Signing Sparkle update for $ZIP_PATH..."
+            SIGN_UPDATE=$(find .build -name "sign_update" -type f -perm +111 2>/dev/null | head -n 1)
+            if [ -n "$SIGN_UPDATE" ]; then
+              SIG_OUTPUT=$("$SIGN_UPDATE" -s "$SPARKLE_ED_KEY" "$ZIP_PATH" 2>/dev/null || true)
+              echo "Sparkle signature output: $SIG_OUTPUT"
+            else
+              echo "Note: sign_update binary not found in build artifacts; skipping signing."
+            fi
+          fi
+
       - name: Commit Updated Appcast if Modified
         run: |
           git config user.name "github-actions[bot]"

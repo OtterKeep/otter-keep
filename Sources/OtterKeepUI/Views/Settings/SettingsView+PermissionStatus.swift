@@ -105,6 +105,45 @@ extension SettingsView {
                     .padding(12)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                     .background(isFinderEnabled ? OtterTheme.statusSuccess.opacity(0.08) : Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
+
+                    // Background Daemon Service (SMAppService) Card
+                    let daemonStatus = DaemonServiceManager.shared.serviceStatus
+                    let isDaemonActive = daemonStatus == .enabled
+                    let isRequiresApproval = daemonStatus == .requiresApproval
+
+                    HStack(spacing: 10) {
+                        Circle()
+                            .fill(isDaemonActive ? OtterTheme.statusSuccess : (isRequiresApproval ? OtterTheme.statusWarning : .secondary))
+                            .frame(width: 10, height: 10)
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(isDaemonActive ? L10n.t(.daemonStatusActive) : (isRequiresApproval ? L10n.t(.daemonStatusRequiresApproval) : L10n.t(.daemonStatusNotFound)))
+                                .font(.callout.weight(.medium))
+                            Text(L10n.t(.daemonStatusHeader))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        if isRequiresApproval {
+                            Button {
+                                DaemonServiceManager.shared.openSystemSettingsLoginItems()
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "gearshape")
+                                    Text(L10n.t(.daemonOpenSystemSettings))
+                                }
+                                .font(.caption.weight(.medium))
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(OtterTheme.statusWarning)
+                            .controlSize(.small)
+                        }
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .background(isDaemonActive ? OtterTheme.statusSuccess.opacity(0.08) : (isRequiresApproval ? OtterTheme.statusWarning.opacity(0.1) : Color.primary.opacity(0.04)), in: RoundedRectangle(cornerRadius: 10))
                 }
             }
         }

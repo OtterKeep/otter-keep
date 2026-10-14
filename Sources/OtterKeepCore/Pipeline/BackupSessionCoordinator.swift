@@ -521,6 +521,14 @@ public actor BackupSessionCoordinator {
                     }
                 }
 
+                // Thermal throttling cooperative relief (every 50 files)
+                if profile.throttleOnThermalPressure && (copiedCount % 50 == 0) && copiedCount > 0 {
+                    let thermal = ProcessInfo.processInfo.thermalState
+                    if thermal == .serious || thermal == .critical {
+                        try await Task.sleep(nanoseconds: 200_000_000)
+                    }
+                }
+
                 let currentItem = item
                 let targetURL = stagingRoot.appendingPathComponent(currentItem.relativePath)
                 let currentItemPath = currentItem.relativePath
@@ -811,6 +819,9 @@ public actor BackupSessionCoordinator {
             autoPrunedSnapshotsCount: autoPrunedCount
         )
         self.lastSessionSummary = sessionSummary
+
+        // Check automated database self-healing routine (every 20 cycles or 7 days)
+        CentralDatabase.shared.recordBackupCompletionAndCheckMaintenance()
 
         // Deliver macOS system notification
         NotificationDeliveryService.shared.notifyBackupCompleted(

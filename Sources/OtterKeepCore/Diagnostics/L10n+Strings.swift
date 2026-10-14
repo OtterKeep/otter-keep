@@ -1003,5 +1003,16 @@ extension L10n {
         .presetExclusionXcode: Translation(english: "Xcode & Swift (DerivedData, .build)", hungarian: "Xcode & Swift (DerivedData, .build)"),
         .presetExclusionPython: Translation(english: "Python & Virtualenvs (.venv, __pycache__)", hungarian: "Python & Virtuális környezetek (.venv, __pycache__)"),
         .presetExclusionMediaCaches: Translation(english: "Media Caches & Temp (Render Files, Caches)", hungarian: "Média gyorsítótárak és átmeneti fájlok"),
+        .sparsebundlePasswordLabel: Translation(english: "Container Passphrase", hungarian: "Tároló jelszava"),
+        .sparsebundlePasswordPlaceholder: Translation(english: "Enter secure passphrase", hungarian: "Add meg a titkosítási jelszót"),
+        .sparsebundlePasswordHint: Translation(english: "Saved securely to macOS Keychain", hungarian: "Biztonságosan elmentve a macOS Kulcskarikára"),
+        .menuSaveSupportBundle: Translation(english: "Save Support Bundle...", hungarian: "Diagnosztikai csomag mentése..."),
+        .daemonStatusHeader: Translation(english: "Background Daemon Service", hungarian: "Háttérbeli Daemon Szolgáltatás"),
+        .daemonStatusActive: Translation(english: "Active & Monitored", hungarian: "Aktív és figyelt"),
+        .daemonStatusRequiresApproval: Translation(english: "Requires Approval in System Settings", hungarian: "Jóváhagyást igényel a Rendszerbeállításokban"),
+        .daemonStatusNotFound: Translation(english: "Not Installed / Disabled", hungarian: "Nincs telepítve / Kikapcsolva"),
+        .daemonOpenSystemSettings: Translation(english: "Open Login Items Settings…", hungarian: "Bejelentkezési elemek beállításai…"),
+        .addVolumeToRotation: Translation(english: "Add Current Volume to Rotation", hungarian: "Aktuális kötet hozzáadása a rotációhoz"),
+        .noRotationVolumes: Translation(english: "No alternate backup drives registered yet", hungarian: "Még nincs másodlagos mentési kötet regisztrálva"),
     ]
 }

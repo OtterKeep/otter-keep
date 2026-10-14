@@ -214,6 +214,14 @@ public struct OtterKeepMenuCommands: Commands {
             }
             .keyboardShortcut("l", modifiers: [.shift, .command])
 
+            Button(L10n.t(.menuSaveSupportBundle)) {
+                Task {
+                    if let zipURL = try? await SanctuarySupportBundleExporter.shared.exportSupportBundle() {
+                        NSWorkspace.shared.activateFileViewerSelecting([zipURL])
+                    }
+                }
+            }
+
             Divider()
 
             Button(L10n.t(.menuReportIssue)) {

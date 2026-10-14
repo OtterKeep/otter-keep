@@ -1121,6 +1121,17 @@ public enum L10n {
         case presetExclusionXcode
         case presetExclusionPython
         case presetExclusionMediaCaches
+        case sparsebundlePasswordLabel
+        case sparsebundlePasswordPlaceholder
+        case sparsebundlePasswordHint
+        case menuSaveSupportBundle
+        case daemonStatusHeader
+        case daemonStatusActive
+        case daemonStatusRequiresApproval
+        case daemonStatusNotFound
+        case daemonOpenSystemSettings
+        case addVolumeToRotation
+        case noRotationVolumes
     }
 
 

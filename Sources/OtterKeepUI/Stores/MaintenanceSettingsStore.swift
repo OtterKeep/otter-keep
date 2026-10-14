@@ -130,6 +130,12 @@ public final class MaintenanceSettingsStore: Sendable {
     /// Draft switch for automatic volume ejection after completion.
     public var newProfileAutoEjectOnCompletion: Bool = false
 
+    /// Draft switch for continuous real-time FSEvents backup mode.
+    public var newProfileIsContinuous: Bool = false
+
+    /// Draft quiet-window debouncing seconds for continuous mode.
+    public var newProfileDebouncingSeconds: Int = 30
+
     /// Tag of the currently applied configuration preset.
     public var selectedPresetTag: String? = nil
 
@@ -288,6 +294,8 @@ public final class MaintenanceSettingsStore: Sendable {
         newProfileRespectGitIgnore = false
         newProfileBackupOnVolumeMount = false
         newProfileAutoEjectOnCompletion = false
+        newProfileIsContinuous = false
+        newProfileDebouncingSeconds = 30
         selectedPresetTag = nil
     }
 

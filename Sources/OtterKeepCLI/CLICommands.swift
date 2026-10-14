@@ -94,16 +94,12 @@ struct BackupCommand: AsyncParsableCommand {
     var continuous: Bool = false
 
     func run() async throws {
-        var args: [String] = []
-        if dryRun { args.append("--dry-run") }
-        if full { args.append("--full") }
-        if continuous { args.append("--continuous") }
-        let target = profile ?? profileName
-        if let target = target {
-            args.append("--profile")
-            args.append(target)
-        }
-        await OtterKeepCLI.handleBackup(args)
+        await OtterKeepCLI.runBackup(
+            profileTarget: profile ?? profileName,
+            isDryRun: dryRun,
+            isFull: full,
+            isContinuous: continuous
+        )
     }
 }
 

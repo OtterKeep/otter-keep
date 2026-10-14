@@ -167,24 +167,55 @@ public struct DriveProfileMetadata: Codable, Sendable, Equatable {
 
     public let profileId: UUID
     public let profileName: String
+    public let sourceRelativePath: String
+    public let excludePatterns: [String]
+    public let isContinuous: Bool
     public let createdAt: Date
     public let sanctuaryVersion: String
 
     public init(
         profileId: UUID,
         profileName: String,
+        sourceRelativePath: String = "Documents",
+        excludePatterns: [String] = [],
+        isContinuous: Bool = false,
         createdAt: Date = Date(),
         sanctuaryVersion: String = CoreEngine.version
     ) {
         self.profileId = profileId
         self.profileName = profileName
+        self.sourceRelativePath = sourceRelativePath
+        self.excludePatterns = excludePatterns
+        self.isContinuous = isContinuous
         self.createdAt = createdAt
         self.sanctuaryVersion = sanctuaryVersion
     }
 
+    enum CodingKeys: String, CodingKey {
+        case profileId, profileName, sourceRelativePath, excludePatterns, isContinuous, createdAt, sanctuaryVersion
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.profileId = try container.decode(UUID.self, forKey: .profileId)
+        self.profileName = try container.decode(String.self, forKey: .profileName)
+        self.sourceRelativePath = try container.decodeIfPresent(String.self, forKey: .sourceRelativePath) ?? "Documents"
+        self.excludePatterns = try container.decodeIfPresent([String].self, forKey: .excludePatterns) ?? []
+        self.isContinuous = try container.decodeIfPresent(Bool.self, forKey: .isContinuous) ?? false
+        self.createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        self.sanctuaryVersion = try container.decodeIfPresent(String.self, forKey: .sanctuaryVersion) ?? CoreEngine.version
+    }
+
     /// Writes profile metadata to the target destination folder.
     public static func write(for profile: BackupProfile, to destinationURL: URL) {
-        let meta = DriveProfileMetadata(profileId: profile.id, profileName: profile.name)
+        let relSource = profile.sourceURL.lastPathComponent
+        let meta = DriveProfileMetadata(
+            profileId: profile.id,
+            profileName: profile.name,
+            sourceRelativePath: relSource,
+            excludePatterns: profile.excludePatterns,
+            isContinuous: profile.executionMode.isContinuous
+        )
         let fileURL = destinationURL.appendingPathComponent(fileName)
         if let data = try? JSONEncoder().encode(meta) {
             try? data.write(to: fileURL, options: .atomic)
@@ -333,6 +364,10 @@ public final class VolumeMonitor: @unchecked Sendable {
                 guard let self = self else { return }
                 LogManager.shared.log("Volume mounted: \(mountedURL?.path ?? "unknown")", level: .info, category: "Storage")
                 self.notifyHandlers(with: mountedURL)
+                if let url = mountedURL {
+                    let profiles = ProfileStore.shared.loadProfiles()
+                    self.handleMountedVolume(url, profiles: profiles)
+                }
             },
             onUnmount: { [weak self] unmountedURL in
                 guard let self = self else { return }

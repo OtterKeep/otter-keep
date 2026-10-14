@@ -232,7 +232,8 @@ extension AppState {
         enableIgnoreFiles: Bool = true,
         respectGitIgnore: Bool = false,
         backupOnVolumeMount: Bool = false,
-        autoEjectOnCompletion: Bool = false
+        autoEjectOnCompletion: Bool = false,
+        executionMode: BackupExecutionMode? = nil
     ) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -255,7 +256,8 @@ extension AppState {
             enableIgnoreFiles: enableIgnoreFiles,
             respectGitIgnore: respectGitIgnore,
             backupOnVolumeMount: backupOnVolumeMount,
-            autoEjectOnCompletion: autoEjectOnCompletion
+            autoEjectOnCompletion: autoEjectOnCompletion,
+            executionMode: executionMode ?? .scheduled(BackupSchedule())
         )
         profiles.append(newProfile)
         selectedProfileId = newProfile.id
@@ -269,6 +271,9 @@ extension AppState {
     public func createProfileFromDraft() {
         let trimmed = newProfileName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        let execMode: BackupExecutionMode = newProfileIsContinuous
+            ? .continuous(debouncingSeconds: newProfileDebouncingSeconds)
+            : .scheduled(BackupSchedule())
         createProfile(
             name: trimmed,
             sourceURL: newProfileSourceURL,
@@ -277,7 +282,8 @@ extension AppState {
             enableIgnoreFiles: newProfileEnableIgnoreFiles,
             respectGitIgnore: newProfileRespectGitIgnore,
             backupOnVolumeMount: newProfileBackupOnVolumeMount,
-            autoEjectOnCompletion: newProfileAutoEjectOnCompletion
+            autoEjectOnCompletion: newProfileAutoEjectOnCompletion,
+            executionMode: execMode
         )
     }
 

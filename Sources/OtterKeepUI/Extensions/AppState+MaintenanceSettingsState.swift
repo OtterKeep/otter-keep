@@ -121,6 +121,16 @@ extension AppState {
         get { maintenanceSettings.newProfileAutoEjectOnCompletion }
         set { maintenanceSettings.newProfileAutoEjectOnCompletion = newValue }
     }
+    /// Draft switch for continuous real-time FSEvents backup mode.
+    public var newProfileIsContinuous: Bool {
+        get { maintenanceSettings.newProfileIsContinuous }
+        set { maintenanceSettings.newProfileIsContinuous = newValue }
+    }
+    /// Draft quiet-window debouncing seconds for continuous mode.
+    public var newProfileDebouncingSeconds: Int {
+        get { maintenanceSettings.newProfileDebouncingSeconds }
+        set { maintenanceSettings.newProfileDebouncingSeconds = newValue }
+    }
     /// Tag of the currently applied configuration preset.
     public var selectedPresetTag: String? { get { maintenanceSettings.selectedPresetTag } set { maintenanceSettings.selectedPresetTag = newValue } }
     /// Controls presentation of the rename profile sheet.

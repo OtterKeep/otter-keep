@@ -6,11 +6,13 @@ import Darwin
 public final class DefaultFileSystemProvider: FileSystemProvider, Sendable {
 
     private let registry: FileSystemDriverRegistry
+    public let fastCDCEngine: FastCDCEngine
 
     /// Initializes a new `DefaultFileSystemProvider` instance.
     /// - Parameter registry: Driver registry to use for driver resolution (defaults to `FileSystemDriverRegistry.shared`).
-    public init(registry: FileSystemDriverRegistry = .shared) {
+    public init(registry: FileSystemDriverRegistry = .shared, fastCDCEngine: FastCDCEngine = FastCDCEngine()) {
         self.registry = registry
+        self.fastCDCEngine = fastCDCEngine
     }
 
     // MARK: - Capabilities & Metrics
@@ -164,5 +166,19 @@ extension DefaultFileSystemProvider: FileSystemPort {
 
     public func remove(at url: URL) throws {
         try removeItem(at: url)
+    }
+
+    // MARK: - FastCDC Variable-Block Deduplication
+
+    /// Deduplicates and stores content using FastCDC variable block chunking into a CAS repository.
+    public func deduplicateAndStore(sourceURL: URL, casRootURL: URL) throws -> [String] {
+        let chunks = try fastCDCEngine.chunk(fileURL: sourceURL)
+        try fastCDCEngine.store(chunks: chunks, in: casRootURL)
+        return chunks.map { $0.sha256 }
+    }
+
+    /// Reconstructs a file from chunk hashes stored in CAS repository.
+    public func reconstructFromChunks(chunkHashes: [String], casRootURL: URL, destinationURL: URL) throws {
+        try fastCDCEngine.reconstruct(chunkHashes: chunkHashes, from: casRootURL, to: destinationURL)
     }
 }
