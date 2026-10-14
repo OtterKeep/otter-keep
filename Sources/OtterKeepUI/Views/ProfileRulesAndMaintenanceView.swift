@@ -136,15 +136,18 @@ public struct ProfileRulesAndMaintenanceView: View {
     private var rulesContent: some View {
         rulesView.folderSummaryHeader(profile: profile)
         rulesView.exclusionRulesSection(profile: profile)
+        rulesView.localEncryptionSection(profile: profile)
         rulesView.icloudStrategySection(profile: profile)
         WiFiProtectionCardView(appState: appState, profile: profile)
         rulesView.ransomwareGuardSection(profile: profile)
+        rulesView.canaryTrapSection(profile: profile)
     }
 
     // MARK: - 2. Automation & Schedule Tab Content
     @ViewBuilder
     private var automationContent: some View {
         rulesView.scheduleSection(profile: profile)
+        rulesView.powerGovernorSection(profile: profile)
         rulesView.externalDriveSection(profile: profile)
         rulesView.backupCopyJobSection(profile: profile)
         WebhookSettingsCardView(appState: appState, profile: profile)

@@ -67,9 +67,6 @@ public struct MainDashboardView: View {
                     // MARK: - Zone 3: Guardianship & Resilience
                     rule321ComplianceCard(profile: profile)
 
-                    // Storage Depletion Forecasting & Health
-                    StorageForecastCardView(appState: appState)
-
                     // Quick Statistics
                     quickStatsSection(profile: profile)
 
@@ -109,6 +106,11 @@ public struct MainDashboardView: View {
             .padding(20)
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .onAppear {
+            if appState.storageForecastReport == nil {
+                appState.refreshStorageForecast()
+            }
+        }
         .sheet(isPresented: Binding(
             get: { appState.showDryRunModal },
             set: { appState.showDryRunModal = $0 }
@@ -126,6 +128,13 @@ public struct MainDashboardView: View {
             }
         }
     }
+
+    private static let forecastDateFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateStyle = .medium
+        df.timeStyle = .none
+        return df
+    }()
 
     // MARK: - Sanctuary Hero Card
     private func sanctuaryMood(for profile: BackupProfile) -> SanctuaryMascotMood {
@@ -263,6 +272,12 @@ public struct MainDashboardView: View {
                                 Text(forecast.formattedDepletionText)
                                     .font(.caption.bold().monospacedDigit())
                                     .foregroundStyle(colorForHealth(forecast.healthStatus))
+
+                                if let fullDate = forecast.estimatedFullDate {
+                                    Text("(\(Self.forecastDateFormatter.string(from: fullDate)))")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
 
                             Button {
