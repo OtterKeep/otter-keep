@@ -66,3 +66,19 @@ Annak érdekében, hogy a mentési merevlemez ne teljen be feleslegesen, a **Pro
 - **Napi mentések**: Az elmúlt 30 napra.
 - **Heti mentések**: Az elmúlt 12 hónapra.
 - A feleslegessé vált pillanatképek törlésekor az SQLite katalógus automatikusan frissül, és az APFS azonnal felszabadítja a már nem hivatkozott adatblokkokat. Az aktív WORM zárral védett pillanatképek szigorú védelmet élveznek, a zárolási idő lejárta előtt a rendszer nem törli őket.
+
+---
+
+## 6. Folyamatos mentési üzemmód és Termálkormányzó (v2.0.0)
+
+- **Folyamatos mentés (Continuous Mode)**: Az időzített (óránkénti/napi) mentések mellett beállítható a fájlrendszer-eseményeken alapuló valós idejű mentés. Az OtterKeep azonnal érzékeli a fájlváltozásokat, és a beállított türelmi idő (debouncing) lejárta után automatikusan biztonságba helyezi őket.
+- **Intelligens Termál- és Akkumulátorkormányzó**: Ha a Mac akkumulátorról üzemel, vagy a processzor hőmérséklete és ventilátorterhelése megemelkedik (pl. videóexportálás vagy fordítás közben), az OtterKeep automatikusan visszavesz a tempóból, késlelteti az I/O műveleteket, vagy szünetelteti a mentést, megőrizve a gép csendes, hűvös és energiatakarékos működését.
+
+---
+
+## 7. Zsarolóvírus-védelem és Vizuális Idővonal (v2.0.0)
+
+- **Kanári Csapdák (Anti-Ransomware Tripwires)**: A forrásmappákban elhelyezett rejtett, kriptográfiailag védett ellenőrzőfájlok valós időben riasztanak, ha bármilyen kártékony program titkosítani vagy manipulálni próbálná az állományokat. Az OtterKeep azonnal felfüggeszti a mentést a kompromittált adatok felülírásának elkerülésére.
+- **Vizuális Idővonal Csúszka (Timeline Scrubber)**: A visszaállítási felület tetején elhelyezett interaktív csúszkával és léptetőgombokkal térben és időben könnyedén lapozhat a múltbéli pillanatképek között.
+- **Fejlesztői Kizárási Sablonok**: Egyetlen kattintással kizárhatók az átmeneti gyorsítótárak és lefordított állományok (Node.js `node_modules`, Xcode `.build`/DerivedData, Python `__pycache__`/`.venv`, média cache-ek).
+

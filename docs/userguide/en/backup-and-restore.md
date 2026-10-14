@@ -66,3 +66,19 @@ To ensure your backup drive never fills up unexpectedly, configure automatic ret
 - **Keep Daily Backups**: Retained for the last 30 days.
 - **Keep Weekly Backups**: Retained for 12 months.
 - When an obsolete snapshot is pruned, the SQLite catalog updates automatically and APFS frees data blocks that are no longer referenced by any remaining snapshot. Snapshots with active WORM locks are strictly protected and exempted from pruning until their lock expires.
+
+---
+
+## 6. Near-Continuous Backup & Thermal Governor (v2.0.0)
+
+- **Continuous Mode**: In addition to cron-like schedules, OtterKeep supports event-driven filesystem monitoring. Backups trigger automatically after monitored directories settle following file modifications (configurable debouncing).
+- **Intelligent Power & Thermal Governor**: When running on battery power or during high thermal pressure (video rendering, heavy builds), OtterKeep throttles I/O pacing or pauses background sessions, preserving battery longevity and system responsiveness.
+
+---
+
+## 7. Anti-Ransomware Tripwires & Visual Timeline Scrubber (v2.0.0)
+
+- **Canary Traps**: Cryptographically secured trap files placed across source trees detect unauthorized encryption attempts in real time, immediately aborting backup operations to protect snapshot catalogs.
+- **Visual Timeline Scrubber**: An interactive slider with granular step controls lets you quickly navigate between historical snapshots in the Restore Explorer.
+- **Technology Stack Exclusion Presets**: 1-click exclusions for developer caches and dependencies (Node.js `node_modules`, Xcode `.build`/DerivedData, Python `__pycache__`/`.venv`, and media render caches).
+

@@ -47,10 +47,11 @@ still reported immediately.
 
 ---
 
-## 2. The 12 Semantic Test Suites
+## 2. The 13 Semantic Test Suites (82 Tests Total)
 
 | Test Suite File | Subsystem & Focus |
 | :--- | :--- |
+| **`SanctuaryCore2_0Tests.swift`** | FastCDC chunking & CAS reconstruction, canary trap tampering & tripwire verification, power/thermal governor telemetry, multi-drive zero-config adoption, database self-healing & maintenance, FSEventWatcher continuous engine, and Sparsebundle container queries |
 | **`SystemVersionIntegrityTests.swift`** | Version/subsystem matrix consistency against `version.json`, SemVer parsing, Sparkle appcast audit |
 | **`StorageEngineTests.swift`** | APFS `clonefile(2)` block sharing, hardlink fallback, xattr preservation, atomic tree rename, driver registry, B2 configuration |
 | **`DatabaseEngineTests.swift`** | SQLite manifest WAL pragmas, batch cataloging, diff engine, timeline queries, connection closure, cascading deletes, text diff, offline inspection |

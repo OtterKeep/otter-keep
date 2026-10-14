@@ -207,8 +207,44 @@ consumed by the core. `Pipeline` is AppKit-free and the remaining services can b
 by injecting their no-op/default implementations; the shells leave the defaults in place so runtime
 behavior is unchanged.
 
-### Known follow-ups
-- A headless/daemon build could exclude the four AppKit adapter files by injecting no-op
-  implementations; that requires a build configuration (or separate target) rather than code changes.
-- The repository still carries a pre-existing `swift-format` backlog, so the CI lint step is advisory;
-  enabling a strict gate needs a one-time repo-wide `scripts/format.sh` run.
+---
+
+## 15. OtterKeep 2.0.0 System Architecture Subsystems
+
+### Continuous Backup Engine (`FSEventWatcher`)
+In addition to scheduled and manual modes, OtterKeep 2.0.0 introduces `BackupExecutionMode.continuous(debouncingSeconds: Int)`. A low-overhead Darwin `FSEventStreamCreate` monitor streams filesystem events from the monitored directory, automatically debouncing bursts of file activity and honoring regex exclusion patterns before signaling the backup coordinator.
+
+### Power & Thermal Governor (`PowerAndThermalGovernor`)
+To maintain the "whisper-quiet" sanctuary experience, background jobs are governed by real-time hardware telemetry:
+- Battery status & low power mode detection via `IOPSCopyPowerSourcesInfo`.
+- Thermal pressure level monitoring via `ProcessInfo.processInfo.thermalState`.
+- Automatic cooperative sleep and adaptive pacing when thermal state reaches `.serious` or `.critical`, preventing CPU throttling and fan spin-up.
+
+### Anti-Ransomware Canary Traps (`CanaryTrapMonitor`)
+Protects against unauthorized bulk encryption before backups commit:
+- Plants canary files (`.otterkeep_canary_*.dat`) with known SHA-256 signatures in source roots.
+- Arms real-time file-descriptor tripwires (`DispatchSourceFileSystemObject`) for immediate modification alerts.
+- Enforces BSD user-immutable flags (`uchg`) to prevent tampering and automatically aborts backup sessions if any canary file is mutated or deleted.
+
+### Content-Defined Chunking & Deduplication (`FastCDCEngine`)
+Large changing files (virtual disks, container images, local databases) are deduplicated using the FastCDC 2016/2020 algorithm:
+- Gear rolling hash with normalized chunk masks (`MaskS` / `MaskL`) targeting 64 KB average chunk sizes.
+- Chunks stored in content-addressed storage (`chunks/xx/yy/<sha256>.chunk`).
+- Bit-for-bit file reconstruction from manifest chunk hashes.
+
+### Sparsebundle Encrypted Containers (`SparsebundleContainer`)
+Encapsulates backups on non-APFS or remote network shares inside dynamically expandable, encrypted APFS sparsebundles using Apple `hdiutil` commands.
+
+### Multi-Drive Rotation & Zero-Config Adoption
+Enables seamless backup drive rotation across office and home locations:
+- Profiles store `destinationVolumeUUIDs` arrays matching any authorized target volume.
+- Each backup root is stamped with `.otterkeep_profile_meta.json`. When plugged into a new or reinstalled Mac, OtterKeep recognizes and adopts the backup history without requiring manual re-configuration.
+
+### SQLite Self-Healing & Database Maintenance
+`DatabaseEngine` and `CentralDatabase` include proactive resilience routines:
+- `performIntegrityCheck()` via `PRAGMA quick_check;`.
+- `performSelfHealingMaintenance()` via `PRAGMA optimize;`, `VACUUM;`, and corrupted index rebuilding via `REINDEX;`.
+
+### Modern Service Management (`SMAppService`) & Sparkle 2
+Headless background execution uses Apple's macOS 13+ `SMAppService.agent` API with fallback to `~/Library/LaunchAgents/`. Software updates are orchestrated via Sparkle 2.10 framework with cryptographically signed EdDSA/Ed25519 appcasts.
+
