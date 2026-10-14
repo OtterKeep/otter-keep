@@ -58,4 +58,69 @@ struct PhotosProtectionTests {
         let albumMap = deltaScanner.mapAssetAlbums()
         _ = albumMap
     }
+
+    @Test func testPhotosBackupStagingAndCatalogRecordGeneration() async throws {
+        let tempDir = try TemporaryDirectoryFixtures.createUniqueDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let internalDir = tempDir.appendingPathComponent(".otterkeep")
+        try FileManager.default.createDirectory(at: internalDir, withIntermediateDirectories: true)
+        let dbPath = internalDir.appendingPathComponent("manifest.sqlite").path
+
+        let db = DatabaseEngine()
+        try await db.open(at: dbPath)
+
+        let snapshotId = "photos_2026-10-14_120000"
+        let snapshotRecord = SnapshotRecord(
+            id: snapshotId,
+            timestamp: Date(),
+            status: "completed",
+            totalFiles: 1,
+            totalBytes: 2500,
+            snapshotPath: "2026-10-14_120000",
+            backupType: "full"
+        )
+        try await db.insertSnapshot(snapshotRecord)
+
+        let photoRecords = [
+            PhotosAssetRecord(
+                snapshotId: snapshotId,
+                localIdentifier: "ID_1",
+                originalFilename: "IMG_0001.JPG",
+                relativePath: "2026/10/IMG_0001.JPG",
+                fileSize: 2500,
+                modificationTime: Date(),
+                sha256: "abc123hash",
+                isEdited: false,
+                isLivePhoto: false,
+                mediaType: "photo"
+            )
+        ]
+        try await db.insertPhotosAssetRecordsBatch(photoRecords)
+
+        // Verify standard FileCatalogRecord batch insertion for Photos
+        let catalogRecords = photoRecords.map { asset in
+            FileCatalogRecord(
+                snapshotId: snapshotId,
+                relativePath: asset.relativePath,
+                fileSize: asset.fileSize,
+                modificationTime: asset.modificationTime,
+                inode: 0,
+                checksum: asset.sha256,
+                isDirectory: false,
+                isSymlink: false
+            )
+        }
+        try await db.insertFileRecordsBatch(catalogRecords)
+
+        // Query back via standard FileCatalog queries (used by RestoreEngine and DataScrubber)
+        let files = try await db.listFiles(forSnapshotId: snapshotId)
+        try assertEqual(files.count, 1)
+        try assertEqual(files.first?.relativePath, "2026/10/IMG_0001.JPG")
+        try assertEqual(files.first?.checksum, "abc123hash")
+
+        await db.close()
+        let isOpen = await db.isOpen
+        try assertFalse(isOpen, "Database connection must be cleanly closed")
+    }
 }

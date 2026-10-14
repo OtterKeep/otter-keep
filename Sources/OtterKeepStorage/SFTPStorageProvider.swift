@@ -350,9 +350,11 @@ public actor SFTPStorageProvider {
         }
         arguments.append(contentsOf: ["\(config.username)@\(config.host)", "rm -f \(escapedPath)"])
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
-        process.arguments = arguments
+        var extraEnv: [String: String] = [:]
+        if let pwd = password, !pwd.isEmpty {
+            extraEnv["SSHPASS"] = pwd
+        }
+        let process = createIsolatedProcess(executable: "/usr/bin/ssh", arguments: arguments, extraEnvironment: extraEnv)
         let errPipe = Pipe()
         process.standardError = errPipe
 

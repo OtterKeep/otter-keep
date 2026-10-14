@@ -446,15 +446,15 @@ struct BackupPipelineTests {
         }
         try assertTrue(caughtPermissionDenied, "Manual deletion of locked snapshot without isPruning must throw permissionDenied")
 
-        // 6. Automated retention pruning CAN remove snapshots (unlocking WORM immutability recursively first)
+        // 6. Automated retention pruning CANNOT remove WORM-locked snapshots while locked
         let pruned = try await retention.applyRetentionPolicy(
             destinationURL: tempDir,
             policy: PruningPolicy(isAutoPruningEnabled: true, maxSnapshotsToKeep: 1, keepDailyDays: 7)
         )
 
         try assertTrue(pruned.contains(snapIdPrunable), "Old unlocked snapshot must be pruned")
-        try assertTrue(pruned.contains(snapIdLocked), "Pruning must be able to remove WORM-locked snapshot past retention policy")
-        try assertFalse(FileManager.default.fileExists(atPath: snapDirLocked.path), "Pruned WORM snapshot folder must be deleted from disk")
+        try assertFalse(pruned.contains(snapIdLocked), "WORM-locked snapshot must NEVER be pruned while locked")
+        try assertTrue(FileManager.default.fileExists(atPath: snapDirLocked.path), "Locked WORM snapshot folder must be preserved on disk")
 
         // 7. Test restored file is NOT immutable at destination
         let restoreDest = tempDir.appendingPathComponent("restored_output")
@@ -660,5 +660,228 @@ struct BackupPipelineTests {
 
         let errRO = FileSystemError.copyFailed(path: "/vol/dst", errno: EROFS, message: "Read-only file system")
         try assertTrue(errRO.isFatalVolumeError)
+    }
+
+    @Test func testRestorePathTraversalProtection() async throws {
+        let tempDir = try TemporaryDirectoryFixtures.createUniqueDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let backupRoot = tempDir.appendingPathComponent("BackupRoot")
+        let snapshotDir = backupRoot.appendingPathComponent("2026-10-14_120000")
+        let rootDir = snapshotDir.appendingPathComponent("root")
+        let targetDir = tempDir.appendingPathComponent("TargetDir")
+        try FileManager.default.createDirectory(at: rootDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+
+        let safeFile = rootDir.appendingPathComponent("hello.txt")
+        try "Safe content".write(to: safeFile, atomically: true, encoding: .utf8)
+
+        let restoreEngine = RestoreEngine(storage: DefaultFileSystemProvider())
+
+        // 1. Path traversal in relativePath with ..
+        do {
+            _ = try await restoreEngine.restore(
+                snapshotPath: "2026-10-14_120000",
+                backupRootURL: backupRoot,
+                relativePath: "../../../etc/passwd",
+                targetDirectoryURL: targetDir
+            )
+            try assertTrue(false, "Expected RestoreError.invalidPath to be thrown")
+        } catch let err as RestoreError {
+            if case .invalidPath(let p) = err {
+                try assertTrue(p.contains(".."))
+            } else {
+                try assertTrue(false, "Unexpected error: \(err)")
+            }
+        }
+
+        // 2. Path traversal in relativePath with leading slash
+        do {
+            _ = try await restoreEngine.restore(
+                snapshotPath: "2026-10-14_120000",
+                backupRootURL: backupRoot,
+                relativePath: "/etc/passwd",
+                targetDirectoryURL: targetDir
+            )
+            try assertTrue(false, "Expected RestoreError.invalidPath to be thrown")
+        } catch let err as RestoreError {
+            if case .invalidPath(let p) = err {
+                try assertTrue(p.hasPrefix("/"))
+            } else {
+                try assertTrue(false, "Unexpected error: \(err)")
+            }
+        }
+
+        // 3. Path traversal in snapshotPath with ..
+        do {
+            _ = try await restoreEngine.restore(
+                snapshotPath: "../../etc",
+                backupRootURL: backupRoot,
+                relativePath: "hello.txt",
+                targetDirectoryURL: targetDir
+            )
+            try assertTrue(false, "Expected RestoreError.invalidPath to be thrown")
+        } catch let err as RestoreError {
+            if case .invalidPath(let p) = err {
+                try assertTrue(p.contains(".."))
+            } else {
+                try assertTrue(false, "Unexpected error: \(err)")
+            }
+        }
+    }
+
+    @Test func testWORMRetentionPruningImmunity() async throws {
+        let tempDir = try TemporaryDirectoryFixtures.createUniqueDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let destinationURL = tempDir.appendingPathComponent("Destination")
+        let internalDir = destinationURL.appendingPathComponent(".otterkeep")
+        try FileManager.default.createDirectory(at: internalDir, withIntermediateDirectories: true)
+
+        let dbPath = internalDir.appendingPathComponent("manifest.sqlite").path
+        let db = DatabaseEngine()
+        try await db.open(at: dbPath)
+
+        let oldDate = Date().addingTimeInterval(-30 * 86400) // 30 days ago
+        let lockedUntil = Date().addingTimeInterval(365 * 86400) // Locked for 1 year
+
+        let lockedSnapshotDir = destinationURL.appendingPathComponent("snap_locked")
+        let unlockedSnapshotDir = destinationURL.appendingPathComponent("snap_unlocked")
+        try FileManager.default.createDirectory(at: lockedSnapshotDir.appendingPathComponent("root"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: unlockedSnapshotDir.appendingPathComponent("root"), withIntermediateDirectories: true)
+
+        let lockedSnap = SnapshotRecord(
+            id: "snap_locked",
+            timestamp: oldDate,
+            status: "completed",
+            totalFiles: 1,
+            totalBytes: 100,
+            snapshotPath: "snap_locked",
+            lockedUntil: lockedUntil
+        )
+        let unlockedSnap = SnapshotRecord(
+            id: "snap_unlocked",
+            timestamp: oldDate,
+            status: "completed",
+            totalFiles: 1,
+            totalBytes: 100,
+            snapshotPath: "snap_unlocked",
+            lockedUntil: nil
+        )
+
+        try await db.insertSnapshot(lockedSnap)
+        try await db.insertSnapshot(unlockedSnap)
+        defer { Task { await db.close() } }
+
+        let retentionManager = RetentionManager(storage: DefaultFileSystemProvider(), database: db)
+
+        // Policy: keep only 1 day of daily backups, and max 1 snapshot total!
+        let policy = PruningPolicy(isAutoPruningEnabled: true, maxSnapshotsToKeep: 1, keepDailyDays: 1)
+        let deleted = try await retentionManager.applyRetentionPolicy(destinationURL: destinationURL, policy: policy)
+
+        // The unlocked snapshot should be deleted, but the WORM-locked snapshot MUST be preserved!
+        try assertTrue(deleted.contains("snap_unlocked"), "Unlocked old snapshot should be deleted by retention pruning")
+        try assertFalse(deleted.contains("snap_locked"), "WORM locked snapshot must NEVER be deleted by retention pruning")
+
+        // Direct deleteSnapshot on locked snapshot must throw permissionDenied
+        do {
+            try await retentionManager.deleteSnapshot(destinationURL: destinationURL, snapshot: lockedSnap, isPruning: false)
+            try assertTrue(false, "Direct deletion of locked snapshot must fail")
+        } catch let err as FileSystemError {
+            if case .permissionDenied = err {
+                // Expected
+            } else {
+                try assertTrue(false, "Unexpected error: \(err)")
+            }
+        }
+    }
+
+    @Test func testChangeDetectorStructuralTypeMismatch() throws {
+        let detector = ChangeDetector()
+        let t = Date()
+
+        let testURL = URL(fileURLWithPath: "/tmp/data")
+        // Previously a regular file
+        let prevRecord = FileCatalogRecord(
+            snapshotId: "s1",
+            relativePath: "data",
+            fileSize: 100,
+            modificationTime: t,
+            inode: 1234,
+            isDirectory: false,
+            isSymlink: false
+        )
+
+        // Now a directory with same path and modification time
+        let dirMeta = FileMetadata(
+            url: testURL,
+            size: 100,
+            modificationTime: t,
+            inode: 1234,
+            posixPermissions: 0o755,
+            isDirectory: true,
+            isSymlink: false
+        )
+        let scannedDir = ScannedItem(url: testURL, relativePath: "data", metadata: dirMeta)
+
+        let result = detector.detectChanges(scannedItems: [scannedDir], previousCatalog: ["data": prevRecord])
+        try assertEqual(result.modified.count, 1, "Type change from file to directory must be categorized as modified")
+        try assertEqual(result.unmodified.count, 0)
+    }
+
+    @Test func testWebhookCompletedStatusParity() async throws {
+        let dispatcher = WebhookDispatcher()
+        let config = WebhookConfiguration(
+            isEnabled: true,
+            serviceType: .slack,
+            url: "https://example.com/webhook",
+            notifyOnSuccess: true,
+            notifyOnWarning: false,
+            notifyOnFailure: false
+        )
+
+        let completedPayload = WebhookBackupPayload(
+            profileId: "p1",
+            profileName: "My Profile",
+            status: "completed",
+            snapshotPath: "/backup/snap",
+            filesScanned: 10,
+            filesCopied: 5,
+            bytesWritten: 1024,
+            durationSeconds: 1.0,
+            timestamp: Date()
+        )
+
+        let request = try await dispatcher.buildRequest(config: config, payload: completedPayload)
+        try assertNotNil(request.httpBody)
+        let bodyData = request.httpBody ?? Data()
+        let bodyStr = String(data: bodyData, encoding: .utf8) ?? ""
+        try assertTrue(bodyStr.contains("Backup Completed"), "Status 'completed' must render as Backup Completed, not Backup Failed")
+        try assertTrue(bodyStr.contains("✅"), "Status 'completed' must use green checkmark emoji")
+    }
+
+    @Test func testHookScriptOwnershipSecurity() async throws {
+        let tempDir = try TemporaryDirectoryFixtures.createUniqueDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let scriptURL = tempDir.appendingPathComponent("hook.sh")
+        try "#!/bin/sh\necho test\n".write(to: scriptURL, atomically: true, encoding: .utf8)
+
+        let manager = HookExecutionManager()
+
+        // 1. With safe permissions (0o755: rwxr-xr-x, not group/world writable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+        let isTrustedSafe = await manager.isTrustedHookScript(at: scriptURL)
+        try assertTrue(isTrustedSafe, "Owned by current user with mode 0755 should be trusted")
+
+        // 2. With insecure world-writable permissions (0o777)
+        try FileManager.default.setAttributes([.posixPermissions: 0o777], ofItemAtPath: scriptURL.path)
+        let isTrustedInsecure = await manager.isTrustedHookScript(at: scriptURL)
+        try assertFalse(isTrustedInsecure, "World-writable script (mode 0777) must NOT be trusted")
+
+        // 3. With insecure group-writable permissions (0o775)
+        try FileManager.default.setAttributes([.posixPermissions: 0o775], ofItemAtPath: scriptURL.path)
+        let isTrustedGroupWritable = await manager.isTrustedHookScript(at: scriptURL)
+        try assertFalse(isTrustedGroupWritable, "Group-writable script (mode 0775) must NOT be trusted")
     }
 }

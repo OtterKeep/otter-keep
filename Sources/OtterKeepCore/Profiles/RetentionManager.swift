@@ -48,6 +48,13 @@ public actor RetentionManager {
             snapshotsToKeep.insert(newestSnapshot.id)
         }
 
+        // Immutability Protection: WORM locked snapshots must always be retained regardless of age or policy
+        for snap in snapshots {
+            if snap.isLocked {
+                snapshotsToKeep.insert(snap.id)
+            }
+        }
+
         for snap in snapshots {
             if snap.timestamp >= oneDayAgo {
                 // 1. Preserve all snapshots taken within the last 24 hours (hourly granularity)
@@ -76,6 +83,10 @@ public actor RetentionManager {
                 if let newest = snapshots.first {
                     trimmed.insert(newest.id)
                 }
+                // Always preserve locked snapshots even when capped
+                for snap in snapshots where snap.isLocked {
+                    trimmed.insert(snap.id)
+                }
                 snapshotsToKeep = trimmed
             }
         }
@@ -90,6 +101,7 @@ public actor RetentionManager {
         var deletedIds: [String] = []
 
         for snap in snapshotsToDelete {
+            if snap.isLocked { continue }
             try await deleteSnapshot(destinationURL: destinationURL, snapshot: snap, isPruning: true)
             deletedIds.append(snap.id)
         }
@@ -133,7 +145,7 @@ public actor RetentionManager {
     ///   - snapshot: The snapshot record to remove.
     ///   - isPruning: True when triggered by automated retention pruning policy.
     public func deleteSnapshot(destinationURL: URL, snapshot: SnapshotRecord, isPruning: Bool = false) async throws {
-        if snapshot.isLocked && !isPruning {
+        if snapshot.isLocked {
             let msg = "Snapshot '\(snapshot.id)' is locked with WORM immutability until \(snapshot.lockedUntil?.description ?? ""). Deletion rejected."
             logger.error("\(msg)")
             throw FileSystemError.permissionDenied(path: "\(snapshot.snapshotPath) (\(msg))")

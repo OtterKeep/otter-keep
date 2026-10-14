@@ -124,15 +124,24 @@ public struct ArchivePackagingEngine: Sendable {
                 // If --zstd failed, attempt fallback to gzip
                 if selectedFormat == .tarZst {
                     logger.warning("tar --zstd failed with code \(process.terminationStatus). Falling back to gzip (.tar.gz)...")
+                    let fallbackURL = destinationArchiveURL.pathExtension == "zst"
+                        ? destinationArchiveURL.deletingPathExtension().appendingPathExtension("gz")
+                        : destinationArchiveURL
+                    let fallbackPath = fallbackURL.standardizedFileURL.path(percentEncoded: false)
+                    try? FileManager.default.removeItem(atPath: fallbackPath)
+
                     let fallbackProcess = Process()
                     fallbackProcess.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
-                    fallbackProcess.arguments = ["-czf", destPath, "-C", srcPath, "."]
+                    fallbackProcess.arguments = ["-czf", fallbackPath, "-C", srcPath, "."]
                     let fallbackPipe = Pipe()
                     fallbackProcess.standardError = fallbackPipe
                     try fallbackProcess.run()
                     fallbackProcess.waitUntilExit()
                     if fallbackProcess.terminationStatus == 0 {
-                        return destinationArchiveURL
+                        if fallbackURL != destinationArchiveURL {
+                            try? FileManager.default.removeItem(at: destinationArchiveURL)
+                        }
+                        return fallbackURL
                     }
                 }
 

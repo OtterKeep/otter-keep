@@ -65,6 +65,12 @@ public struct ChangeDetector: Sendable {
             currentPaths.insert(item.relativePath)
 
             if let prev = previousCatalog[item.relativePath] {
+                // If item type changed (file <-> directory or symlink <-> regular), force re-backup
+                if item.metadata.isDirectory != prev.isDirectory || item.metadata.isSymlink != prev.isSymlink {
+                    modified.append(item)
+                    continue
+                }
+
                 // Directory matching by structure
                 if item.metadata.isDirectory && prev.isDirectory {
                     unmodified.append((current: item, previous: prev))

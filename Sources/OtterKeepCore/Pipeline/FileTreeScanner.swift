@@ -254,10 +254,10 @@ public final class FileTreeScanner: Sendable {
             let relativePath = Self.computeRelativePath(for: fileURL, rootPath: rootPath)
             let itemAbsoluteURL = rootURL.appendingPathComponent(relativePath)
 
-            var isDirObjc: ObjCBool = false
-            let itemExists = fileManager.fileExists(atPath: itemAbsoluteURL.path(percentEncoded: false), isDirectory: &isDirObjc)
-            guard itemExists else { continue }
-            let isDirectory = isDirObjc.boolValue
+            let itemPath = itemAbsoluteURL.path(percentEncoded: false)
+            var statBuf = stat()
+            guard lstat(itemPath, &statBuf) == 0 else { continue }
+            let isDirectory = (statBuf.st_mode & S_IFMT) == S_IFDIR
 
             if Self.defaultExcludedNames.contains(lastComponent) {
                 if isDirectory {

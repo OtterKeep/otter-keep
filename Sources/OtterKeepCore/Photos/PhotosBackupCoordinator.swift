@@ -86,6 +86,9 @@ public actor PhotosBackupCoordinator {
         try storage.createDirectory(at: internalDir)
         let dbPath = internalDir.appendingPathComponent("manifest.sqlite").path
         try await dbEngine.open(at: dbPath)
+        defer {
+            Task { await dbEngine.close() }
+        }
 
         // 3. Fetch previous snapshot index
         let previousIndex = try await dbEngine.fetchLatestPhotosAssetIndex()
@@ -104,13 +107,23 @@ public actor PhotosBackupCoordinator {
             configuration: configuration
         )
 
-        // 6. Prepare new snapshot identifier and directory
+        // 6. Prepare new snapshot identifier, staging directory and root container
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd_HHmmss"
         let snapshotDateStr = formatter.string(from: startTime)
         let snapshotId = "photos_\(snapshotDateStr)"
         let snapshotFolderURL = configuration.destinationURL.appendingPathComponent(snapshotDateStr, isDirectory: true)
-        try storage.createDirectory(at: snapshotFolderURL)
+
+        let stagingFolderURL = configuration.destinationURL.appendingPathComponent(".in-progress_photos_\(snapshotDateStr)")
+        let rootStagingURL = stagingFolderURL.appendingPathComponent("root")
+        try storage.createDirectory(at: rootStagingURL)
+
+        var stagingCommitted = false
+        defer {
+            if !stagingCommitted {
+                try? FileManager.default.removeItem(at: stagingFolderURL)
+            }
+        }
 
         progress.phaseDescription = L10n.t(.phaseCopying)
         onProgress?(progress)
@@ -142,13 +155,15 @@ public actor PhotosBackupCoordinator {
             do {
                 switch action {
                 case .cloneReflink(let prevRecord, let relativePath):
-                    let targetURL = snapshotFolderURL.appendingPathComponent(relativePath)
+                    let targetURL = rootStagingURL.appendingPathComponent(relativePath)
                     try self.storage.createDirectory(at: targetURL.deletingLastPathComponent())
 
                     if let prevSnap = previousSnapshot {
-                        let prevFileURL = configuration.destinationURL
-                            .appendingPathComponent(prevSnap.snapshotPath)
-                            .appendingPathComponent(prevRecord.relativePath)
+                        let prevSnapDir = configuration.destinationURL.appendingPathComponent(prevSnap.snapshotPath)
+                        let prevRootURL = prevSnapDir.appendingPathComponent("root")
+                        let prevCandidate1 = prevRootURL.appendingPathComponent(prevRecord.relativePath)
+                        let prevCandidate2 = prevSnapDir.appendingPathComponent(prevRecord.relativePath)
+                        let prevFileURL = FileManager.default.fileExists(atPath: prevCandidate1.path) ? prevCandidate1 : prevCandidate2
 
                         if (try? self.storage.metadata(at: prevFileURL)) != nil {
                             try await self.storage.cloneItem(at: prevFileURL, to: targetURL)
@@ -178,7 +193,7 @@ public actor PhotosBackupCoordinator {
                         continue
                     }
 
-                    let targetURL = snapshotFolderURL.appendingPathComponent(relativePath)
+                    let targetURL = rootStagingURL.appendingPathComponent(relativePath)
                     try self.storage.createDirectory(at: targetURL.deletingLastPathComponent())
 
                     // Download resources from Photos / iCloud
@@ -221,7 +236,7 @@ public actor PhotosBackupCoordinator {
                         if configuration.includeLivePhotoVideos && item.isLivePhoto {
                             if let pairedVideoRes = resources.first(where: { $0.type == .pairedVideo }) {
                                 let movRelativePath = (relativePath as NSString).deletingPathExtension + ".mov"
-                                let movTargetURL = snapshotFolderURL.appendingPathComponent(movRelativePath)
+                                let movTargetURL = rootStagingURL.appendingPathComponent(movRelativePath)
                                 let movTmpURL = await self.ephemeralGuard.createTemporaryFileURL(prefix: "live_mov", fileExtension: "mov")
 
                                 try? await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
@@ -241,7 +256,7 @@ public actor PhotosBackupCoordinator {
                         if configuration.includeEditedVersions && item.hasAdjustments {
                             if let adjResource = resources.first(where: { $0.type == .fullSizePhoto || $0.type == .fullSizeVideo }) {
                                 let adjRelativePath = self.deltaScanner.resolveRelativePath(for: item, structure: configuration.exportStructure, isEdited: true)
-                                let adjTargetURL = snapshotFolderURL.appendingPathComponent(adjRelativePath)
+                                let adjTargetURL = rootStagingURL.appendingPathComponent(adjRelativePath)
                                 try? self.storage.createDirectory(at: adjTargetURL.deletingLastPathComponent())
                                 let adjTmpURL = await self.ephemeralGuard.createTemporaryFileURL(prefix: "adj", fileExtension: "jpg")
 
@@ -262,7 +277,7 @@ public actor PhotosBackupCoordinator {
                         if configuration.generateXMPSidecars {
                             if let xmpData = self.metadataExtractor.generateXMPSidecar(for: phAsset, albums: item.albums) {
                                 let xmpRelativePath = (relativePath as NSString).deletingPathExtension + ".xmp"
-                                let xmpURL = snapshotFolderURL.appendingPathComponent(xmpRelativePath)
+                                let xmpURL = rootStagingURL.appendingPathComponent(xmpRelativePath)
                                 try? xmpData.write(to: xmpURL)
                             }
                         }
@@ -325,8 +340,42 @@ public actor PhotosBackupCoordinator {
         try await dbEngine.insertSnapshot(snapshotRecord)
         try await dbEngine.insertPhotosAssetRecordsBatch(recordedAssets)
 
-        // 9. Clean up all temporary files
+        // Write standard FileCatalogRecord entries so snapshot works with RestoreEngine and DataScrubber
+        let fileCatalogRecords = recordedAssets.map { asset in
+            FileCatalogRecord(
+                snapshotId: snapshotId,
+                relativePath: asset.relativePath,
+                fileSize: asset.fileSize,
+                modificationTime: asset.modificationTime,
+                inode: 0,
+                checksum: asset.sha256,
+                isDirectory: false,
+                isSymlink: false
+            )
+        }
+        try await dbEngine.insertFileRecordsBatch(fileCatalogRecords)
+
+        // Write standard .snapshot_info.json metadata file
+        let snapshotInfoURL = stagingFolderURL.appendingPathComponent(".snapshot_info.json")
+        let snapshotInfo: [String: Any] = [
+            "id": snapshotId,
+            "timestamp": startTime.timeIntervalSince1970,
+            "totalFiles": Int64(recordedAssets.count),
+            "totalBytes": totalSnapshotBytes,
+            "backupType": previousSnapshot == nil ? "full" : "incremental",
+            "sourceType": "photos"
+        ]
+        if let infoData = try? JSONSerialization.data(withJSONObject: snapshotInfo, options: [.prettyPrinted]) {
+            try? infoData.write(to: snapshotInfoURL)
+        }
+
+        // Atomically commit staged snapshot directory to final destination
+        try await storage.atomicMove(from: stagingFolderURL, to: snapshotFolderURL)
+        stagingCommitted = true
+
+        // 9. Clean up all temporary files and release database locks
         await ephemeralGuard.cleanupAllTemporaryFiles()
+        await dbEngine.close()
 
         let duration = Date().timeIntervalSince(startTime)
         progress.isRunning = false

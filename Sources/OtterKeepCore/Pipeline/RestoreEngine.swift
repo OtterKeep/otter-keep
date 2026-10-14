@@ -25,6 +25,8 @@ public enum RestoreError: Error, Sendable, LocalizedError, Equatable {
     case integrityMismatch(path: String, expected: String, actual: String)
     /// Incompatible collision: directory vs file.
     case typeMismatch(path: String, isSourceDirectory: Bool)
+    /// Invalid or unsafe relative path attempting directory traversal.
+    case invalidPath(String)
 
     /// Human-readable localized error description.
     public var errorDescription: String? {
@@ -41,6 +43,8 @@ public enum RestoreError: Error, Sendable, LocalizedError, Equatable {
             return isSourceDirectory
                 ? "Cannot restore directory '\(path)': a file already exists at the destination."
                 : "Cannot restore file '\(path)': a directory already exists at the destination."
+        case .invalidPath(let path):
+            return "Invalid or unsafe path: \(path)"
         }
     }
 }
@@ -121,6 +125,39 @@ public actor RestoreEngine {
         self.database = database
     }
 
+    private func validatePath(_ path: String, within baseURL: URL) throws -> URL {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return baseURL.standardizedFileURL }
+        let components = (trimmed as NSString).pathComponents
+        if components.contains("..") || (components.count == 1 && components.contains(".")) || trimmed.hasPrefix("/") || trimmed.hasPrefix("~") {
+            throw RestoreError.invalidPath(path)
+        }
+        let resolved = baseURL.standardizedFileURL.appendingPathComponent(trimmed).standardizedFileURL
+        let basePath = baseURL.standardizedFileURL.path(percentEncoded: false)
+        let resolvedPath = resolved.path(percentEncoded: false)
+        let baseWithSlash = basePath.hasSuffix("/") ? basePath : basePath + "/"
+        guard resolvedPath == basePath || resolvedPath.hasPrefix(baseWithSlash) else {
+            throw RestoreError.invalidPath(path)
+        }
+        return resolved
+    }
+
+    private func validateSnapshotPath(_ snapshotPath: String, within backupRootURL: URL) throws -> URL {
+        let trimmed = snapshotPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let components = (trimmed as NSString).pathComponents
+        guard !trimmed.isEmpty, !trimmed.hasPrefix("/"), !trimmed.hasPrefix("~"), !components.contains("..") else {
+            throw RestoreError.invalidPath(snapshotPath)
+        }
+        let resolved = backupRootURL.standardizedFileURL.appendingPathComponent(trimmed).standardizedFileURL
+        let basePath = backupRootURL.standardizedFileURL.path(percentEncoded: false)
+        let resolvedPath = resolved.path(percentEncoded: false)
+        let baseWithSlash = basePath.hasSuffix("/") ? basePath : basePath + "/"
+        guard resolvedPath != basePath && resolvedPath.hasPrefix(baseWithSlash) else {
+            throw RestoreError.invalidPath(snapshotPath)
+        }
+        return resolved
+    }
+
     /// Restores a file or directory from a snapshot with collision handling and SHA-256 cryptographic verification.
     /// - Parameters:
     ///   - snapshotPath: Relative snapshot directory name.
@@ -136,7 +173,8 @@ public actor RestoreEngine {
         targetDirectoryURL: URL,
         collisionResolution: CollisionResolution = .keepBoth
     ) async throws -> URL {
-        let destinationFileURL = targetDirectoryURL.standardizedFileURL.appendingPathComponent(relativePath)
+        _ = try validateSnapshotPath(snapshotPath, within: backupRootURL)
+        let destinationFileURL = try validatePath(relativePath, within: targetDirectoryURL)
         return try await restoreToFile(
             snapshotPath: snapshotPath,
             backupRootURL: backupRootURL,
@@ -153,18 +191,21 @@ public actor RestoreEngine {
     ///   - relativePath: Relative path of the item within the snapshot root.
     ///   - destinationFileURL: Exact destination file URL.
     ///   - collisionResolution: Conflict resolution mode (default: `.overwrite`).
+    ///   - expectedChecksum: Optional precomputed or catalog-supplied SHA-256 checksum for verification.
     /// - Returns: The final restored file URL.
     public func restoreToFile(
         snapshotPath: String,
         backupRootURL: URL,
         relativePath: String,
         destinationFileURL: URL,
-        collisionResolution: CollisionResolution = .overwrite
+        collisionResolution: CollisionResolution = .overwrite,
+        expectedChecksum: String? = nil
     ) async throws -> URL {
         try Task.checkCancellation()
 
-        let snapshotURL = backupRootURL.standardizedFileURL.appendingPathComponent(snapshotPath)
-        let sourceItemURL = snapshotURL.appendingPathComponent("root").appendingPathComponent(relativePath)
+        let snapshotURL = try validateSnapshotPath(snapshotPath, within: backupRootURL)
+        let sourceRootURL = snapshotURL.appendingPathComponent("root")
+        let sourceItemURL = try validatePath(relativePath, within: sourceRootURL)
 
         guard FileManager.default.fileExists(atPath: sourceItemURL.standardizedFileURL.path(percentEncoded: false)) else {
             throw RestoreError.itemNotFoundInSnapshot(relativePath)
@@ -263,32 +304,42 @@ public actor RestoreEngine {
         try? storage.setImmutable(at: stagingURL, immutable: false, recursive: true)
 
         // 3. Pre-flight verify cryptographic SHA-256 data integrity BEFORE touching existing destination
-        let internalDir = backupRootURL.appendingPathComponent(".otterkeep")
-        let dbPath = internalDir.appendingPathComponent("manifest.sqlite").standardizedFileURL.path(percentEncoded: false)
-        try? await database.open(at: dbPath)
-
-        let snapshots = (try? await database.listSnapshots()) ?? []
-        if let snapshot = snapshots.first(where: { $0.snapshotPath == snapshotPath }) {
-            let files = (try? await database.listFiles(forSnapshotId: snapshot.id)) ?? []
-            if let record = files.first(where: { $0.relativePath == relativePath }),
-               let expectedChecksum = record.checksum {
-                let actualChecksum = try ChecksumCalculator.computeSHA256(for: stagingURL)
-                if actualChecksum != expectedChecksum {
-                    logger.error("Integrity mismatch on restore: \(relativePath) expected: \(expectedChecksum), actual: \(actualChecksum)")
-                    // Quarantine the corrupted restore rather than discarding everything
-                    let timestampSec = Int(Date().timeIntervalSince1970)
-                    let corruptName = "\(finalDestinationURL.lastPathComponent).corrupted_\(timestampSec)_\(UUID().uuidString.prefix(6))"
-                    let corruptURL = parentDir.appendingPathComponent(corruptName)
-                    if (try? await storage.atomicMove(from: stagingURL, to: corruptURL)) != nil {
-                        stagingCommitted = true // Quarantined successfully, do not delete in defer
+        var targetChecksum = expectedChecksum
+        if targetChecksum == nil {
+            let internalDir = backupRootURL.appendingPathComponent(".otterkeep")
+            let dbPath = internalDir.appendingPathComponent("manifest.sqlite").standardizedFileURL.path(percentEncoded: false)
+            if FileManager.default.fileExists(atPath: dbPath) {
+                if (try? await database.open(at: dbPath)) != nil {
+                    let snapshots = (try? await database.listSnapshots()) ?? []
+                    if let snapshot = snapshots.first(where: { $0.snapshotPath == snapshotPath }) {
+                        let files = (try? await database.listFiles(forSnapshotId: snapshot.id)) ?? []
+                        if let record = files.first(where: { $0.relativePath == relativePath }),
+                           let chk = record.checksum {
+                            targetChecksum = chk
+                        }
                     }
-
-                    throw RestoreError.integrityMismatch(
-                        path: relativePath,
-                        expected: expectedChecksum,
-                        actual: actualChecksum
-                    )
+                    await database.close()
                 }
+            }
+        }
+
+        if let checksum = targetChecksum {
+            let actualChecksum = try ChecksumCalculator.computeSHA256(for: stagingURL)
+            if actualChecksum != checksum {
+                logger.error("Integrity mismatch on restore: \(relativePath) expected: \(checksum), actual: \(actualChecksum)")
+                // Quarantine the corrupted restore rather than discarding everything
+                let timestampSec = Int(Date().timeIntervalSince1970)
+                let corruptName = "\(finalDestinationURL.lastPathComponent).corrupted_\(timestampSec)_\(UUID().uuidString.prefix(6))"
+                let corruptURL = parentDir.appendingPathComponent(corruptName)
+                if (try? await storage.atomicMove(from: stagingURL, to: corruptURL)) != nil {
+                    stagingCommitted = true // Quarantined successfully, do not delete in defer
+                }
+
+                throw RestoreError.integrityMismatch(
+                    path: relativePath,
+                    expected: checksum,
+                    actual: actualChecksum
+                )
             }
         }
 
@@ -337,7 +388,7 @@ public actor RestoreEngine {
         try Task.checkCancellation()
         let startTime = Date()
 
-        let snapshotURL = backupRootURL.standardizedFileURL.appendingPathComponent(snapshotPath)
+        let snapshotURL = try validateSnapshotPath(snapshotPath, within: backupRootURL)
         let sourceRootURL = snapshotURL.appendingPathComponent("root")
 
         guard FileManager.default.fileExists(atPath: sourceRootURL.standardizedFileURL.path(percentEncoded: false)) else {
@@ -371,6 +422,25 @@ public actor RestoreEngine {
                     requiredBytes: requiredSpace,
                     availableBytes: cap.availableBytes
                 )
+            }
+        }
+
+        // Preload catalog checksums in a single query to avoid O(N) database operations
+        let internalDir = backupRootURL.appendingPathComponent(".otterkeep")
+        let dbPath = internalDir.appendingPathComponent("manifest.sqlite").standardizedFileURL.path(percentEncoded: false)
+        var checksumMap: [String: String] = [:]
+        if FileManager.default.fileExists(atPath: dbPath) {
+            if (try? await database.open(at: dbPath)) != nil {
+                let snapshots = (try? await database.listSnapshots()) ?? []
+                if let snapshot = snapshots.first(where: { $0.snapshotPath == snapshotPath }) {
+                    let catalogFiles = (try? await database.listFiles(forSnapshotId: snapshot.id)) ?? []
+                    for rec in catalogFiles {
+                        if let cs = rec.checksum {
+                            checksumMap[rec.relativePath] = cs
+                        }
+                    }
+                }
+                await database.close()
             }
         }
 
@@ -421,7 +491,8 @@ public actor RestoreEngine {
                 backupRootURL: backupRootURL,
                 relativePath: file.relativePath,
                 destinationFileURL: destFileURL,
-                collisionResolution: useFullDirectoryStaging ? .overwrite : collisionResolution
+                collisionResolution: useFullDirectoryStaging ? .overwrite : collisionResolution,
+                expectedChecksum: checksumMap[file.relativePath]
             )
 
             processedFiles += 1
@@ -502,6 +573,9 @@ public actor RestoreEngine {
         try storage.createDirectory(at: internalDir)
         let dbPath = internalDir.appendingPathComponent("manifest.sqlite").standardizedFileURL.path(percentEncoded: false)
         try await database.open(at: dbPath)
+        defer {
+            Task { await database.close() }
+        }
 
         let contents = (try? FileManager.default.contentsOfDirectory(at: backupRootURL, includingPropertiesForKeys: nil)) ?? []
         var restoredSnapshotsCount = 0
@@ -558,6 +632,7 @@ public actor RestoreEngine {
             restoredSnapshotsCount += 1
         }
 
+        await database.close()
         logger.info("Disaster recovery catalog rebuild finished: \(restoredSnapshotsCount) snapshots indexed")
         return restoredSnapshotsCount
     }
@@ -579,6 +654,17 @@ public actor RestoreEngine {
         passphrase: String? = nil,
         collisionResolution: CollisionResolution = .overwrite
     ) async throws -> URL {
+        let trimmedSnap = snapshotId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let snapComponents = (trimmedSnap as NSString).pathComponents
+        guard !trimmedSnap.isEmpty, !trimmedSnap.hasPrefix("/"), !trimmedSnap.hasPrefix("~"), !snapComponents.contains("..") else {
+            throw RestoreError.invalidPath(snapshotId)
+        }
+        let trimmedRel = relativePath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let relComponents = (trimmedRel as NSString).pathComponents
+        guard !trimmedRel.isEmpty, !trimmedRel.hasPrefix("/"), !trimmedRel.hasPrefix("~"), !relComponents.contains("..") else {
+            throw RestoreError.invalidPath(relativePath)
+        }
+
         logger.info("Initiating remote restore for '\(relativePath)' from destination '\(destination.name)'")
 
         var finalDestinationURL = destinationFileURL.standardizedFileURL
@@ -597,13 +683,13 @@ public actor RestoreEngine {
                 let ext = finalDestinationURL.pathExtension
                 let baseName = finalDestinationURL.deletingPathExtension().lastPathComponent
                 var counter = 1
-                var newName = "\(baseName) (visszaállított \(counter))"
+                var newName = "\(baseName)\(L10n.format(.restoredSuffixFormat, counter))"
                 if !ext.isEmpty { newName += ".\(ext)" }
                 var candidateURL = parentDir.appendingPathComponent(newName)
 
                 while FileManager.default.fileExists(atPath: candidateURL.standardizedFileURL.path(percentEncoded: false)) {
                     counter += 1
-                    newName = "\(baseName) (visszaállított \(counter))"
+                    newName = "\(baseName)\(L10n.format(.restoredSuffixFormat, counter))"
                     if !ext.isEmpty { newName += ".\(ext)" }
                     candidateURL = parentDir.appendingPathComponent(newName)
                 }
@@ -782,16 +868,22 @@ public actor RestoreEngine {
         }
 
         if FileManager.default.fileExists(atPath: finalDestinationURL.standardizedFileURL.path(percentEncoded: false)) {
+            // Unlock destination file if it has UF_IMMUTABLE active so atomic replace succeeds
+            try? storage.setImmutable(at: finalDestinationURL, immutable: false, recursive: true)
+            let backupOldURL = parentDir.appendingPathComponent("\(finalDestinationURL.lastPathComponent).old_\(Int(Date().timeIntervalSince1970))_\(UUID().uuidString.prefix(6))")
+            try await storage.atomicMove(from: finalDestinationURL, to: backupOldURL)
             do {
                 try await storage.atomicMove(from: stagingURL, to: finalDestinationURL)
+                stagingCommitted = true
+                try? storage.removeItem(at: backupOldURL)
             } catch {
-                try storage.removeItem(at: finalDestinationURL)
-                try await storage.atomicMove(from: stagingURL, to: finalDestinationURL)
+                try? await storage.atomicMove(from: backupOldURL, to: finalDestinationURL)
+                throw error
             }
         } else {
             try await storage.atomicMove(from: stagingURL, to: finalDestinationURL)
+            stagingCommitted = true
         }
-        stagingCommitted = true
 
         try? storage.setImmutable(at: finalDestinationURL, immutable: false, recursive: true)
         logger.info("Remote restore successfully committed: \(relativePath) -> \(finalDestinationURL.path)")
