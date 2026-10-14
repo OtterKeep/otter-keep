@@ -452,6 +452,7 @@ public final class AppState: Sendable {
 
     public func saveProfiles() {
         try? ProfileStore.shared.saveProfiles(profiles)
+        BackupScheduler.shared.syncContinuousWatchers()
     }
 
     public func refreshVolumeEvaluation() {

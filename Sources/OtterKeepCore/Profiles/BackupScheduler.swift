@@ -15,6 +15,7 @@ public final class BackupScheduler: @unchecked Sendable {
     private var timerTask: Task<Void, Never>?
     private var activeProfileIdsRunning = Set<UUID>()
     private var isPhotosBackupRunning = false
+    private var activeFSEventWatchers: [UUID: FSEventWatcher] = [:]
     public var onTriggerBackup: BackupTriggerHandler?
     public var onTriggerPhotosBackup: PhotosBackupTriggerHandler?
 
@@ -41,20 +42,25 @@ public final class BackupScheduler: @unchecked Sendable {
         photosTriggerHandler: PhotosBackupTriggerHandler? = nil
     ) {
         lock.lock()
-        defer { lock.unlock() }
-
         self.onTriggerBackup = triggerHandler
         if let pHandler = photosTriggerHandler {
             self.onTriggerPhotosBackup = pHandler
         }
-        guard !isRunning else { return }
+        guard !isRunning else {
+            lock.unlock()
+            return
+        }
         isRunning = true
+        lock.unlock()
+
+        syncContinuousWatchers()
 
         timerTask = Task.detached { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 30_000_000_000) // 30-second interval
                 guard let self = self else { break }
                 await self.evaluateSchedules()
+                self.syncContinuousWatchers()
             }
         }
     }
@@ -66,6 +72,11 @@ public final class BackupScheduler: @unchecked Sendable {
         isRunning = false
         timerTask?.cancel()
         timerTask = nil
+
+        for (_, watcher) in activeFSEventWatchers {
+            watcher.stop()
+        }
+        activeFSEventWatchers.removeAll()
     }
 
     /// Handles external volume mount events, checking for missed backups for profiles stored on that volume.
@@ -304,6 +315,45 @@ public final class BackupScheduler: @unchecked Sendable {
             } else {
                 return calendar.date(byAdding: .weekOfYear, value: 1, to: candidate) ?? candidate.addingTimeInterval(7 * 86400)
             }
+        }
+    }
+
+    /// Synchronizes active real-time continuous FSEventWatchers with configured backup profiles.
+    public func syncContinuousWatchers() {
+        let profiles = ProfileStore.shared.loadProfiles()
+        lock.lock()
+        defer { lock.unlock() }
+
+        let currentIds = Set(activeFSEventWatchers.keys)
+        let continuousProfiles = profiles.filter { $0.executionMode.isContinuous }
+        let wantedIds = Set(continuousProfiles.map(\.id))
+
+        // Stop watchers for profiles no longer set to continuous or deleted
+        for id in currentIds.subtracting(wantedIds) {
+            activeFSEventWatchers[id]?.stop()
+            activeFSEventWatchers.removeValue(forKey: id)
+            LogManager.shared.log("Stopped real-time FSEventWatcher for profile UUID \(id)", level: .debug, category: "Scheduler")
+        }
+
+        // Start watchers for newly continuous profiles
+        for profile in continuousProfiles where activeFSEventWatchers[profile.id] == nil {
+            let sourcePath = profile.sourceURL.standardizedFileURL.path(percentEncoded: false)
+            guard FileManager.default.fileExists(atPath: sourcePath) else { continue }
+
+            let watcher = FSEventWatcher(
+                watchedPath: sourcePath,
+                excludePatterns: profile.excludePatterns,
+                debouncingSeconds: profile.executionMode.debouncingSeconds
+            ) { [weak self] _ in
+                guard let self = self else { return }
+                Task {
+                    LogManager.shared.log("Real-time filesystem change triggered backup for profile '\(profile.name)'", level: .info, category: "Scheduler")
+                    await self.triggerBackupSafely(for: profile, isCatchUp: false)
+                }
+            }
+            watcher.start()
+            activeFSEventWatchers[profile.id] = watcher
+            LogManager.shared.log("Started real-time FSEventWatcher for profile '\(profile.name)' [\(sourcePath)]", level: .info, category: "Scheduler")
         }
     }
 }

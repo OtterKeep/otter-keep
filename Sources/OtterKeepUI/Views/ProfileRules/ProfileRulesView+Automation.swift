@@ -11,28 +11,86 @@ extension ProfileRulesView {
                 .font(.headline)
 
             VStack(alignment: .leading, spacing: 14) {
-                // Schedule toggle
-                Toggle(isOn: Binding(
-                    get: { profile.schedule.isEnabled },
-                    set: { enabled in
+                // Execution mode selector
+                Picker("", selection: Binding(
+                    get: { profile.executionMode.isContinuous ? 1 : 0 },
+                    set: { modeIndex in
                         var updated = profile
-                        updated.schedule.isEnabled = enabled
+                        if modeIndex == 1 {
+                            updated.executionMode = .continuous(debouncingSeconds: profile.executionMode.debouncingSeconds)
+                        } else {
+                            updated.executionMode = .scheduled(profile.schedule)
+                        }
                         appState.selectedProfile = updated
+                        appState.saveProfiles()
                     }
                 )) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L10n.t(.scheduleEnableToggle))
-                            .font(.body.weight(.medium))
-                        Text(L10n.t(.scheduleCardSubtitle))
+                    Text(L10n.t(.executionModeScheduled)).tag(0)
+                    Text(L10n.t(.executionModeContinuous)).tag(1)
+                }
+                .pickerStyle(.segmented)
+                .padding(.bottom, 2)
+
+                if profile.executionMode.isContinuous {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "bolt.fill")
+                                .foregroundStyle(OtterTheme.otterAmber)
+                            Text(L10n.t(.executionModeContinuous))
+                                .font(.body.weight(.medium))
+                            Spacer()
+                        }
+
+                        Text(L10n.t(.continuousDebounceDesc))
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                    }
-                }
-                .toggleStyle(.checkbox)
-                .frame(maxWidth: .infinity, alignment: .leading)
 
-                if profile.schedule.isEnabled {
-                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 8) {
+                            Text(L10n.t(.continuousDebounceLabel))
+                                .font(.body)
+                            Spacer()
+                            Picker("", selection: Binding(
+                                get: { profile.executionMode.debouncingSeconds },
+                                set: { sec in
+                                    var updated = profile
+                                    updated.executionMode = .continuous(debouncingSeconds: sec)
+                                    appState.selectedProfile = updated
+                                    appState.saveProfiles()
+                                }
+                            )) {
+                                Text("10 s").tag(10)
+                                Text("30 s").tag(30)
+                                Text("60 s").tag(60)
+                                Text("120 s").tag(120)
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 120)
+                        }
+                    }
+                } else {
+                    // Schedule toggle
+                    Toggle(isOn: Binding(
+                        get: { profile.schedule.isEnabled },
+                        set: { enabled in
+                            var updated = profile
+                            updated.schedule.isEnabled = enabled
+                            appState.selectedProfile = updated
+                            appState.saveProfiles()
+                        }
+                    )) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L10n.t(.scheduleEnableToggle))
+                                .font(.body.weight(.medium))
+                            Text(L10n.t(.scheduleCardSubtitle))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(.checkbox)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if profile.schedule.isEnabled {
+                        VStack(alignment: .leading, spacing: 12) {
                         Divider()
 
                         HStack(spacing: 8) {
@@ -190,6 +248,7 @@ extension ProfileRulesView {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
+            }
             }
             .otterCard()
         }
