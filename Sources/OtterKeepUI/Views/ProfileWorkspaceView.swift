@@ -86,13 +86,13 @@ public struct ProfileWorkspaceView: View {
 
             // Centered Segmented Workspace Tabs
             Picker("", selection: activeTabBinding) {
-                ForEach(ProfileWorkspaceTab.allCases) { tab in
+                ForEach([ProfileWorkspaceTab.overview, ProfileWorkspaceTab.timeMachine]) { tab in
                     Label(tab.localizedTitle, systemImage: tab.iconName).tag(tab)
                 }
             }
             .pickerStyle(.segmented)
             .controlSize(.regular)
-            .frame(maxWidth: 440)
+            .frame(maxWidth: 320)
 
             Spacer()
 
