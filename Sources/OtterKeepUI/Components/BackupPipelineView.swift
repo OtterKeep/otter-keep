@@ -122,40 +122,64 @@ public struct BackupPipelineView: View {
                 .help(detail)
 
             if onChange != nil || onReveal != nil {
-                HStack(spacing: 8) {
-                    if let onChange = onChange {
-                        Button {
-                            onChange()
-                        } label: {
-                            HStack(spacing: 3) {
-                                Image(systemName: "folder.badge.gearshape")
-                                Text(L10n.t(.changeFolderButton))
-                            }
-                            .font(.system(size: 10, weight: .medium))
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                        .disabled(isActive)
-                    }
-
-                    if let onReveal = onReveal {
-                        Button {
-                            onReveal()
-                        } label: {
-                            HStack(spacing: 3) {
-                                Image(systemName: "arrow.up.forward.app")
-                                Text(L10n.t(.revealInFinderButton))
-                            }
-                            .font(.system(size: 10, weight: .medium))
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                    }
-                }
-                .padding(.top, 2)
+                nodeActionButtons(alignment: alignment, onChange: onChange, onReveal: onReveal)
             }
         }
         .frame(maxWidth: .infinity, alignment: alignment == .trailing ? .trailing : .leading)
+    }
+
+    @ViewBuilder
+    private func nodeActionButtons(
+        alignment: HorizontalAlignment,
+        onChange: (() -> Void)?,
+        onReveal: (() -> Void)?
+    ) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) {
+                actionButtons(onChange: onChange, onReveal: onReveal)
+            }
+            VStack(alignment: alignment, spacing: 4) {
+                actionButtons(onChange: onChange, onReveal: onReveal)
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    @ViewBuilder
+    private func actionButtons(
+        onChange: (() -> Void)?,
+        onReveal: (() -> Void)?
+    ) -> some View {
+        if let onChange = onChange {
+            Button {
+                onChange()
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "folder.badge.gearshape")
+                    Text(L10n.t(.changeFolderButton))
+                }
+                .font(.system(size: 10, weight: .medium))
+                .lineLimit(1)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+            .disabled(isActive)
+        }
+
+        if let onReveal = onReveal {
+            Button {
+                onReveal()
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "arrow.up.forward.app")
+                    Text(L10n.t(.revealInFinderButton))
+                }
+                .font(.system(size: 10, weight: .medium))
+                .lineLimit(1)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+        }
     }
 
     private var pipelineEngineNode: some View {

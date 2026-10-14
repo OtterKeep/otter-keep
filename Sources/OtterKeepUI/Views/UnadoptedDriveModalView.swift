@@ -21,10 +21,7 @@ public struct UnadoptedDriveModalView: View {
     public var body: some View {
         VStack(spacing: 20) {
             // Ottie calming sanctuary mascot
-            Image("OttieSanctuarySafe", bundle: Bundle.module)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 96, height: 96)
+            OttieSanctuaryMascotView(mood: .safe, size: 96)
 
             VStack(spacing: 8) {
                 Text(LocalizationManager.shared.effectiveLanguage == .hungarian

@@ -92,28 +92,44 @@ public struct StorageGaugeBar: View {
             .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
 
             // Legend Row
-            HStack(spacing: 16) {
-                legendItem(
-                    color: OtterTheme.storageBackups,
-                    label: L10n.t(.storageBackupsLabel),
-                    bytes: backupBytes
-                )
-
-                legendItem(
-                    color: OtterTheme.storageOther,
-                    label: L10n.t(.storageOtherLabel),
-                    bytes: otherBytes
-                )
-
-                legendItem(
-                    color: Color.secondary.opacity(0.5),
-                    label: L10n.t(.storageFreeLabel),
-                    bytes: freeBytes
-                )
-
-                Spacer(minLength: 0)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 16) {
+                    legendContent
+                    Spacer(minLength: 0)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 12) {
+                        legendItem(color: OtterTheme.storageBackups, label: L10n.t(.storageBackupsLabel), bytes: backupBytes)
+                        legendItem(color: OtterTheme.storageOther, label: L10n.t(.storageOtherLabel), bytes: otherBytes)
+                    }
+                    legendItem(color: Color.secondary.opacity(0.5), label: L10n.t(.storageFreeLabel), bytes: freeBytes)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    legendContent
+                }
             }
         }
+    }
+
+    @ViewBuilder
+    private var legendContent: some View {
+        legendItem(
+            color: OtterTheme.storageBackups,
+            label: L10n.t(.storageBackupsLabel),
+            bytes: backupBytes
+        )
+
+        legendItem(
+            color: OtterTheme.storageOther,
+            label: L10n.t(.storageOtherLabel),
+            bytes: otherBytes
+        )
+
+        legendItem(
+            color: Color.secondary.opacity(0.5),
+            label: L10n.t(.storageFreeLabel),
+            bytes: freeBytes
+        )
     }
 
     private func legendItem(color: Color, label: String, bytes: Int64) -> some View {
@@ -125,10 +141,12 @@ public struct StorageGaugeBar: View {
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
 
             Text(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
                 .font(.caption2.monospacedDigit().bold())
                 .foregroundStyle(.primary)
+                .lineLimit(1)
         }
     }
 }

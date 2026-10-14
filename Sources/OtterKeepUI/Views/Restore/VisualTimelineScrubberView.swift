@@ -99,7 +99,7 @@ public struct VisualTimelineScrubberView: View {
                                 Circle()
                                     .fill(dotColor(for: snapshots[idx], isSelected: idx == currentIndex))
                                     .frame(width: idx == currentIndex ? 10 : 6, height: idx == currentIndex ? 10 : 6)
-                                    .position(x: min(max(position, 5), trackWidth - 5), y: 3)
+                                    .position(x: min(max(position, 5), trackWidth - 5), y: 8)
                                     .onTapGesture {
                                         selectSnapshot(at: idx)
                                     }
@@ -113,7 +113,7 @@ public struct VisualTimelineScrubberView: View {
                                 .fill(Color.accentColor)
                                 .frame(width: 16, height: 16)
                                 .shadow(radius: 2)
-                                .position(x: min(max(thumbX, 8), trackWidth - 8), y: 3)
+                                .position(x: min(max(thumbX, 8), trackWidth - 8), y: 8)
                         }
                     }
                     .frame(height: 16)

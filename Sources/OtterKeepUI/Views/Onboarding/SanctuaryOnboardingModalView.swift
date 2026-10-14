@@ -51,7 +51,7 @@ public struct SanctuaryOnboardingModalView: View {
 
             // Step Content
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 18) {
                     switch currentStep {
                     case 0:
                         welcomeStep
@@ -65,7 +65,8 @@ public struct SanctuaryOnboardingModalView: View {
                         EmptyView()
                     }
                 }
-                .padding(28)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 20)
             }
 
             Divider()
@@ -73,7 +74,7 @@ public struct SanctuaryOnboardingModalView: View {
             // Bottom Navigation Actions
             footerView
         }
-        .frame(width: 580, height: 500)
+        .frame(width: 600, height: 560)
         .background(Color(NSColor.windowBackgroundColor))
         .onAppear {
             checkPermissions()
@@ -110,19 +111,9 @@ public struct SanctuaryOnboardingModalView: View {
     // MARK: - Step 0: Welcome & Philosophy
 
     private var welcomeStep: some View {
-        VStack(spacing: 20) {
-            ZStack {
-                Circle()
-                    .fill(Color.accentColor.opacity(0.12))
-                    .frame(width: 90, height: 90)
-
-                Image(systemName: "heart.shield.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 48, height: 48)
-                    .foregroundStyle(Color.accentColor)
-            }
-            .padding(.top, 10)
+        VStack(spacing: 16) {
+            OttieSanctuaryMascotView(mood: .safe, size: 96)
+                .padding(.top, 4)
 
             Text(L10n.t(.welcomeSanctuaryTitle))
                 .font(.title2.weight(.bold))
@@ -132,23 +123,23 @@ public struct SanctuaryOnboardingModalView: View {
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
 
             VStack(alignment: .leading, spacing: 12) {
                 featureBullet(
                     icon: "sparkles",
-                    title: "APFS Copy-on-Write",
-                    subtitle: "Zero-duplicate instantaneous snapshots without taking extra storage."
+                    title: L10n.t(.onboardingFeatureApfsTitle),
+                    subtitle: L10n.t(.onboardingFeatureApfsDesc)
                 )
                 featureBullet(
                     icon: "lock.shield",
-                    title: "Private & Local First",
-                    subtitle: "Your data stays entirely under your control on your trusted drives."
+                    title: L10n.t(.onboardingFeatureLocalTitle),
+                    subtitle: L10n.t(.onboardingFeatureLocalDesc)
                 )
                 featureBullet(
                     icon: "leaf.fill",
-                    title: "Gentle on Battery & Hardware",
-                    subtitle: "Smart power throttling keeps your Mac cool and silent."
+                    title: L10n.t(.onboardingFeatureGentleTitle),
+                    subtitle: L10n.t(.onboardingFeatureGentleDesc)
                 )
             }
             .padding(16)
@@ -170,7 +161,7 @@ public struct SanctuaryOnboardingModalView: View {
             Text(L10n.t(.onboardingStepFDA))
                 .font(.title2.weight(.bold))
 
-            Text("OtterKeep requires Full Disk Access to safely back up protected user directories like Documents, Desktop, and Mail without permission errors.")
+            Text(L10n.t(.onboardingFDADesc))
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -201,7 +192,7 @@ public struct SanctuaryOnboardingModalView: View {
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .help("Recheck Full Disk Access")
+                .help(L10n.t(.onboardingRecheckFDA))
             }
             .padding(.top, 8)
         }
@@ -210,11 +201,11 @@ public struct SanctuaryOnboardingModalView: View {
     // MARK: - Step 2: First Profile Setup
 
     private var profileSetupStep: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.t(.onboardingStepProfile))
                     .font(.title2.weight(.bold))
-                Text("Select the primary folders you wish to safeguard.")
+                Text(L10n.t(.onboardingProfileFoldersSubtitle))
                     .font(.body)
                     .foregroundStyle(.secondary)
             }
@@ -222,15 +213,15 @@ public struct SanctuaryOnboardingModalView: View {
             VStack(alignment: .leading, spacing: 14) {
                 // Profile Name
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Profile Name")
+                    Text(L10n.t(.onboardingProfileNameLabel))
                         .font(.headline)
-                    TextField("Name", text: profileNameBinding)
+                    TextField(L10n.t(.defaultProfileName), text: profileNameBinding)
                         .textFieldStyle(.roundedBorder)
                 }
 
                 // Source Folder
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Source Directory (What to back up)")
+                    Text(L10n.t(.sourceFolderTitle))
                         .font(.headline)
                     HStack {
                         Image(systemName: "folder")
@@ -239,10 +230,11 @@ public struct SanctuaryOnboardingModalView: View {
                             .lineLimit(1)
                             .truncationMode(.middle)
                             .font(.system(.subheadline, design: .monospaced))
-                        Spacer()
-                        Button("Choose...") {
+                        Spacer(minLength: 8)
+                        Button(L10n.t(.browseButton)) {
                             chooseFolder { appState.maintenanceSettings.onboardingSourceURL = $0 }
                         }
+                        .fixedSize()
                     }
                     .padding(10)
                     .background(Color(NSColor.controlBackgroundColor))
@@ -251,7 +243,7 @@ public struct SanctuaryOnboardingModalView: View {
 
                 // Destination Folder
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Destination Directory (Where to store snapshots)")
+                    Text(L10n.t(.destinationFolderTitle))
                         .font(.headline)
                     HStack {
                         Image(systemName: "externaldrive")
@@ -260,10 +252,11 @@ public struct SanctuaryOnboardingModalView: View {
                             .lineLimit(1)
                             .truncationMode(.middle)
                             .font(.system(.subheadline, design: .monospaced))
-                        Spacer()
-                        Button("Choose...") {
+                        Spacer(minLength: 8)
+                        Button(L10n.t(.browseButton)) {
                             chooseFolder { appState.maintenanceSettings.onboardingDestinationURL = $0 }
                         }
+                        .fixedSize()
                     }
                     .padding(10)
                     .background(Color(NSColor.controlBackgroundColor))
@@ -276,11 +269,11 @@ public struct SanctuaryOnboardingModalView: View {
     // MARK: - Step 3: Protection Mode & Schedule
 
     private var protectionModeStep: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.t(.onboardingStepSchedule))
                     .font(.title2.weight(.bold))
-                Text("Configure real-time monitoring and anti-ransomware traps.")
+                Text(L10n.t(.onboardingProtectionSubtitle))
                     .font(.body)
                     .foregroundStyle(.secondary)
             }
@@ -324,7 +317,7 @@ public struct SanctuaryOnboardingModalView: View {
     private var footerView: some View {
         HStack {
             if currentStep > 0 {
-                Button("Back") {
+                Button(L10n.t(.back)) {
                     withAnimation {
                         appState.maintenanceSettings.onboardingCurrentStep -= 1
                     }

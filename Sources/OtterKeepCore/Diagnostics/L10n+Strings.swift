@@ -1015,5 +1015,18 @@ extension L10n {
         .daemonOpenSystemSettings: Translation(english: "Open Login Items Settings…", hungarian: "Bejelentkezési elemek beállításai…"),
         .addVolumeToRotation: Translation(english: "Add Current Volume to Rotation", hungarian: "Aktuális kötet hozzáadása a rotációhoz"),
         .noRotationVolumes: Translation(english: "No alternate backup drives registered yet", hungarian: "Még nincs másodlagos mentési kötet regisztrálva"),
+        .onboardingFeatureApfsTitle: Translation(english: "APFS Copy-on-Write", hungarian: "APFS Másolás-íráskor"),
+        .onboardingFeatureApfsDesc: Translation(english: "Zero-duplicate instantaneous snapshots without taking extra storage.", hungarian: "Azonnali, duplikációmentes pillanatképek extra tárhelyfoglalás nélkül."),
+        .onboardingFeatureLocalTitle: Translation(english: "Private & Local First", hungarian: "Bizalmas & Helyi Védelem"),
+        .onboardingFeatureLocalDesc: Translation(english: "Your data stays entirely under your control on your trusted drives.", hungarian: "Adataid teljes mértékben a te felügyeleted alatt maradnak a saját lemezeiden."),
+        .onboardingFeatureGentleTitle: Translation(english: "Gentle on Battery & Hardware", hungarian: "Kíméletes az Akkumulátorral és Lemezzel"),
+        .onboardingFeatureGentleDesc: Translation(english: "Smart power throttling keeps your Mac cool and silent.", hungarian: "Az intelligens energiagazdálkodó hűvösen és csendben tartja a Macet."),
+        .onboardingFDADesc: Translation(english: "OtterKeep requires Full Disk Access to safely back up protected user directories like Documents, Desktop, and Mail without permission errors.", hungarian: "Az OtterKeep számára Teljes Lemezelérés szükséges a védett könyvtárak (Dokumentumok, Íróasztal, Mail) hibamentes és biztonságos mentéséhez."),
+        .onboardingRecheckFDA: Translation(english: "Recheck Full Disk Access", hungarian: "Teljes Lemezelérés Újraellenőrzése"),
+        .onboardingProfileFoldersSubtitle: Translation(english: "Select the primary folders you wish to safeguard.", hungarian: "Válaszd ki az elsődleges mappákat, amelyeket biztonságba szeretnél helyezni."),
+        .onboardingProfileNameLabel: Translation(english: "Profile Name", hungarian: "Profil Neve"),
+        .onboardingProtectionSubtitle: Translation(english: "Configure real-time monitoring and anti-ransomware traps.", hungarian: "Valós idejű fájlfigyelés és zsarolóvírus-csapdák beállítása."),
+        .back: Translation(english: "Back", hungarian: "Vissza"),
+        .daysCountFormat: Translation(english: "%d days", hungarian: "%d nap"),
     ]
 }

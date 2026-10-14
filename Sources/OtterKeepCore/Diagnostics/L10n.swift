@@ -1133,6 +1133,19 @@ public enum L10n {
         case daemonOpenSystemSettings
         case addVolumeToRotation
         case noRotationVolumes
+        case onboardingFeatureApfsTitle
+        case onboardingFeatureApfsDesc
+        case onboardingFeatureLocalTitle
+        case onboardingFeatureLocalDesc
+        case onboardingFeatureGentleTitle
+        case onboardingFeatureGentleDesc
+        case onboardingFDADesc
+        case onboardingRecheckFDA
+        case onboardingProfileFoldersSubtitle
+        case onboardingProfileNameLabel
+        case onboardingProtectionSubtitle
+        case back
+        case daysCountFormat
     }
 
 

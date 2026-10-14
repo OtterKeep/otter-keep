@@ -300,7 +300,7 @@ extension ProfileRulesView {
                                 appState.selectedProfile = updated
                             }
                         ), in: 1...365) {
-                            Text("\(profile.immutabilityLockDays) nap")
+                            Text(L10n.format(.daysCountFormat, profile.immutabilityLockDays))
                                 .monospacedDigit()
                         }
                     }

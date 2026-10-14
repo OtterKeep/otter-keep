@@ -179,9 +179,9 @@ public struct MainDashboardView: View {
         let forecast = appState.storageForecastReport
 
         return VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 18) {
+            HStack(alignment: .center, spacing: 16) {
                 // Ottie mascot with dynamic emotional state
-                OttieSanctuaryMascotView(mood: mood, size: 96)
+                OttieSanctuaryMascotView(mood: mood, size: 88)
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
@@ -253,57 +253,9 @@ public struct MainDashboardView: View {
                             .background(OtterTheme.oceanicTeal.opacity(0.12), in: Capsule())
                         }
                     }
-
-                    // Integrated Storage Forecast Telemetry Strip
-                    if let forecast = forecast {
-                        HStack(spacing: 12) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "chart.line.uptrend.xyaxis")
-                                    .font(.caption2)
-                                    .foregroundStyle(OtterTheme.otterAmber)
-                                Text(forecast.formattedDailyGrowth)
-                                    .font(.caption.bold().monospacedDigit())
-                                    .foregroundStyle(OtterTheme.oceanicTeal)
-                                Text(L10n.t(.forecastDailyGrowthLabel))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Text("•")
-                                .foregroundStyle(.tertiary)
-
-                            HStack(spacing: 4) {
-                                Image(systemName: forecast.healthStatus.sfSymbol)
-                                    .font(.caption2)
-                                    .foregroundStyle(colorForHealth(forecast.healthStatus))
-                                Text(forecast.formattedDepletionText)
-                                    .font(.caption.bold().monospacedDigit())
-                                    .foregroundStyle(colorForHealth(forecast.healthStatus))
-
-                                if let fullDate = forecast.estimatedFullDate {
-                                    Text("(\(Self.forecastDateFormatter.string(from: fullDate)))")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-
-                            Button {
-                                appState.refreshStorageForecast()
-                            } label: {
-                                Image(systemName: "arrow.clockwise")
-                                    .font(.system(size: 9))
-                                    .foregroundStyle(.secondary)
-                            }
-                            .buttonStyle(.plain)
-                            .help("Refresh Storage Forecast")
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    }
                 }
 
-                Spacer()
+                Spacer(minLength: 12)
 
                 VStack(alignment: .trailing, spacing: 8) {
                     if let sum = status.lastSessionSummary {
@@ -389,6 +341,56 @@ public struct MainDashboardView: View {
                         }
                     }
                 }
+            }
+
+            // Integrated Storage Forecast Telemetry Strip
+            if let forecast = forecast {
+                HStack(spacing: 12) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.caption2)
+                            .foregroundStyle(OtterTheme.otterAmber)
+                        Text(forecast.formattedDailyGrowth)
+                            .font(.caption.bold().monospacedDigit())
+                            .foregroundStyle(OtterTheme.oceanicTeal)
+                        Text(L10n.t(.forecastDailyGrowthLabel))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Text("•")
+                        .foregroundStyle(.tertiary)
+
+                    HStack(spacing: 4) {
+                        Image(systemName: forecast.healthStatus.sfSymbol)
+                            .font(.caption2)
+                            .foregroundStyle(colorForHealth(forecast.healthStatus))
+                        Text(forecast.formattedDepletionText)
+                            .font(.caption.bold().monospacedDigit())
+                            .foregroundStyle(colorForHealth(forecast.healthStatus))
+
+                        if let fullDate = forecast.estimatedFullDate {
+                            Text("(\(Self.forecastDateFormatter.string(from: fullDate)))")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    Button {
+                        appState.refreshStorageForecast()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Refresh Storage Forecast")
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             }
 
             // Quota Exceeded alert banner if active

@@ -43,7 +43,7 @@ public struct SettingsView: View {
                 // Permission Status HUD
                 permissionStatusHUD
 
-                // Top Preferences: 1. Nyelvválasztó, 2. Témaválasztó (középen), 3. Rendszerindítás
+                // Top Preferences: 1. Nyelvválasztó, 2. Témaválasztó
                 Grid(alignment: .topLeading, horizontalSpacing: 16, verticalSpacing: 16) {
                     GridRow {
                         // 1. Language Selection Section
@@ -74,7 +74,7 @@ public struct SettingsView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
 
-                        // 2. Appearance & Theme Selection Card (Középen a Nyelv és Indítás között)
+                        // 2. Appearance & Theme Selection Card
                         VStack(alignment: .leading, spacing: 14) {
                             HStack(spacing: 8) {
                                 Image(systemName: "circle.lefthalf.filled")
@@ -100,48 +100,46 @@ public struct SettingsView: View {
                         .padding(20)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
-
-                        // 3. Launch at Login & Start Minimized Section
-                        VStack(alignment: .leading, spacing: 14) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "power.circle.fill")
-                                    .font(.title2)
-                                    .foregroundStyle(OtterTheme.oceanicTeal)
-                                Text(L10n.t(.settingsStartupSection))
-                                    .font(.title3.bold())
-                            }
-
-                            Text(L10n.t(.settingsLaunchAtLoginDesc))
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-
-                            Spacer(minLength: 4)
-
-                            Toggle(isOn: launchAtLoginBinding) {
-                                Text(L10n.t(.settingsLaunchAtLoginToggle))
-                                    .font(.body.weight(.medium))
-                            }
-                            .toggleStyle(.switch)
-
-                            Divider()
-                                .padding(.vertical, 2)
-
-                            Toggle(isOn: startMinimizedBinding) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(L10n.t(.settingsStartMinimizedToggle))
-                                        .font(.body.weight(.medium))
-                                    Text(L10n.t(.settingsStartMinimizedDesc))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .toggleStyle(.switch)
-                        }
-                        .padding(20)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
                     }
                 }
+
+                // 3. Launch at Login & Start Minimized Section
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "power.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(OtterTheme.oceanicTeal)
+                        Text(L10n.t(.settingsStartupSection))
+                            .font(.title3.bold())
+                    }
+
+                    Text(L10n.t(.settingsLaunchAtLoginDesc))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+
+                    Toggle(isOn: launchAtLoginBinding) {
+                        Text(L10n.t(.settingsLaunchAtLoginToggle))
+                            .font(.body.weight(.medium))
+                    }
+                    .toggleStyle(.switch)
+
+                    Divider()
+                        .padding(.vertical, 2)
+
+                    Toggle(isOn: startMinimizedBinding) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L10n.t(.settingsStartMinimizedToggle))
+                                .font(.body.weight(.medium))
+                            Text(L10n.t(.settingsStartMinimizedDesc))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(.switch)
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
 
                 // 4. Persistent Files & Storage Section
                 persistentFilesSection
