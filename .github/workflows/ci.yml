@@ -45,6 +45,12 @@ jobs:
         # failure (see scripts/test.sh) and reports real test failures immediately.
         run: scripts/test.sh -c release
 
+      - name: Package App Dry-Run Verification
+        # Verifies that app bundle structure, Info.plist, completions, and Sparkle.framework assemble cleanly
+        run: |
+          chmod +x scripts/package_app.sh
+          SKIP_REGISTER=1 ./scripts/package_app.sh release /tmp
+
       - name: Formatting report (advisory)
         # The repository still carries ~2.7k pre-existing style violations, so this step
         # reports them instead of failing. Use scripts/format.sh to fix touched files.

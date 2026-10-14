@@ -1076,6 +1076,51 @@ public enum L10n {
         case welcomeSanctuaryTitle
         case welcomeSanctuarySubtitle
         case createFirstProfileButton
+
+        // MARK: - 2.0.0 Core Engine & Resilience
+        case executionModeScheduled
+        case executionModeContinuous
+        case continuousDebounceLabel
+        case continuousDebounceDesc
+        case powerGovernorHeader
+        case pauseOnBatteryLabel
+        case pauseOnBatteryDesc
+        case throttleOnThermalLabel
+        case throttleOnThermalDesc
+        case canaryTrapHeader
+        case enableCanaryTrapsLabel
+        case enableCanaryTrapsDesc
+        case localEncryptionHeader
+        case enableLocalEncryptionLabel
+        case enableLocalEncryptionDesc
+        case canaryTrapTriggeredAlertTitle
+        case canaryTrapTriggeredAlertMessage
+
+        // MARK: - 2.0.0 Multi-Drive & Storage
+        case multiDriveRotationTitle
+        case multiDriveRotationDesc
+        case dedupCdcTitle
+        case dedupCdcDesc
+
+        // MARK: - 2.0.0 Sanctuary Onboarding & Scrubber
+        case onboardingWelcomeTitle
+        case onboardingWelcomeDesc
+        case onboardingStepFDA
+        case onboardingStepProfile
+        case onboardingStepSchedule
+        case onboardingStepFinish
+        case onboardingContinue
+        case onboardingSkip
+        case onboardingFinish
+        case timelineScrubberTitle
+        case smartHeroTitle
+        case smartHeroHealthy
+        case smartHeroWarning
+        case presetExclusionsTitle
+        case presetExclusionNodeModules
+        case presetExclusionXcode
+        case presetExclusionPython
+        case presetExclusionMediaCaches
     }
 
 

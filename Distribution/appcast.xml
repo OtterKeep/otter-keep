@@ -2,16 +2,16 @@
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/sparrow/rss" xmlns:dc="http://purl.org/dc/elements/1.1/">
     <channel>
         <title>OtterKeep Changelog</title>
-        <link>https://github.com/richardeszeshu/otter-keep</link>
+        <link>https://github.com/OtterKeep/otter-keep</link>
         <description>Most recent updates and releases for OtterKeep on macOS.</description>
         <language>en</language>
         <item>
             <title>Version 2.0.0</title>
             <pubDate>Tue, 13 Oct 2026 20:40:00 +0000</pubDate>
-            <sparkle:releaseNotesLink>https://github.com/richardeszeshu/otter-keep/releases/tag/v2.0.0</sparkle:releaseNotesLink>
+            <sparkle:releaseNotesLink>https://github.com/OtterKeep/otter-keep/releases/tag/v2.0.0</sparkle:releaseNotesLink>
             <description><![CDATA[OtterKeep 2.0.0 release: Clean Architecture (Ports & Adapters) transition, decoupled Domain and Application layers, abstract repository and storage interfaces, and foundational architectural refactoring.]]></description>
             <enclosure
-                url="https://github.com/richardeszeshu/otter-keep/releases/download/v2.0.0/OtterKeep-2.0.0.zip"
+                url="https://github.com/OtterKeep/otter-keep/releases/download/v2.0.0/OtterKeep-2.0.0.zip"
                 sparkle:version="2000"
                 sparkle:shortVersionString="2.0.0"
                 length="11600000"
@@ -20,10 +20,10 @@
         <item>
             <title>Version 1.7.1</title>
             <pubDate>Tue, 13 Oct 2026 18:30:00 +0000</pubDate>
-            <sparkle:releaseNotesLink>https://github.com/richardeszeshu/otter-keep/releases/tag/v1.7.1</sparkle:releaseNotesLink>
+            <sparkle:releaseNotesLink>https://github.com/OtterKeep/otter-keep/releases/tag/v1.7.1</sparkle:releaseNotesLink>
             <description><![CDATA[OtterKeep 1.7.1 architectural modularization and decomposition release: decomposed monolithic classes (Localization, DatabaseEngine, OtterKeepCLI, BackupSessionCoordinator, AppState, BackupCopyJobCoordinator, and SwiftUI views) into focused functional extensions and domain records under strict Swift 6 concurrency.]]></description>
             <enclosure
-                url="https://github.com/richardeszeshu/otter-keep/releases/download/v1.7.1/OtterKeep-1.7.1.zip"
+                url="https://github.com/OtterKeep/otter-keep/releases/download/v1.7.1/OtterKeep-1.7.1.zip"
                 sparkle:version="1701"
                 sparkle:shortVersionString="1.7.1"
                 length="11590000"
@@ -32,10 +32,10 @@
         <item>
             <title>Version 1.7.0</title>
             <pubDate>Fri, 09 Oct 2026 18:30:00 +0000</pubDate>
-            <sparkle:releaseNotesLink>https://github.com/richardeszeshu/otter-keep/releases/tag/v1.7.0</sparkle:releaseNotesLink>
+            <sparkle:releaseNotesLink>https://github.com/OtterKeep/otter-keep/releases/tag/v1.7.0</sparkle:releaseNotesLink>
             <description><![CDATA[OtterKeep 1.7.0 backend maintenance release: architectural layering hardening, removal of compatibility shims and legacy generators, unified SnapshotCatalogService, centralized 3-2-1 ComplianceEvaluator, subprocess environment isolation, and strict SQLite file security.]]></description>
             <enclosure
-                url="https://github.com/richardeszeshu/otter-keep/releases/download/v1.7.0/OtterKeep-1.7.0.zip"
+                url="https://github.com/OtterKeep/otter-keep/releases/download/v1.7.0/OtterKeep-1.7.0.zip"
                 sparkle:version="1700"
                 sparkle:shortVersionString="1.7.0"
                 length="11580000"
@@ -44,10 +44,10 @@
         <item>
             <title>Version 1.6.0</title>
             <pubDate>Thu, 08 Oct 2026 22:30:00 +0000</pubDate>
-            <sparkle:releaseNotesLink>https://github.com/richardeszeshu/otter-keep/releases/tag/v1.6.0</sparkle:releaseNotesLink>
+            <sparkle:releaseNotesLink>https://github.com/OtterKeep/otter-keep/releases/tag/v1.6.0</sparkle:releaseNotesLink>
             <description><![CDATA[OtterKeep 1.6.0 release with Native macOS HIG & Sanctuary GUI Polish, 3-tab segmented Profile Rules & Maintenance workspace, dynamic 3D Pixar Ottie Sanctuary Mascot (Safe, Warning, Danger states), integrated Storage Forecast telemetry, direct Pipeline folder management, profile-switching last backup status awareness, reactivated Snapshot Timeline Mode, QuickLook integration, keyboard shortcuts, and System Notification on software update discovery.]]></description>
             <enclosure
-                url="https://github.com/richardeszeshu/otter-keep/releases/download/v1.6.0/OtterKeep-1.6.0.zip"
+                url="https://github.com/OtterKeep/otter-keep/releases/download/v1.6.0/OtterKeep-1.6.0.zip"
                 sparkle:version="1600"
                 sparkle:shortVersionString="1.6.0"
                 length="11570000"
@@ -56,10 +56,10 @@
         <item>
             <title>Version 1.5.0</title>
             <pubDate>Thu, 08 Oct 2026 19:30:00 +0000</pubDate>
-            <sparkle:releaseNotesLink>https://github.com/richardeszeshu/otter-keep/releases/tag/v1.5.0</sparkle:releaseNotesLink>
+            <sparkle:releaseNotesLink>https://github.com/OtterKeep/otter-keep/releases/tag/v1.5.0</sparkle:releaseNotesLink>
             <description><![CDATA[OtterKeep 1.5.0 release with Side-by-Side Diff, Bit-rot Scrubber, WORM Immutability, Backblaze B2, Parallel Multi-Destination, and Dataless iCloud optimization.]]></description>
             <enclosure
-                url="https://github.com/richardeszeshu/otter-keep/releases/download/v1.5.0/OtterKeep-1.5.0.zip"
+                url="https://github.com/OtterKeep/otter-keep/releases/download/v1.5.0/OtterKeep-1.5.0.zip"
                 sparkle:version="1500"
                 sparkle:shortVersionString="1.5.0"
                 length="11550000"
@@ -68,10 +68,10 @@
         <item>
             <title>Version 1.4.0</title>
             <pubDate>Wed, 07 Oct 2026 20:01:04 +0000</pubDate>
-            <sparkle:releaseNotesLink>https://github.com/richardeszeshu/otter-keep/releases/tag/v1.4.0</sparkle:releaseNotesLink>
+            <sparkle:releaseNotesLink>https://github.com/OtterKeep/otter-keep/releases/tag/v1.4.0</sparkle:releaseNotesLink>
             <description><![CDATA[OtterKeep 1.4.0 release.]]></description>
             <enclosure
-                url="https://github.com/richardeszeshu/otter-keep/releases/download/v1.4.0/OtterKeep-1.4.0.zip"
+                url="https://github.com/OtterKeep/otter-keep/releases/download/v1.4.0/OtterKeep-1.4.0.zip"
                 sparkle:version="1400"
                 sparkle:shortVersionString="1.4.0"
                 length="11548985"
@@ -80,10 +80,10 @@
         <item>
             <title>Version 1.3.1</title>
             <pubDate>Sun, 04 Oct 2026 08:46:25 +0000</pubDate>
-            <sparkle:releaseNotesLink>https://github.com/richardeszeshu/otter-keep/releases/tag/v1.3.1</sparkle:releaseNotesLink>
+            <sparkle:releaseNotesLink>https://github.com/OtterKeep/otter-keep/releases/tag/v1.3.1</sparkle:releaseNotesLink>
             <description><![CDATA[OtterKeep 1.3.1 release.]]></description>
             <enclosure
-                url="https://github.com/richardeszeshu/otter-keep/releases/download/v1.3.1/OtterKeep-1.3.1.zip"
+                url="https://github.com/OtterKeep/otter-keep/releases/download/v1.3.1/OtterKeep-1.3.1.zip"
                 sparkle:version="1310"
                 sparkle:shortVersionString="1.3.1"
                 length="11539008"
@@ -92,10 +92,10 @@
         <item>
             <title>Version 1.3.0</title>
             <pubDate>Sat, 03 Oct 2026 14:26:00 +0000</pubDate>
-            <sparkle:releaseNotesLink>https://github.com/richardeszeshu/otter-keep/releases/tag/v1.3.0</sparkle:releaseNotesLink>
+            <sparkle:releaseNotesLink>https://github.com/OtterKeep/otter-keep/releases/tag/v1.3.0</sparkle:releaseNotesLink>
             <description><![CDATA[OtterKeep 1.3.0 — Multi-Filesystem Driver Architecture (NTFS & exFAT Support) & Subsystem Versioning.]]></description>
             <enclosure
-                url="https://github.com/richardeszeshu/otter-keep/releases/download/v1.3.0/OtterKeep-1.3.0.zip"
+                url="https://github.com/OtterKeep/otter-keep/releases/download/v1.3.0/OtterKeep-1.3.0.zip"
                 sparkle:version="1300"
                 sparkle:shortVersionString="1.3.0"
                 length="10113401"
@@ -104,10 +104,10 @@
         <item>
             <title>Version 1.2.0</title>
             <pubDate>Sat, 03 Oct 2026 11:51:15 +0000</pubDate>
-            <sparkle:releaseNotesLink>https://github.com/richardeszeshu/otter-keep/releases/tag/v1.2.0</sparkle:releaseNotesLink>
+            <sparkle:releaseNotesLink>https://github.com/OtterKeep/otter-keep/releases/tag/v1.2.0</sparkle:releaseNotesLink>
             <description><![CDATA[OtterKeep 1.2.0 release.]]></description>
             <enclosure
-                url="https://github.com/richardeszeshu/otter-keep/releases/download/v1.2.0/OtterKeep-1.2.0.zip"
+                url="https://github.com/OtterKeep/otter-keep/releases/download/v1.2.0/OtterKeep-1.2.0.zip"
                 sparkle:version="1200"
                 sparkle:shortVersionString="1.2.0"
                 length="10064242"
@@ -116,10 +116,10 @@
         <item>
             <title>Version 1.1.1</title>
             <pubDate>Sat, 03 Oct 2026 10:49:54 +0000</pubDate>
-            <sparkle:releaseNotesLink>https://github.com/richardeszeshu/otter-keep/releases/tag/v1.1.1</sparkle:releaseNotesLink>
+            <sparkle:releaseNotesLink>https://github.com/OtterKeep/otter-keep/releases/tag/v1.1.1</sparkle:releaseNotesLink>
             <description><![CDATA[OtterKeep 1.1.1 — Critical Software Update Fix & Resilient Updater. Resolves repository endpoints, robust Sparkle Appcast SAX XML parsing, cumulative feed updates, and GitHub Releases API automatic fallback.]]></description>
             <enclosure
-                url="https://github.com/richardeszeshu/otter-keep/releases/download/v1.1.1/OtterKeep-1.1.1.zip"
+                url="https://github.com/OtterKeep/otter-keep/releases/download/v1.1.1/OtterKeep-1.1.1.zip"
                 sparkle:version="1110"
                 sparkle:shortVersionString="1.1.1"
                 length="9981428"
@@ -128,10 +128,10 @@
         <item>
             <title>Version 1.1.0</title>
             <pubDate>Sat, 03 Oct 2026 09:19:43 +0000</pubDate>
-            <sparkle:releaseNotesLink>https://github.com/richardeszeshu/otter-keep/releases/tag/v1.1.0</sparkle:releaseNotesLink>
+            <sparkle:releaseNotesLink>https://github.com/OtterKeep/otter-keep/releases/tag/v1.1.0</sparkle:releaseNotesLink>
             <description><![CDATA[OtterKeep 1.1.0 — macOS Golden Gate Design System Refresh. Features liquid glass materials, responsive 4-tile destination selector, refined floating About window, and CLI version breakdown.]]></description>
             <enclosure
-                url="https://github.com/richardeszeshu/otter-keep/releases/download/v1.1.0/OtterKeep-1.1.0.zip"
+                url="https://github.com/OtterKeep/otter-keep/releases/download/v1.1.0/OtterKeep-1.1.0.zip"
                 sparkle:version="1100"
                 sparkle:shortVersionString="1.1.0"
                 length="9919084"
@@ -140,10 +140,10 @@
         <item>
             <title>Version 1.0.0</title>
             <pubDate>Sat, 03 Oct 2026 08:12:53 +0000</pubDate>
-            <sparkle:releaseNotesLink>https://github.com/richardeszeshu/otter-keep/releases/tag/v1.0.0</sparkle:releaseNotesLink>
+            <sparkle:releaseNotesLink>https://github.com/OtterKeep/otter-keep/releases/tag/v1.0.0</sparkle:releaseNotesLink>
             <description><![CDATA[OtterKeep 1.0.0 — Official Production Release. Zero-cost APFS copy-on-write backups, Apple Photos incremental archiving, ransomware shield, and client-side AES-256-GCM encrypted replication.]]></description>
             <enclosure
-                url="https://github.com/richardeszeshu/otter-keep/releases/download/v1.0.0/OtterKeep-1.0.0.zip"
+                url="https://github.com/OtterKeep/otter-keep/releases/download/v1.0.0/OtterKeep-1.0.0.zip"
                 sparkle:version="1000"
                 sparkle:shortVersionString="1.0.0"
                 length="9885028"

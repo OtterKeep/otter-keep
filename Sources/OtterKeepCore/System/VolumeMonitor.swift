@@ -161,6 +161,48 @@ public enum VolumeCapabilityEvaluator {
     }
 }
 
+/// Zero-configuration adoption and drive rotation metadata stamped on external backup storage targets.
+public struct DriveProfileMetadata: Codable, Sendable, Equatable {
+    public static let fileName = ".otterkeep_profile_meta.json"
+
+    public let profileId: UUID
+    public let profileName: String
+    public let createdAt: Date
+    public let sanctuaryVersion: String
+
+    public init(
+        profileId: UUID,
+        profileName: String,
+        createdAt: Date = Date(),
+        sanctuaryVersion: String = CoreEngine.version
+    ) {
+        self.profileId = profileId
+        self.profileName = profileName
+        self.createdAt = createdAt
+        self.sanctuaryVersion = sanctuaryVersion
+    }
+
+    /// Writes profile metadata to the target destination folder.
+    public static func write(for profile: BackupProfile, to destinationURL: URL) {
+        let meta = DriveProfileMetadata(profileId: profile.id, profileName: profile.name)
+        let fileURL = destinationURL.appendingPathComponent(fileName)
+        if let data = try? JSONEncoder().encode(meta) {
+            try? data.write(to: fileURL, options: .atomic)
+        }
+    }
+
+    /// Reads profile metadata from a given root or folder URL.
+    public static func read(from folderURL: URL) -> DriveProfileMetadata? {
+        let fileURL = folderURL.appendingPathComponent(fileName)
+        guard FileManager.default.fileExists(atPath: fileURL.path(percentEncoded: false)),
+              let data = try? Data(contentsOf: fileURL),
+              let meta = try? JSONDecoder().decode(DriveProfileMetadata.self, from: data) else {
+            return nil
+        }
+        return meta
+    }
+}
+
 /// Thread-safe monitor listening to macOS volume mount and unmount notifications.
 public final class VolumeMonitor: @unchecked Sendable {
     /// Shared singleton instance.
@@ -205,6 +247,7 @@ public final class VolumeMonitor: @unchecked Sendable {
     }
 
     /// Evaluates whether a mounted volume corresponds to any profile's destination with mount trigger enabled.
+    /// Supports direct path matches, registered multi-drive rotation volume UUIDs, and zero-config adoption tags.
     /// Enforces a cooldown (default: 15 minutes / 900 seconds) to prevent redundant runs.
     public func evaluateMountForAutoBackup(
         mountedURL: URL,
@@ -218,10 +261,23 @@ public final class VolumeMonitor: @unchecked Sendable {
         var triggeredProfiles: [BackupProfile] = []
         let now = Date()
 
+        // Extract volume UUID if available
+        let volumeUUID = (try? mountedURL.resourceValues(forKeys: [.volumeUUIDStringKey]))?.volumeUUIDString
+
+        // Check for zero-config adoption tag at root of mounted drive
+        let rootMeta = DriveProfileMetadata.read(from: mountedURL)
+
         for profile in profiles where profile.backupOnVolumeMount {
             let destPath = BackupProfile.canonicalizePath(profile.destinationURL.standardizedFileURL.path(percentEncoded: false))
-            let matches = destPath == mountedPath || destPath.hasPrefix(mountedPath + "/")
-            if matches {
+            let pathMatches = destPath == mountedPath || destPath.hasPrefix(mountedPath + "/")
+
+            // Check multi-drive rotation UUID match
+            let uuidMatches = volumeUUID != nil && profile.destinationVolumeUUIDs.contains(volumeUUID!)
+
+            // Check zero-config adoption tag match
+            let metaMatches = rootMeta?.profileId == profile.id
+
+            if pathMatches || uuidMatches || metaMatches {
                 let cacheKey = "\(profile.id.uuidString)_\(mountedPath)"
                 if let lastDate = lastTriggeredPerVolume[cacheKey], now.timeIntervalSince(lastDate) < cooldownSeconds {
                     LogManager.shared.log("Skipping mount backup trigger for '\(profile.name)': Cooldown active (\(Int(now.timeIntervalSince(lastDate)))s elapsed).", level: .debug, category: "Storage")

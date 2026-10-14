@@ -48,6 +48,11 @@ public struct RestoreExplorerView: View {
             // Top Bar: Mode Selector (Snapshot vs. Timeline)
             headerModeSelector
 
+            // Visual Timeline Scrubber
+            if appState.restoreBrowseMode == .snapshot || appState.restoreBrowseMode == .timeline {
+                VisualTimelineScrubberView(appState: appState)
+            }
+
             Divider()
 
             // View content based on selected mode

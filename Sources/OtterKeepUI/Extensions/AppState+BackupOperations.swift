@@ -23,6 +23,11 @@ extension AppState {
     }
 
     public func checkForSoftwareUpdates(silent: Bool = false) {
+        if !silent, let native = onCheckForUpdatesNative {
+            native()
+            return
+        }
+
         guard !isCheckingForSoftwareUpdates else { return }
         isCheckingForSoftwareUpdates = true
         if !silent {

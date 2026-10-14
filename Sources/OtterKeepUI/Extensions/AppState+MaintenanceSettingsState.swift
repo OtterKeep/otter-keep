@@ -31,6 +31,11 @@ extension AppState {
         get { maintenanceSettings.softwareUpdateAvailableInfo }
         set { maintenanceSettings.softwareUpdateAvailableInfo = newValue }
     }
+    /// Native update callback (e.g. Sparkle).
+    public var onCheckForUpdatesNative: (@MainActor () -> Void)? {
+        get { maintenanceSettings.onCheckForUpdatesNative }
+        set { maintenanceSettings.onCheckForUpdatesNative = newValue }
+    }
 
     // MARK: - Pre-backup Simulation (Dry-Run)
     /// Indicates an ongoing dry-run simulation.
@@ -73,6 +78,8 @@ extension AppState {
     public var inspectorSearchQuery: String { get { maintenanceSettings.inspectorSearchQuery } set { maintenanceSettings.inspectorSearchQuery = newValue } }
 
     // MARK: - Profile Management Dialogs
+    /// Controls presentation of the 4-step Sanctuary Onboarding Wizard modal.
+    public var showOnboardingModal: Bool { get { maintenanceSettings.showOnboardingModal } set { maintenanceSettings.showOnboardingModal = newValue } }
     /// Controls presentation of the new profile sheet.
     public var showNewProfileSheet: Bool { get { maintenanceSettings.showNewProfileSheet } set { maintenanceSettings.showNewProfileSheet = newValue } }
     /// Draft profile name.

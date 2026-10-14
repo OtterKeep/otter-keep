@@ -36,6 +36,9 @@ public final class MaintenanceSettingsStore: Sendable {
     /// Metadata of an available software update.
     public var softwareUpdateAvailableInfo: SoftwareUpdateInfo? = nil
 
+    /// Native update checker callback (e.g. Sparkle).
+    public var onCheckForUpdatesNative: (@MainActor () -> Void)? = nil
+
     // MARK: - Pre-backup Simulation (Dry-Run)
 
     /// Indicates an ongoing dry-run simulation.
@@ -86,6 +89,16 @@ public final class MaintenanceSettingsStore: Sendable {
     public var inspectorSearchQuery: String = ""
 
     // MARK: - Profile Management Dialogs
+
+    /// Controls presentation of the 4-step Sanctuary Onboarding Wizard modal.
+    public var showOnboardingModal: Bool = false
+    public var onboardingCurrentStep: Int = 0
+    public var onboardingProfileName: String = ""
+    public var onboardingSourceURL: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents")
+    public var onboardingDestinationURL: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("OtterKeep_Backups")
+    public var onboardingIsContinuousMode: Bool = false
+    public var onboardingEnableCanaryTraps: Bool = true
+    public var onboardingHasFDAPermission: Bool = false
 
     /// Controls presentation of the new profile sheet.
     public var showNewProfileSheet: Bool = false

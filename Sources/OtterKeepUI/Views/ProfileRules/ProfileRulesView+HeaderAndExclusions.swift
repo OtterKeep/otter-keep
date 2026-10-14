@@ -141,6 +141,36 @@ extension ProfileRulesView {
                     }
                 }
 
+                // Technology Stack Presets
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L10n.t(.presetExclusionsTitle))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    FlowLayout(spacing: OtterTheme.spacing6) {
+                        stackPresetChip(
+                            title: L10n.t(.presetExclusionNodeModules),
+                            patterns: ["node_modules", ".next", ".nuxt", "dist"],
+                            profile: profile
+                        )
+                        stackPresetChip(
+                            title: L10n.t(.presetExclusionXcode),
+                            patterns: ["DerivedData", ".build", "Pods"],
+                            profile: profile
+                        )
+                        stackPresetChip(
+                            title: L10n.t(.presetExclusionPython),
+                            patterns: [".venv", "venv", "__pycache__", "*.pyc"],
+                            profile: profile
+                        )
+                        stackPresetChip(
+                            title: L10n.t(.presetExclusionMediaCaches),
+                            patterns: ["Cache", "Caches", "Render Files"],
+                            profile: profile
+                        )
+                    }
+                }
+
                 Divider()
 
                 // Active exclusion tags
@@ -224,5 +254,25 @@ extension ProfileRulesView {
         }
     }
 
+    private func stackPresetChip(title: String, patterns: [String], profile: BackupProfile) -> some View {
+        let allAdded = patterns.allSatisfy { profile.excludePatterns.contains($0) }
+        return Button {
+            for p in patterns where !profile.excludePatterns.contains(p) {
+                appState.addExcludePattern(p)
+            }
+        } label: {
+            HStack(spacing: 4) {
+                if allAdded {
+                    Image(systemName: "checkmark")
+                        .font(.caption2)
+                }
+                Text(title)
+            }
+            .font(.caption)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .disabled(allAdded)
+    }
 
 }

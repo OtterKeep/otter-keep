@@ -15,9 +15,11 @@ let package = Package(
         .library(name: "OtterKeepUI", targets: ["OtterKeepUI"]),
         .executable(name: "OtterKeepFinderSyncExtension", targets: ["OtterKeepFinderSyncExtension"]),
         .executable(name: "otterkeep", targets: ["OtterKeepCLI"]),
-        .executable(name: "OtterKeepApp", targets: ["OtterKeepApp"])
     ],
-    dependencies: [],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
+        .package(url: "https://github.com/sparkle-project/Sparkle.git", from: "2.6.0")
+    ],
     targets: [
         // MARK: - Domain Layer (Pure Domain Entities & Invariants)
         .target(
@@ -117,7 +119,8 @@ let package = Package(
                 "OtterKeepApplication",
                 "OtterKeepStorage",
                 "OtterKeepDatabase",
-                "OtterKeepCore"
+                "OtterKeepCore",
+                .product(name: "ArgumentParser", package: "swift-argument-parser")
             ],
             path: "Sources/OtterKeepCLI",
             swiftSettings: [
@@ -128,7 +131,11 @@ let package = Package(
         // MARK: - App Executable
         .executableTarget(
             name: "OtterKeepApp",
-            dependencies: ["OtterKeepCore", "OtterKeepUI"],
+            dependencies: [
+                "OtterKeepCore",
+                "OtterKeepUI",
+                .product(name: "Sparkle", package: "Sparkle")
+            ],
             path: "Sources/OtterKeepApp",
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency")

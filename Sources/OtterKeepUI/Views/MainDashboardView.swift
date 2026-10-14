@@ -206,6 +206,35 @@ public struct MainDashboardView: View {
                             .foregroundStyle(.secondary)
                     }
 
+                    // S.M.A.R.T. Drive Health & Mode Badge
+                    HStack(spacing: 8) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.shield.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(OtterTheme.statusGreen)
+                            Text(L10n.t(.smartHeroHealthy))
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(OtterTheme.statusGreen)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(OtterTheme.statusGreen.opacity(0.12), in: Capsule())
+
+                        if profile.executionMode.isContinuous {
+                            HStack(spacing: 4) {
+                                Image(systemName: "bolt.fill")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(OtterTheme.oceanicTeal)
+                                Text(L10n.t(.executionModeContinuous))
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(OtterTheme.oceanicTeal)
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(OtterTheme.oceanicTeal.opacity(0.12), in: Capsule())
+                        }
+                    }
+
                     // Integrated Storage Forecast Telemetry Strip
                     if let forecast = forecast {
                         HStack(spacing: 12) {

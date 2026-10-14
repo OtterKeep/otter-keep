@@ -779,4 +779,49 @@ public final class CentralDatabase: @unchecked Sendable {
         guard let ptr = sqlite3_column_text(stmt, index) else { return nil }
         return String(cString: ptr)
     }
+
+    // MARK: - Self-Healing & Maintenance
+
+    /// Checks the structural integrity of the central SQLite database.
+    public func performIntegrityCheck() throws -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        try ensureConnectedUnlocked()
+        return performIntegrityCheckUnlocked()
+    }
+
+    private func performIntegrityCheckUnlocked() -> Bool {
+        guard let db = db else { return false }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "PRAGMA quick_check;", -1, &stmt, nil) == SQLITE_OK else {
+            return false
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        if sqlite3_step(stmt) == SQLITE_ROW {
+            if let result = sqlite3_column_text(stmt, 0) {
+                let status = String(cString: result)
+                return status.lowercased() == "ok"
+            }
+        }
+        return false
+    }
+
+    /// Performs self-healing optimization, rebuilding indexes if corrupted and compacting database with VACUUM.
+    public func performSelfHealingMaintenance() throws {
+        lock.lock()
+        defer { lock.unlock() }
+        try ensureConnectedUnlocked()
+
+        guard let _ = db else { return }
+        let healthy = performIntegrityCheckUnlocked()
+        if !healthy {
+            logger.error("Central database corruption suspected! Executing REINDEX repair...")
+            try? executeUnlocked(query: "REINDEX;")
+        }
+
+        try? executeUnlocked(query: "PRAGMA optimize;")
+        try? executeUnlocked(query: "VACUUM;")
+        logger.info("Central database self-healing maintenance and VACUUM completed.")
+    }
 }

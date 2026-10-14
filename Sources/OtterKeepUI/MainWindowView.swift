@@ -134,6 +134,12 @@ public struct MainWindowView: View {
         )) {
             DeleteProfileConfirmationModalView(appState: appState)
         }
+        .sheet(isPresented: Binding(
+            get: { appState.showOnboardingModal },
+            set: { appState.showOnboardingModal = $0 }
+        )) {
+            SanctuaryOnboardingModalView(appState: appState)
+        }
         .alert(L10n.t(.renameProfileSheetTitle), isPresented: Binding(
             get: { appState.showRenameProfileSheet },
             set: { appState.showRenameProfileSheet = $0 }

@@ -192,14 +192,14 @@ public struct OtterKeepMenuCommands: Commands {
         // MARK: - Help (Súgó)
         CommandGroup(replacing: .help) {
             Button(L10n.t(.menuDocumentation)) {
-                if let url = URL(string: "https://github.com/richardeszeshu/otter-keep#readme") {
+                if let url = URL(string: "https://github.com/OtterKeep/otter-keep#readme") {
                     NSWorkspace.shared.open(url)
                 }
             }
             .keyboardShortcut("?", modifiers: .command)
 
             Button(L10n.t(.menuReleaseNotes)) {
-                if let url = URL(string: "https://github.com/richardeszeshu/otter-keep/releases") {
+                if let url = URL(string: "https://github.com/OtterKeep/otter-keep/releases") {
                     NSWorkspace.shared.open(url)
                 }
             }
@@ -217,7 +217,7 @@ public struct OtterKeepMenuCommands: Commands {
             Divider()
 
             Button(L10n.t(.menuReportIssue)) {
-                if let url = URL(string: "https://github.com/richardeszeshu/otter-keep/issues") {
+                if let url = URL(string: "https://github.com/OtterKeep/otter-keep/issues") {
                     NSWorkspace.shared.open(url)
                 }
             }

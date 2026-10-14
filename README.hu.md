@@ -5,9 +5,9 @@
 
 [![macOS](https://img.shields.io/badge/macOS-15.0%2B%20%28Sequoia%29-blue.svg)](https://apple.com/macos)
 [![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org)
-[![Verzió](https://img.shields.io/badge/verzi%C3%B3-2.0.0-emerald.svg)](https://github.com/richardeszeshu/otter-keep/releases)
-[![Build](https://img.shields.io/badge/build-2000-cyan.svg)](https://github.com/richardeszeshu/otter-keep)
-[![Tesztek](https://img.shields.io/badge/tesztek-75%2F75%20sikeres-brightgreen.svg)](https://github.com/richardeszeshu/otter-keep)
+[![Verzió](https://img.shields.io/badge/verzi%C3%B3-2.0.0-emerald.svg)](https://github.com/OtterKeep/otter-keep/releases)
+[![Build](https://img.shields.io/badge/build-2000-cyan.svg)](https://github.com/OtterKeep/otter-keep)
+[![Tesztek](https://img.shields.io/badge/tesztek-82%2F82%20sikeres-brightgreen.svg)](https://github.com/OtterKeep/otter-keep)
 [![Licenc](https://img.shields.io/badge/licenc-MIT-lightgrey.svg)](LICENSE)
 [![English](https://img.shields.io/badge/English-README.md-blue.svg)](README.md)
 
@@ -105,13 +105,13 @@ A hagyományos, ventillátorzajt keltő és akkumulátort merítő mentőszoftve
 ### Homebrew Tap (Ajánlott)
 
 ```bash
-brew tap richardeszeshu/otter-keep
+brew tap OtterKeep/otterkeep
 brew install --cask otterkeep
 ```
 
 ### Közvetlen letöltés
 
-Töltse le az aláírt és hitelesített `.dmg` csomagot a [Kiadások (Releases)](https://github.com/richardeszeshu/otter-keep/releases) oldalról. Csatolja a lemezképet, majd húzza az `OtterKeep.app` ikont az `Alkalmazások` (Applications) mappába.
+Töltse le az aláírt és hitelesített `.dmg` csomagot a [Kiadások (Releases)](https://github.com/OtterKeep/otter-keep/releases) oldalról. Csatolja a lemezképet, majd húzza az `OtterKeep.app` ikont az `Alkalmazások` (Applications) mappába.
 
 ### Parancssori felület (CLI)
 

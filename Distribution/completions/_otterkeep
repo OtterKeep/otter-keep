@@ -1,0 +1,495 @@
+#compdef otterkeep
+
+__otterkeep_complete() {
+    local -ar non_empty_completions=("${@:#(|:*)}")
+    local -ar empty_completions=("${(M)@:#(|:*)}")
+    _describe -V '' non_empty_completions -- empty_completions -P $'\'\''
+}
+
+__otterkeep_custom_complete() {
+    local -a completions
+    completions=("${(@f)"$("${command_name}" "${@}" "${command_line[@]}")"}")
+    if [[ "${#completions[@]}" -gt 1 ]]; then
+        __otterkeep_complete "${completions[@]:0:-1}"
+    fi
+}
+
+__otterkeep_cursor_index_in_current_word() {
+    if [[ -z "${QIPREFIX}${IPREFIX}${PREFIX}" ]]; then
+        printf 0
+    else
+        printf %s "${#${(z)LBUFFER}[-1]}"
+    fi
+}
+
+_otterkeep() {
+    emulate -RL zsh -G
+    setopt extendedglob nullglob numericglobsort
+    unsetopt aliases banghist
+
+    local -xr SAP_SHELL=zsh
+    local -x SAP_SHELL_VERSION
+    SAP_SHELL_VERSION="$(builtin emulate zsh -c 'printf %s "${ZSH_VERSION}"')"
+    local -r SAP_SHELL_VERSION
+
+    local context state state_descr line
+    local -A opt_args
+
+    local -r command_name="${words[1]}"
+    local -ar command_line=("${words[@]}")
+    local -ir current_word_index="$((CURRENT - 1))"
+
+    local -i ret=1
+    local -ar arg_specs=(
+        '--lang[Application language\: en or hu]:lang:'
+        '--debug[Enable verbose debug file logging to ~/Library/Logs/OtterKeep/]'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+        '(-): :->command'
+        '(-)*:: :->arg'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+    case "${state}" in
+    command)
+        local -ar subcommands=(
+            'backup:Execute a backup session or pre-backup simulation.'
+            'restore:Restore individual files or folders from a historical snapshot.'
+            'restore-snapshot:Restore an entire snapshot hierarchy atomically.'
+            'profile:Manage backup profiles (list, show, create, delete).'
+            'schedule:Evaluate schedules and trigger due backups.'
+            'diagnostics:Generate system diagnostic reports and bundles.'
+            'status:Display status of all backup profiles.'
+            'replicate:Trigger 3-2-1 secondary replication (Backup Copy Job).'
+            'photos:Manage Apple Photos sanctuary backups.'
+            'prune:Prune obsolete historical snapshots.'
+            'daemon:Manage headless background daemon.'
+            'doctor:Run system diagnostics and check permissions.'
+            'snapshots:List recorded snapshots in the catalog.'
+            'file-history:Inspect historical versions of a file across snapshots.'
+            'logs:Inspect unified diagnostic logs.'
+            'scrub:Run cryptographic SHA-256 data scrubbing pass.'
+            'diff:Compare snapshots or file contents.'
+            'lock:Apply WORM immutability protection to a snapshot.'
+            'unlock:Remove user immutable flag from a snapshot.'
+            'help:Show subcommand help information.'
+        )
+        _describe -V subcommand subcommands && ret=0
+        ;;
+    arg)
+        case "${words[1]}" in
+        backup|restore|restore-snapshot|profile|schedule|diagnostics|status|replicate|photos|prune|daemon|doctor|snapshots|file-history|logs|scrub|diff|lock|unlock|help)
+            "_otterkeep_${words[1]}" && ret=0
+            ;;
+        esac
+        ;;
+    esac
+
+    return "${ret}"
+}
+
+_otterkeep_backup() {
+    local -i ret=1
+    local -ar arg_specs=(
+        ':profile-name:'
+        '--profile[Target backup profile name or UUID]:profile:'
+        '--dry-run[Perform non-destructive dry-run analysis]'
+        '--full[Force full baseline backup without CoW cloning]'
+        '--continuous[Run in continuous event-driven mode (FSEvents)]'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_restore() {
+    local -i ret=1
+    local -ar arg_specs=(
+        ':profile-name:'
+        '--profile[Target backup profile name or UUID]:profile:'
+        '--snapshot[Snapshot identifier to restore from]:snapshot:'
+        '--file[Relative path of file inside snapshot root]:file:'
+        '--target[Destination path where item will be restored]:target:'
+        '--collision[Collision resolution strategy (keepBoth, overwrite, skip)]:collision:'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_restore-snapshot() {
+    local -i ret=1
+    local -ar arg_specs=(
+        ':profile-name:'
+        '--profile[Target backup profile name or UUID]:profile:'
+        '--snapshot[Snapshot identifier to restore]:snapshot:'
+        '--target[Target destination directory]:target:'
+        '--collision[Collision resolution strategy (overwrite, keepBoth, skip)]:collision:'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_profile() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+        '(-): :->command'
+        '(-)*:: :->arg'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+    case "${state}" in
+    command)
+        local -ar subcommands=(
+            'list:List all configured profiles.'
+            'show:Show detailed profile configuration.'
+            'create:Create a new backup profile.'
+            'delete:Delete an existing backup profile.'
+        )
+        _describe -V subcommand subcommands && ret=0
+        ;;
+    arg)
+        case "${words[1]}" in
+        list|show|create|delete)
+            "_otterkeep_profile_${words[1]}" && ret=0
+            ;;
+        esac
+        ;;
+    esac
+
+    return "${ret}"
+}
+
+_otterkeep_profile_list() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_profile_show() {
+    local -i ret=1
+    local -ar arg_specs=(
+        ':name:'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_profile_create() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--name[Profile name]:name:'
+        '--source[Source folder path]:source:'
+        '--destination[Destination folder path]:destination:'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_profile_delete() {
+    local -i ret=1
+    local -ar arg_specs=(
+        ':name:'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_schedule() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+        '(-): :->command'
+        '(-)*:: :->arg'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+    case "${state}" in
+    command)
+        local -ar subcommands=(
+            'check:Check for overdue scheduled backups.'
+            'run:Run scheduled backup checks immediately.'
+        )
+        _describe -V subcommand subcommands && ret=0
+        ;;
+    arg)
+        case "${words[1]}" in
+        check|run)
+            "_otterkeep_schedule_${words[1]}" && ret=0
+            ;;
+        esac
+        ;;
+    esac
+
+    return "${ret}"
+}
+
+_otterkeep_schedule_check() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_schedule_run() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_diagnostics() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+        '(-): :->command'
+        '(-)*:: :->arg'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+    case "${state}" in
+    command)
+        local -ar subcommands=(
+            'bundle:Export sanitized diagnostic support bundle.'
+        )
+        _describe -V subcommand subcommands && ret=0
+        ;;
+    arg)
+        case "${words[1]}" in
+        bundle)
+            "_otterkeep_diagnostics_${words[1]}" && ret=0
+            ;;
+        esac
+        ;;
+    esac
+
+    return "${ret}"
+}
+
+_otterkeep_diagnostics_bundle() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--output[Target output path for zip archive]:output:'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_status() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_replicate() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--profile[Target profile name or UUID]:profile:'
+        '--snapshot[Target snapshot ID to replicate (defaults to latest)]:snapshot:'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_photos() {
+    local -i ret=1
+    local -ar arg_specs=(
+        ':action:'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_prune() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--profile[Target profile name or UUID]:profile:'
+        '--keep[Number of newest snapshots to retain]:keep:'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_daemon() {
+    local -i ret=1
+    local -ar arg_specs=(
+        ':action:'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_doctor() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_snapshots() {
+    local -i ret=1
+    local -ar arg_specs=(
+        ':action:'
+        '--profile[Target profile name or UUID]:profile:'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_file-history() {
+    local -i ret=1
+    local -ar arg_specs=(
+        ':path:'
+        '--gui[Open version history in macOS graphical interface]'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_logs() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--path[Print active log file path]'
+        '--list[List all recorded log files]'
+        '--enable[Enable debug file logging]'
+        '--disable[Disable debug file logging]'
+        '--limit[Number of log lines to show]:limit:'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_scrub() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--profile[Target profile name or UUID]:profile:'
+        '--limit[Limit count of recent snapshots to scrub]:limit:'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_diff() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--profile[Target profile name or UUID]:profile:'
+        '--target[Target snapshot ID (default\: latest)]:target:'
+        '--base[Base snapshot ID (default\: previous)]:base:'
+        '--file[Relative path of file to compare]:file:'
+        '--side-by-side[Render aligned side-by-side Myers LCS line comparison]'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_lock() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--snapshot[Snapshot identifier to lock]:snapshot:'
+        '--profile[Target profile name or UUID]:profile:'
+        '--days[Lock retention period in days (default\: 30)]:days:'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_unlock() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '--snapshot[Snapshot identifier to unlock]:snapshot:'
+        '--profile[Target profile name or UUID]:profile:'
+        '--version[Show the version.]'
+        '(-h --help)'{-h,--help}'[Show help information.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+_otterkeep_help() {
+    local -i ret=1
+    local -ar arg_specs=(
+        '*:subcommands:'
+        '--version[Show the version.]'
+    )
+    _arguments -w -s -S : "${arg_specs[@]}" && ret=0
+
+    return "${ret}"
+}
+
+if [[ "${funcstack[1]}" = _otterkeep ]]; then
+    _otterkeep "${@}"
+else
+    compdef _otterkeep otterkeep
+fi

@@ -164,6 +164,69 @@ public struct BackupSchedule: Codable, Sendable, Equatable {
     }
 }
 
+/// Execution mode governing whether backups are periodic on a schedule or continuously triggered upon filesystem changes.
+public enum BackupExecutionMode: Codable, Sendable, Equatable {
+    case scheduled(BackupSchedule)
+    case continuous(debouncingSeconds: Int)
+
+    public var isContinuous: Bool {
+        if case .continuous = self { return true }
+        return false
+    }
+
+    public var debouncingSeconds: Int {
+        switch self {
+        case .scheduled: return 30
+        case .continuous(let s): return s
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case type, schedule, debouncingSeconds
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decodeIfPresent(String.self, forKey: .type) ?? "scheduled"
+        if type == "continuous" {
+            let debounce = try container.decodeIfPresent(Int.self, forKey: .debouncingSeconds) ?? 30
+            self = .continuous(debouncingSeconds: debounce)
+        } else {
+            let sched = try container.decodeIfPresent(BackupSchedule.self, forKey: .schedule) ?? BackupSchedule()
+            self = .scheduled(sched)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .scheduled(let sched):
+            try container.encode("scheduled", forKey: .type)
+            try container.encode(sched, forKey: .schedule)
+        case .continuous(let debounce):
+            try container.encode("continuous", forKey: .type)
+            try container.encode(debounce, forKey: .debouncingSeconds)
+        }
+    }
+}
+
+/// Local encryption configuration for encrypted APFS Sparsebundle containers.
+public struct LocalEncryptionConfiguration: Codable, Sendable, Equatable {
+    public var isEnabled: Bool
+    public var keychainKeyIdentifier: String?
+    public var containerName: String
+
+    public init(
+        isEnabled: Bool = false,
+        keychainKeyIdentifier: String? = nil,
+        containerName: String = "OtterKeepSanctuary"
+    ) {
+        self.isEnabled = isEnabled
+        self.keychainKeyIdentifier = keychainKeyIdentifier
+        self.containerName = containerName
+    }
+}
+
 /// Model representing a user-defined backup profile configuration.
 public struct BackupProfile: Identifiable, Codable, Sendable, Equatable {
     /// Default localized profile name.
@@ -221,6 +284,18 @@ public struct BackupProfile: Identifiable, Codable, Sendable, Equatable {
     public var immutabilityLockDays: Int
     /// Whether secondary replication copy jobs are dispatched in parallel with local CoW backups.
     public var isParallelMultiDestinationEnabled: Bool
+    /// Execution mode: periodic scheduled or real-time continuous filesystem monitoring.
+    public var executionMode: BackupExecutionMode
+    /// Alternate authorized external volume UUIDs for multi-drive rotation.
+    public var destinationVolumeUUIDs: [String]
+    /// Whether to pause/defer backups when running on battery.
+    public var pauseOnBattery: Bool
+    /// Whether to throttle concurrency and I/O pacing during elevated thermal pressure.
+    public var throttleOnThermalPressure: Bool
+    /// Whether hidden canary files are planted and monitored to detect external ransomware tampering.
+    public var enableCanaryTraps: Bool
+    /// Optional local encrypted APFS Sparsebundle container configuration.
+    public var encryptionConfig: LocalEncryptionConfiguration?
 
     /// Initializes a `BackupProfile`.
     /// - Parameters:
@@ -249,6 +324,12 @@ public struct BackupProfile: Identifiable, Codable, Sendable, Equatable {
     ///   - isImmutabilityLockEnabled: True to lock snapshots with WORM immutability.
     ///   - immutabilityLockDays: Lock duration in days.
     ///   - isParallelMultiDestinationEnabled: True to replicate to targets in parallel.
+    ///   - executionMode: Execution mode (scheduled vs continuous).
+    ///   - destinationVolumeUUIDs: List of recognized drive UUIDs.
+    ///   - pauseOnBattery: Whether to pause on battery power.
+    ///   - throttleOnThermalPressure: Whether to throttle under thermal strain.
+    ///   - enableCanaryTraps: Whether canary traps are armed.
+    ///   - encryptionConfig: Local sparsebundle encryption configuration.
     public init(
         id: UUID = UUID(),
         name: String,
@@ -274,7 +355,13 @@ public struct BackupProfile: Identifiable, Codable, Sendable, Equatable {
         abortOnAnomaly: Bool = false,
         isImmutabilityLockEnabled: Bool = true,
         immutabilityLockDays: Int = 30,
-        isParallelMultiDestinationEnabled: Bool = true
+        isParallelMultiDestinationEnabled: Bool = true,
+        executionMode: BackupExecutionMode? = nil,
+        destinationVolumeUUIDs: [String] = [],
+        pauseOnBattery: Bool = false,
+        throttleOnThermalPressure: Bool = true,
+        enableCanaryTraps: Bool = false,
+        encryptionConfig: LocalEncryptionConfiguration? = nil
     ) {
         self.id = id
         self.name = name
@@ -301,6 +388,12 @@ public struct BackupProfile: Identifiable, Codable, Sendable, Equatable {
         self.isImmutabilityLockEnabled = isImmutabilityLockEnabled
         self.immutabilityLockDays = immutabilityLockDays
         self.isParallelMultiDestinationEnabled = isParallelMultiDestinationEnabled
+        self.executionMode = executionMode ?? .scheduled(schedule)
+        self.destinationVolumeUUIDs = destinationVolumeUUIDs
+        self.pauseOnBattery = pauseOnBattery
+        self.throttleOnThermalPressure = throttleOnThermalPressure
+        self.enableCanaryTraps = enableCanaryTraps
+        self.encryptionConfig = encryptionConfig
     }
 
     /// 3-2-1 Remote Backup Copy Job replication configuration.
@@ -312,6 +405,7 @@ public struct BackupProfile: Identifiable, Codable, Sendable, Equatable {
         case webhookConfig, quotaWarningThresholdGB, enableQuotaAlerts
         case enableRateOfChangeGuard, maxChangeThresholdPercent, maxDeletedThresholdCount, detectKnownRansomwareExtensions, abortOnAnomaly
         case isImmutabilityLockEnabled, immutabilityLockDays, isParallelMultiDestinationEnabled
+        case executionMode, destinationVolumeUUIDs, pauseOnBattery, throttleOnThermalPressure, enableCanaryTraps, encryptionConfig
     }
 
     /// Directory URL holding internal manifest and database artifacts (`<destination>/.otterkeep/`).
@@ -357,7 +451,13 @@ public struct BackupProfile: Identifiable, Codable, Sendable, Equatable {
 
         self.hashVerificationMode = try container.decodeIfPresent(HashVerificationMode.self, forKey: .hashVerificationMode) ?? .smartHash
         self.pruningPolicy = try container.decodeIfPresent(PruningPolicy.self, forKey: .pruningPolicy) ?? PruningPolicy()
-        self.schedule = try container.decodeIfPresent(BackupSchedule.self, forKey: .schedule) ?? BackupSchedule()
+        let decodedSchedule = try container.decodeIfPresent(BackupSchedule.self, forKey: .schedule) ?? BackupSchedule()
+        self.schedule = decodedSchedule
+        if let mode = try container.decodeIfPresent(BackupExecutionMode.self, forKey: .executionMode) {
+            self.executionMode = mode
+        } else {
+            self.executionMode = .scheduled(decodedSchedule)
+        }
         self.copyJobConfig = try container.decodeIfPresent(BackupCopyJobConfiguration.self, forKey: .copyJobConfig) ?? BackupCopyJobConfiguration()
         self.enableIgnoreFiles = try container.decodeIfPresent(Bool.self, forKey: .enableIgnoreFiles) ?? true
         self.respectGitIgnore = try container.decodeIfPresent(Bool.self, forKey: .respectGitIgnore) ?? false
@@ -374,6 +474,11 @@ public struct BackupProfile: Identifiable, Codable, Sendable, Equatable {
         self.isImmutabilityLockEnabled = try container.decodeIfPresent(Bool.self, forKey: .isImmutabilityLockEnabled) ?? true
         self.immutabilityLockDays = try container.decodeIfPresent(Int.self, forKey: .immutabilityLockDays) ?? 30
         self.isParallelMultiDestinationEnabled = try container.decodeIfPresent(Bool.self, forKey: .isParallelMultiDestinationEnabled) ?? true
+        self.destinationVolumeUUIDs = try container.decodeIfPresent([String].self, forKey: .destinationVolumeUUIDs) ?? []
+        self.pauseOnBattery = try container.decodeIfPresent(Bool.self, forKey: .pauseOnBattery) ?? false
+        self.throttleOnThermalPressure = try container.decodeIfPresent(Bool.self, forKey: .throttleOnThermalPressure) ?? true
+        self.enableCanaryTraps = try container.decodeIfPresent(Bool.self, forKey: .enableCanaryTraps) ?? false
+        self.encryptionConfig = try container.decodeIfPresent(LocalEncryptionConfiguration.self, forKey: .encryptionConfig)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -403,6 +508,12 @@ public struct BackupProfile: Identifiable, Codable, Sendable, Equatable {
         try container.encode(isImmutabilityLockEnabled, forKey: .isImmutabilityLockEnabled)
         try container.encode(immutabilityLockDays, forKey: .immutabilityLockDays)
         try container.encode(isParallelMultiDestinationEnabled, forKey: .isParallelMultiDestinationEnabled)
+        try container.encode(executionMode, forKey: .executionMode)
+        try container.encode(destinationVolumeUUIDs, forKey: .destinationVolumeUUIDs)
+        try container.encode(pauseOnBattery, forKey: .pauseOnBattery)
+        try container.encode(throttleOnThermalPressure, forKey: .throttleOnThermalPressure)
+        try container.encode(enableCanaryTraps, forKey: .enableCanaryTraps)
+        try container.encodeIfPresent(encryptionConfig, forKey: .encryptionConfig)
     }
 
 

@@ -130,7 +130,7 @@ Version **1.7.0** is a major backend maintenance, architectural stability, and s
   - Replaced alarmist `ABORT` badge with warm amber `Auto-Pause` (`Automatikus megállítás`) badge in `ProfileRulesView`.
   - Standardized diff modal footer to native "Close" (`Bezárás`) with Escape shortcut.
   - Added path hover tooltips and bordered button styling in `BackupPipelineView`.
-  - Corrected documentation and release URLs to `richardeszeshu/otter-keep`.
+  - Corrected documentation and release URLs to `OtterKeep/otter-keep`.
 - **macOS MenuBar Extra Overhaul**:
   - Pixel-perfect mascot template icon maintaining exact 18x18pt dimensions without width jitter.
   - Linear live progress bar with speed (`⚡ MB/s`), completion percentage, processed item counter, and remaining time.

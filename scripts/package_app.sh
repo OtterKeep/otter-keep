@@ -147,6 +147,12 @@ cat << EOF > "$APP_BUNDLE/Contents/Info.plist"
             </array>
         </dict>
     </array>
+    <key>SUFeedURL</key>
+    <string>https://raw.githubusercontent.com/OtterKeep/otter-keep/main/Distribution/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>f1K6iA545H/Q4qJ5+f/1sL7bL6lC55JmQo6W+9yE7yQ=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
     <key>NSServices</key>
     <array>
         <dict>
@@ -214,7 +220,7 @@ cat << EOF > "$APPEX_BUNDLE/Contents/Info.plist"
 </plist>
 EOF
 
-echo "📥 5. Installing binaries..."
+echo "📥 5. Installing binaries & embedded frameworks..."
 cp "$APP_BINARY" "$APP_BUNDLE/Contents/MacOS/OtterKeepApp"
 cp "$EXT_BINARY" "$APPEX_BUNDLE/Contents/MacOS/OtterKeepFinderSyncExtension"
 cp "$CLI_BINARY" "$APP_BUNDLE/Contents/MacOS/otterkeep"
@@ -222,7 +228,23 @@ chmod +x "$APP_BUNDLE/Contents/MacOS/OtterKeepApp"
 chmod +x "$APPEX_BUNDLE/Contents/MacOS/OtterKeepFinderSyncExtension"
 chmod +x "$APP_BUNDLE/Contents/MacOS/otterkeep"
 
-echo "🔐 6. Code signing with App Sandbox entitlement..."
+mkdir -p "$APP_BUNDLE/Contents/Frameworks"
+SPARKLE_FW=$(find "$PROJECT_ROOT/.build" -name "Sparkle.framework" -type d 2>/dev/null | head -n 1)
+if [ -n "$SPARKLE_FW" ]; then
+    echo "   📦 Copying Sparkle.framework to Contents/Frameworks..."
+    cp -R "$SPARKLE_FW" "$APP_BUNDLE/Contents/Frameworks/"
+fi
+
+echo "🔐 6. Hierarchical code signing..."
+SIGN_IDENTITY="${APPLE_DEVELOPER_IDENTITY:--}"
+
+if [ -d "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework" ]; then
+    if [ -f "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/Current/Autoupdate" ]; then
+        codesign --force --sign "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/Current/Autoupdate" 2>/dev/null || true
+    fi
+    codesign --force --sign "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework" 2>/dev/null || true
+fi
+
 TEMP_ENTITLEMENTS="$(mktemp /tmp/otterkeep_ent.XXXXXX.plist)"
 cat << 'EOF' > "$TEMP_ENTITLEMENTS"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -243,13 +265,19 @@ cat << 'EOF' > "$TEMP_ENTITLEMENTS"
 </plist>
 EOF
 
-codesign --force --sign - --entitlements "$TEMP_ENTITLEMENTS" "$APPEX_BUNDLE"
-codesign --force --sign - "$APP_BUNDLE/Contents/MacOS/otterkeep"
-codesign --force --sign - "$APP_BUNDLE"
+codesign --force --sign "$SIGN_IDENTITY" --entitlements "$TEMP_ENTITLEMENTS" "$APPEX_BUNDLE"
+codesign --force --sign "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/MacOS/otterkeep"
+codesign --force --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
 rm -f "$TEMP_ENTITLEMENTS"
 
+echo "🐚 7. Generating shell completions..."
+mkdir -p "$PROJECT_ROOT/Distribution/completions"
+"$CLI_BINARY" --generate-completion-script zsh > "$PROJECT_ROOT/Distribution/completions/_otterkeep" 2>/dev/null || true
+"$CLI_BINARY" --generate-completion-script bash > "$PROJECT_ROOT/Distribution/completions/otterkeep.bash" 2>/dev/null || true
+"$CLI_BINARY" --generate-completion-script fish > "$PROJECT_ROOT/Distribution/completions/otterkeep.fish" 2>/dev/null || true
+
 if [ -z "$SKIP_REGISTER" ]; then
-    echo "📡 7. Registering with LaunchServices, Services, and PluginKit..."
+    echo "📡 8. Registering with LaunchServices, Services, and PluginKit..."
     LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
     if [ -f "$LSREGISTER" ]; then
         "$LSREGISTER" -f "$APP_BUNDLE"

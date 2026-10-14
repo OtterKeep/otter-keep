@@ -19,12 +19,12 @@
 
 ### A) lehetőség: Homebrew (Ajánlott)
 ```bash
-brew tap richardeszeshu/otter-keep
+brew tap OtterKeep/otterkeep
 brew install --cask otterkeep
 ```
 
 ### B) lehetőség: Lemezkép (.dmg) közvetlen letöltése
-1. Töltse le a legfrissebb `OtterKeep-2.0.0.dmg` fájlt a [Kiadások (Releases)](https://github.com/richardeszeshu/otter-keep/releases) oldalról.
+1. Töltse le a legfrissebb `OtterKeep-2.0.0.dmg` fájlt a [Kiadások (Releases)](https://github.com/OtterKeep/otter-keep/releases) oldalról.
 2. Kattintson duplán a letöltött DMG fájlra.
 3. Húzza az **OtterKeep.app** ikont az `Alkalmazások` (Applications) mappába.
 4. Indítsa el az OtterKeep alkalmazást a Launchpadről vagy a Spotlight keresőből.

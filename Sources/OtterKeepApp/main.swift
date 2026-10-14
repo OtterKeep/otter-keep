@@ -2,6 +2,23 @@ import SwiftUI
 import AppKit
 import OtterKeepCore
 import OtterKeepUI
+#if canImport(Sparkle)
+import Sparkle
+
+/// In-app software update controller bridging the official Sparkle 2.x framework.
+final class SparkleUpdaterBridge: NSObject, SPUUpdaterDelegate {
+    static let shared = SparkleUpdaterBridge()
+    private var updaterController: SPUStandardUpdaterController?
+
+    func setup() {
+        updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: self, userDriverDelegate: nil)
+    }
+
+    func checkForUpdates() {
+        updaterController?.checkForUpdates(nil)
+    }
+}
+#endif
 
 /// Shared application context holding the central `@Observable` AppState.
 @MainActor
@@ -18,6 +35,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let icon = OtterKeepLogoView.createApplicationDockIcon() {
             NSApp.applicationIconImage = icon
         }
+
+        #if canImport(Sparkle)
+        SparkleUpdaterBridge.shared.setup()
+        AppContext.shared.appState.onCheckForUpdatesNative = {
+            SparkleUpdaterBridge.shared.checkForUpdates()
+        }
+        #endif
 
         // Register macOS Services provider for universal right-click context menu integration
         NSApp.servicesProvider = self
