@@ -124,6 +124,10 @@ cat << EOF > "$APP_BUNDLE/Contents/Info.plist"
     <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleSupportedPlatforms</key>
+    <array>
+        <string>MacOSX</string>
+    </array>
     <key>CFBundleShortVersionString</key>
     <string>${APP_VERSION}</string>
     <key>CFBundleVersion</key>
@@ -197,6 +201,10 @@ cat << EOF > "$APPEX_BUNDLE/Contents/Info.plist"
     <string>OtterKeepFinderSyncExtension</string>
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
+    <key>CFBundleSupportedPlatforms</key>
+    <array>
+        <string>MacOSX</string>
+    </array>
     <key>CFBundleShortVersionString</key>
     <string>${APP_VERSION}</string>
     <key>CFBundleVersion</key>
@@ -235,8 +243,26 @@ if [ -n "$SPARKLE_FW" ]; then
     cp -R "$SPARKLE_FW" "$APP_BUNDLE/Contents/Frameworks/"
 fi
 
+# Ensure LC_RPATH contains @executable_path/../Frameworks for dynamic frameworks (e.g. Sparkle)
+if ! otool -l "$APP_BUNDLE/Contents/MacOS/OtterKeepApp" | grep -q "@executable_path/../Frameworks"; then
+    echo "   🔗 Adding @executable_path/../Frameworks rpath to OtterKeepApp..."
+    install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP_BUNDLE/Contents/MacOS/OtterKeepApp"
+fi
+
 echo "🔐 6. Hierarchical code signing..."
-SIGN_IDENTITY="${APPLE_DEVELOPER_IDENTITY:--}"
+if [ -z "${APPLE_DEVELOPER_IDENTITY:-}" ]; then
+    DETECTED_ID=$(security find-identity -p codesigning -v 2>/dev/null | grep "Apple Development" | head -n 1 | awk -F'"' '{print $2}' || true)
+    if [ -n "$DETECTED_ID" ]; then
+        SIGN_IDENTITY="$DETECTED_ID"
+        echo "   Using detected codesigning identity: $SIGN_IDENTITY"
+    else
+        SIGN_IDENTITY="-"
+        echo "   Using ad-hoc codesigning (-)"
+    fi
+else
+    SIGN_IDENTITY="$APPLE_DEVELOPER_IDENTITY"
+    echo "   Using specified codesigning identity: $SIGN_IDENTITY"
+fi
 
 if [ -d "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework" ]; then
     if [ -f "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/Current/Autoupdate" ]; then
@@ -267,11 +293,13 @@ EOF
 
 codesign --force --sign "$SIGN_IDENTITY" --entitlements "$TEMP_ENTITLEMENTS" "$APPEX_BUNDLE"
 codesign --force --sign "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/MacOS/otterkeep"
+codesign --force --sign "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/MacOS/OtterKeepApp"
 codesign --force --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
 rm -f "$TEMP_ENTITLEMENTS"
 
 # Strip quarantine attributes so locally packaged application launches without unidentified developer warnings
 xattr -cr "$APP_BUNDLE" 2>/dev/null || true
+xattr -dr com.apple.quarantine "$APP_BUNDLE" 2>/dev/null || true
 
 echo "🐚 7. Generating shell completions..."
 mkdir -p "$PROJECT_ROOT/Distribution/completions"
