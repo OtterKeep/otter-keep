@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import OtterKeepCore
+import OtterKeepDatabase
 
 extension SettingsView {
     var persistentFilesSection: some View {
@@ -71,6 +72,41 @@ extension SettingsView {
                     NSWorkspace.shared.activateFileViewerSelecting([LogManager.shared.logFileURL])
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.regular)
+            }
+
+            Divider()
+
+            // Central SQLite Database & Self-Healing
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(LocalizationManager.shared.effectiveLanguage == .hungarian ? "Központi SQLite Adatbázis" : "Central SQLite Database")
+                        .font(.body.weight(.medium))
+                    Text(CentralDatabase.shared.databasePath)
+                        .font(.callout.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer()
+                Button {
+                    let dbURL = URL(fileURLWithPath: CentralDatabase.shared.databasePath)
+                    NSWorkspace.shared.activateFileViewerSelecting([dbURL])
+                } label: {
+                    Text(L10n.t(.settingsOpenFolder))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+
+                Button {
+                    Task {
+                        try? CentralDatabase.shared.performSelfHealingMaintenance()
+                    }
+                } label: {
+                    Label(LocalizationManager.shared.effectiveLanguage == .hungarian ? "Öngyógyítás & VACUUM" : "Self-Healing & VACUUM", systemImage: "bandage")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(OtterTheme.oceanicTeal)
                 .controlSize(.regular)
             }
         }

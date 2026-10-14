@@ -104,7 +104,14 @@ public actor BackupSessionCoordinator {
                 LogManager.shared.log("Pre-backup hook completed successfully.", level: .info, category: "Hook")
             }
 
-            // 0. Verify source directory accessibility
+            // 0. Check Power & Thermal Governor before beginning I/O
+            try checkPowerAndThermalGovernor(profile: profile)
+
+            // 0b. Arm Canary Trap Decoy if enabled
+            let canaryMonitor = try prepareCanaryTrap(profile: profile)
+            defer { canaryMonitor?.disarm() }
+
+            // 0c. Verify source directory accessibility
             let srcPath = profile.sourceURL.standardizedFileURL.path(percentEncoded: false)
             guard FileManager.default.fileExists(atPath: srcPath) else {
                 let errMsg = "Source directory is not accessible: '\(profile.sourceURL.path)'"
@@ -113,8 +120,14 @@ public actor BackupSessionCoordinator {
                 throw FileSystemError.itemNotFound(path: profile.sourceURL.path)
             }
 
-            // 1. Prepare destination directory, capabilities, and SQLite database
-            let destinationURL = profile.destinationURL.standardizedFileURL
+            // 1. Prepare destination directory, capabilities, and SQLite database (supporting encrypted Sparsebundle)
+            let (destinationURL, activeContainer, _) = try prepareEncryptedContainer(
+                profile: profile,
+                baseDestinationURL: profile.destinationURL.standardizedFileURL
+            )
+            defer {
+                cleanupEncryptedContainer(container: activeContainer, mountPoint: destinationURL)
+            }
             try storage.createDirectory(at: destinationURL)
 
         let eval = VolumeCapabilityEvaluator.evaluate(sourceURL: profile.sourceURL, destinationURL: destinationURL)
@@ -480,7 +493,11 @@ public actor BackupSessionCoordinator {
         }
 
         let filesToCopy = itemsToCopy.filter { !$0.metadata.isDirectory }
-        let copyConcurrency = min(6, max(3, ProcessInfo.processInfo.activeProcessorCount))
+        let baseConcurrency = min(6, max(3, ProcessInfo.processInfo.activeProcessorCount))
+        let copyConcurrency = PowerAndThermalGovernor.shared.recommendedConcurrency(
+            baseConcurrency: baseConcurrency,
+            throttleOnThermal: profile.throttleOnThermalPressure
+        )
 
         try await withThrowingTaskGroup(of: CopyWorkerResult.self) { group in
             var activeTasks = 0
@@ -745,6 +762,9 @@ public actor BackupSessionCoordinator {
             files: catalogRecordsToSave,
             forProfileId: profile.id.uuidString
         )
+
+        // Stamp zero-configuration adoption metadata file on destination volume
+        DriveProfileMetadata.write(for: profile, to: destinationURL)
 
         // 15. Automatic retention pruning (if enabled in profile)
         var autoPrunedCount = 0

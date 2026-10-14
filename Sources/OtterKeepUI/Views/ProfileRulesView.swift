@@ -70,23 +70,38 @@ public struct ProfileRulesView: View {
                     // 3. Exclusion Rules (Tag cloud + Quick presets)
                     exclusionRulesSection(profile: profile)
 
-                    // 4. Automatic Scheduling
+                    // 4. Local APFS Sparsebundle Encryption
+                    localEncryptionSection(profile: profile)
+                }
+                .disabled(isLocked)
+
+                Group {
+                    // 5. Automatic Scheduling
                     scheduleSection(profile: profile)
 
-                    // 5. External Drive Automation
+                    // 6. External Drive Automation
                     externalDriveSection(profile: profile)
 
-                    // 6. 3-2-1 Backup Copy Job & Remote Targets
+                    // 7. Power & Thermal Governor
+                    powerGovernorSection(profile: profile)
+                }
+                .disabled(isLocked)
+
+                Group {
+                    // 8. 3-2-1 Backup Copy Job & Remote Targets
                     backupCopyJobSection(profile: profile)
 
-                    // 7. Wi-Fi SSID & Metered Hotspot Protection
+                    // 9. Wi-Fi SSID & Metered Hotspot Protection
                     WiFiProtectionCardView(appState: appState, profile: profile)
 
-                    // 8. Outbound Webhook Remote Monitoring (Slack, Discord, Pushover)
+                    // 10. Outbound Webhook Remote Monitoring (Slack, Discord, Pushover)
                     WebhookSettingsCardView(appState: appState, profile: profile)
 
-                    // 9. Ransomware & Rate-of-Change Anomaly Guard
+                    // 11. Ransomware & Rate-of-Change Anomaly Guard
                     ransomwareGuardSection(profile: profile)
+
+                    // 12. Canary Trap Decoy Tripwires
+                    canaryTrapSection(profile: profile)
                 }
                 .disabled(isLocked)
             } else {

@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import OtterKeepCore
 
 public struct DiagnosticLogView: View {
@@ -97,6 +98,14 @@ public struct DiagnosticLogView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
+
+                Button {
+                    exportSupportBundle()
+                } label: {
+                    Label(LocalizationManager.shared.effectiveLanguage == .hungarian ? "Támogatási csomag..." : "Support Bundle...", systemImage: "archivebox")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
             }
             .padding()
             .background(.background.secondary)
@@ -171,6 +180,24 @@ public struct DiagnosticLogView: View {
         panel.nameFieldStringValue = "OtterKeep_Logs_\(ISO8601DateFormatter().string(from: Date())).txt"
         if panel.runModal() == .OK, let url = panel.url {
             appState.exportLogs(to: url)
+        }
+    }
+
+    private func exportSupportBundle() {
+        let panel = NSSavePanel()
+        if let zipType = UTType(filenameExtension: "zip") {
+            panel.allowedContentTypes = [zipType]
+        }
+        panel.nameFieldStringValue = "OtterKeep-Diagnostics-\(Int(Date().timeIntervalSince1970)).zip"
+        if panel.runModal() == .OK, let url = panel.url {
+            Task {
+                do {
+                    _ = try await SanctuarySupportBundleExporter.shared.exportSupportBundle(to: url)
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                } catch {
+                    LogManager.shared.log("Failed to export support bundle: \(error.localizedDescription)", level: .error, category: "SupportBundle")
+                }
+            }
         }
     }
 }

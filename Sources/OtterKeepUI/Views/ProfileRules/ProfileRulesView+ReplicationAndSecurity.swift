@@ -409,4 +409,153 @@ extension ProfileRulesView {
         .otterCard()
     }
 
+    // MARK: - 10. Power & Thermal Governor
+    func powerGovernorSection(profile: BackupProfile) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label(L10n.t(.powerGovernorHeader), systemImage: "bolt.batteryblock.fill")
+                    .font(.headline)
+                    .foregroundStyle(OtterTheme.oceanicTeal)
+                Spacer()
+            }
+
+            VStack(alignment: .leading, spacing: 14) {
+                // Pause on battery
+                Toggle(isOn: Binding(
+                    get: { profile.pauseOnBattery },
+                    set: { val in
+                        var updated = profile
+                        updated.pauseOnBattery = val
+                        appState.selectedProfile = updated
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.t(.pauseOnBatteryLabel))
+                            .font(.body.weight(.medium))
+                        Text(L10n.t(.pauseOnBatteryDesc))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.checkbox)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Divider()
+
+                // Thermal throttling
+                Toggle(isOn: Binding(
+                    get: { profile.throttleOnThermalPressure },
+                    set: { val in
+                        var updated = profile
+                        updated.throttleOnThermalPressure = val
+                        appState.selectedProfile = updated
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.t(.throttleOnThermalLabel))
+                            .font(.body.weight(.medium))
+                        Text(L10n.t(.throttleOnThermalDesc))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.checkbox)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .otterCard()
+    }
+
+    // MARK: - 11. Canary Trap Tripwires & Anti-Ransomware Decoys
+    func canaryTrapSection(profile: BackupProfile) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label(L10n.t(.canaryTrapHeader), systemImage: "shield.lefthalf.filled.trianglebadge.exclamationmark")
+                    .font(.headline)
+                    .foregroundStyle(OtterTheme.otterAmber)
+                Spacer()
+            }
+
+            VStack(alignment: .leading, spacing: 14) {
+                Toggle(isOn: Binding(
+                    get: { profile.enableCanaryTraps },
+                    set: { val in
+                        var updated = profile
+                        updated.enableCanaryTraps = val
+                        appState.selectedProfile = updated
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.t(.enableCanaryTrapsLabel))
+                            .font(.body.weight(.medium))
+                        Text(L10n.t(.enableCanaryTrapsDesc))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.checkbox)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .otterCard()
+    }
+
+    // MARK: - 12. Local Sparsebundle Encryption
+    func localEncryptionSection(profile: BackupProfile) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label(L10n.t(.localEncryptionHeader), systemImage: "lock.shield.fill")
+                    .font(.headline)
+                    .foregroundStyle(OtterTheme.oceanicTeal)
+                Spacer()
+            }
+
+            VStack(alignment: .leading, spacing: 14) {
+                Toggle(isOn: Binding(
+                    get: { profile.encryptionConfig?.isEnabled ?? false },
+                    set: { enabled in
+                        var updated = profile
+                        var enc = updated.encryptionConfig ?? LocalEncryptionConfiguration()
+                        enc.isEnabled = enabled
+                        updated.encryptionConfig = enc
+                        appState.selectedProfile = updated
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.t(.enableLocalEncryptionLabel))
+                            .font(.body.weight(.medium))
+                        Text(L10n.t(.enableLocalEncryptionDesc))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.checkbox)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if profile.encryptionConfig?.isEnabled == true {
+                    Divider()
+
+                    HStack {
+                        Text("Sparsebundle:")
+                            .font(.body)
+                        Spacer()
+                        TextField("OtterKeepSanctuary", text: Binding(
+                            get: { profile.encryptionConfig?.containerName ?? "OtterKeepSanctuary" },
+                            set: { val in
+                                var updated = profile
+                                var enc = updated.encryptionConfig ?? LocalEncryptionConfiguration()
+                                enc.containerName = val.isEmpty ? "OtterKeepSanctuary" : val
+                                updated.encryptionConfig = enc
+                                appState.selectedProfile = updated
+                            }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 220)
+                    }
+                }
+            }
+        }
+        .otterCard()
+    }
+
 }

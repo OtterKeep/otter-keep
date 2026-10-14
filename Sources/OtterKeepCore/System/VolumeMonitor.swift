@@ -214,10 +214,14 @@ public final class VolumeMonitor: @unchecked Sendable {
     /// Handler closure invoked when an automated backup trigger is requested for a profile.
     public typealias AutoBackupTriggerHandler = @Sendable (_ profile: BackupProfile) -> Void
 
+    /// Handler closure invoked when an external volume with an unadopted profile is discovered.
+    public typealias UnadoptedDriveHandler = @Sendable (_ metadata: DriveProfileMetadata, _ volumeURL: URL) -> Void
+
     private let lock = NSLock()
     private let observer: VolumeObserving
     private var handlers: [VolumeChangeHandler] = []
     private var autoBackupHandler: AutoBackupTriggerHandler?
+    public var onUnadoptedDriveDetected: UnadoptedDriveHandler?
     private var lastTriggeredPerVolume: [String: Date] = [:]
 
     /// Creates a monitor driven by the given platform observer.
@@ -301,6 +305,15 @@ public final class VolumeMonitor: @unchecked Sendable {
             LogManager.shared.log("Mounted volume '\(mountedURL.lastPathComponent)' matched profile '\(profile.name)'. Initiating automatic backup...", level: .info, category: "Storage")
             NotificationDeliveryService.shared.notifyVolumeMountTrigger(profileName: profile.name, volumeName: mountedURL.lastPathComponent)
             autoBackupHandler?(profile)
+        }
+
+        // Check for unadopted profile metadata tag
+        if let rootMeta = DriveProfileMetadata.read(from: mountedURL) {
+            let alreadyKnown = profiles.contains(where: { $0.id == rootMeta.profileId })
+            if !alreadyKnown {
+                LogManager.shared.log("Unadopted profile metadata found on '\(mountedURL.lastPathComponent)': '\(rootMeta.profileName)' [UUID: \(rootMeta.profileId.uuidString)].", level: .info, category: "Storage")
+                onUnadoptedDriveDetected?(rootMeta, mountedURL)
+            }
         }
     }
 

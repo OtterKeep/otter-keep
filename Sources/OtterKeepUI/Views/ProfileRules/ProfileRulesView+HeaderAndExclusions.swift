@@ -148,26 +148,13 @@ extension ProfileRulesView {
                         .foregroundStyle(.secondary)
 
                     FlowLayout(spacing: OtterTheme.spacing6) {
-                        stackPresetChip(
-                            title: L10n.t(.presetExclusionNodeModules),
-                            patterns: ["node_modules", ".next", ".nuxt", "dist"],
-                            profile: profile
-                        )
-                        stackPresetChip(
-                            title: L10n.t(.presetExclusionXcode),
-                            patterns: ["DerivedData", ".build", "Pods"],
-                            profile: profile
-                        )
-                        stackPresetChip(
-                            title: L10n.t(.presetExclusionPython),
-                            patterns: [".venv", "venv", "__pycache__", "*.pyc"],
-                            profile: profile
-                        )
-                        stackPresetChip(
-                            title: L10n.t(.presetExclusionMediaCaches),
-                            patterns: ["Cache", "Caches", "Render Files"],
-                            profile: profile
-                        )
+                        ForEach(ExclusionPreset.allCases) { preset in
+                            stackPresetChip(
+                                title: preset.localizedTitle,
+                                patterns: preset.patterns,
+                                profile: profile
+                            )
+                        }
                     }
                 }
 
