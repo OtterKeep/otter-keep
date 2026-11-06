@@ -93,6 +93,7 @@ public enum ProfileMaintenanceSubTab: String, CaseIterable, Identifiable, Sendab
 /// Tabs within the general Preferences modal dialog.
 public enum PreferencesTab: String, CaseIterable, Identifiable, Sendable {
     case general = "general"
+    case security = "security"
     case finder = "finder"
     case storage = "storage"
     case diagnostics = "diagnostics"
@@ -102,6 +103,7 @@ public enum PreferencesTab: String, CaseIterable, Identifiable, Sendable {
     public var localizedTitle: String {
         switch self {
         case .general: return L10n.t(.tabGeneral)
+        case .security: return L10n.t(.biometricsTabTitle)
         case .finder: return L10n.t(.tabFinderIntegration)
         case .storage: return L10n.t(.tabStorageAndDb)
         case .diagnostics: return L10n.t(.tabDiagnosticsAndUpdates)
@@ -111,6 +113,7 @@ public enum PreferencesTab: String, CaseIterable, Identifiable, Sendable {
     public var iconName: String {
         switch self {
         case .general: return "slider.horizontal.3"
+        case .security: return "touchid"
         case .finder: return "macwindow"
         case .storage: return "cylinder.split.1x2"
         case .diagnostics: return "stethoscope"

@@ -19,6 +19,34 @@ public struct NewProfileModalView: View {
         )
     }
 
+    private var enableEncryptionBinding: Binding<Bool> {
+        Binding(
+            get: { appState.newProfileEnableEncryption },
+            set: { appState.newProfileEnableEncryption = $0 }
+        )
+    }
+
+    private var encryptionPassphraseBinding: Binding<String> {
+        Binding(
+            get: { appState.newProfileEncryptionPassphrase },
+            set: { appState.newProfileEncryptionPassphrase = $0 }
+        )
+    }
+
+    private var confirmPassphraseBinding: Binding<String> {
+        Binding(
+            get: { appState.newProfileConfirmPassphrase },
+            set: { appState.newProfileConfirmPassphrase = $0 }
+        )
+    }
+
+    private var includePassphraseBinding: Binding<Bool> {
+        Binding(
+            get: { appState.newProfileIncludePassphraseInPDF },
+            set: { appState.newProfileIncludePassphraseInPDF = $0 }
+        )
+    }
+
     private var volumeEval: VolumeEvaluationResult {
         VolumeCapabilityEvaluator.evaluate(
             sourceURL: appState.newProfileSourceURL,
@@ -34,7 +62,9 @@ public struct NewProfileModalView: View {
     }
 
     private var canCreate: Bool {
-        !appState.newProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && isFolderPairValid
+        let nameValid = !appState.newProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let passValid = !appState.newProfileEnableEncryption || (!appState.newProfileEncryptionPassphrase.isEmpty && appState.newProfileEncryptionPassphrase == appState.newProfileConfirmPassphrase)
+        return nameValid && isFolderPairValid && passValid
     }
 
     public var body: some View {
@@ -56,6 +86,7 @@ public struct NewProfileModalView: View {
                     destinationFolderView
                     executionModeView
                     advancedOptionsView
+                    encryptionAndEmergencyKitView
                     validationErrorView
                 }
                 .padding(20)
@@ -379,6 +410,99 @@ public struct NewProfileModalView: View {
         }
     }
 
+    // MARK: - Zero-Knowledge Client Encryption & Emergency Kit
+    private var encryptionAndEmergencyKitView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Kliensoldali Titkosítás (OKENC2) & Vészhelyzeti Kit", systemImage: "lock.shield.fill")
+                    .font(.caption.bold())
+                    .foregroundStyle(OtterTheme.oceanicTeal)
+                Spacer()
+                Toggle("", isOn: enableEncryptionBinding)
+                    .toggleStyle(.switch)
+            }
+
+            if appState.newProfileEnableEncryption {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Állíts be egy erős jelszót. A jelszót a rendszer a macOS Keychainben tárolja.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    SecureField("Titkosítási jelszó megadása...", text: encryptionPassphraseBinding)
+                        .textFieldStyle(.roundedBorder)
+
+                    SecureField("Jelszó megerősítése...", text: confirmPassphraseBinding)
+                        .textFieldStyle(.roundedBorder)
+
+                    if !appState.newProfileEncryptionPassphrase.isEmpty && !appState.newProfileConfirmPassphrase.isEmpty && appState.newProfileEncryptionPassphrase != appState.newProfileConfirmPassphrase {
+                        Text("A megadott jelszavak nem egyeznek.")
+                            .font(.caption2.bold())
+                            .foregroundStyle(OtterTheme.statusError)
+                    }
+
+                    Toggle(isOn: includePassphraseBinding) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(L10n.t(.emergencyKitIncludePassword))
+                                .font(.caption.bold())
+                            Text(L10n.t(.emergencyKitIncludePasswordDesc))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(.checkbox)
+                    .padding(.top, 4)
+
+                    HStack {
+                        Button {
+                            downloadEmergencyKitNow()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: appState.newProfileIsEmergencyKitExported ? "checkmark.seal.fill" : "arrow.down.doc.fill")
+                                Text(appState.newProfileIsEmergencyKitExported ? L10n.t(.emergencyKitExportedNotice) : L10n.t(.emergencyKitExportButton))
+                            }
+                            .font(.caption.bold())
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(appState.newProfileIsEmergencyKitExported ? OtterTheme.statusGreen : OtterTheme.otterAmber)
+                        .disabled(appState.newProfileEncryptionPassphrase.isEmpty || appState.newProfileEncryptionPassphrase != appState.newProfileConfirmPassphrase)
+
+                        Spacer()
+
+                        Text(L10n.t(.emergencyKitCreatedOnlyWarning))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    .padding(.top, 4)
+                }
+                .padding(10)
+                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
+        .padding(10)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func downloadEmergencyKitNow() {
+        let trimmed = appState.newProfileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tempProfile = BackupProfile(
+            name: trimmed.isEmpty ? "OtterKeep Sanctuary" : trimmed,
+            sourceURL: appState.newProfileSourceURL,
+            destinationURL: appState.newProfileDestinationURL
+        )
+        let metadata = EmergencyKitBuilder.buildMetadata(
+            for: tempProfile,
+            passphrase: appState.newProfileEncryptionPassphrase,
+            includePassphrase: appState.newProfileIncludePassphraseInPDF
+        )
+        let targetWindow = NSApp.keyWindow?.attachedSheet ?? NSApp.keyWindow ?? NSApp.mainWindow
+        EmergencyKitPDFExporter.exportPDF(metadata: metadata, parentWindow: targetWindow) { url in
+            if url != nil {
+                appState.newProfileIsEmergencyKitExported = true
+            }
+        }
+    }
+
     @ViewBuilder
     private var validationErrorView: some View {
         if !isFolderPairValid {
@@ -448,7 +572,8 @@ public struct NewProfileModalView: View {
 
     private func performCreate() {
         guard canCreate else { return }
-        appState.createProfileFromDraft()
+        let pass = appState.newProfileEnableEncryption ? appState.newProfileEncryptionPassphrase : nil
+        appState.createProfileFromDraft(encryptionPassphrase: pass)
         appState.showNewProfileSheet = false
     }
 }

@@ -36,6 +36,11 @@ extension AppState {
         self.startMinimized = archive.settings.startMinimized
         self.isDebugFileLoggingEnabled = archive.settings.debugFileLoggingEnabled
         self.isFinderIntegrationEnabled = archive.settings.finderIntegrationEnabled
+        self.isBiometricsEnabled = archive.settings.isBiometricsEnabled
+        self.requireBiometricsForRestore = archive.settings.requireBiometricsForRestore
+        self.requireBiometricsForProfileDeletion = archive.settings.requireBiometricsForProfileDeletion
+        self.requireBiometricsForKeyReveal = archive.settings.requireBiometricsForKeyReveal
+        self.useSecureEnclaveForKeychain = archive.settings.useSecureEnclaveForKeychain
         if let photos = archive.photosConfig {
             self.photosConfig = photos
         }

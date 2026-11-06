@@ -1206,6 +1206,43 @@ public enum L10n {
         case feedbackGuaranteeNothingModified
         case recoveryOpenFullDiskAccess
         case recoveryViewLogs
+
+        // MARK: - Emergency Kit, Biometrics & Automation (v2.1)
+        case emergencyKitTitle
+        case emergencyKitSubtitle
+        case emergencyKitExportButton
+        case emergencyKitExportedNotice
+        case emergencyKitDownloadPrompt
+        case emergencyKitCreatedOnlyWarning
+        case emergencyKitIncludePassword
+        case emergencyKitIncludePasswordDesc
+        case emergencyKitHandwriteNotice
+        case emergencyKitSecuritySummary
+        case emergencyKitRestoreSteps
+        case emergencyKitTerminalCommand
+        case emergencyKitQRCodeLabel
+        case biometricsTabTitle
+        case biometricsEnableMasterToggle
+        case biometricsTouchIDAvailable
+        case biometricsTouchIDUnavailable
+        case biometricsRequireForRestore
+        case biometricsRequireForRestoreDesc
+        case biometricsRequireForDelete
+        case biometricsRequireForDeleteDesc
+        case biometricsRequireForKeyReveal
+        case biometricsRequireForKeyRevealDesc
+        case biometricsHardwareSecureEnclave
+        case biometricsHardwareSecureEnclaveDesc
+        case biometricsAuthPromptRestore
+        case biometricsAuthPromptDelete
+        case biometricsAuthPromptKeyReveal
+        case biometricsAuthPromptEmergencyKit
+        case biometricsAuthFailed
+        case encryptionLockedNotice
+        case intentStartBackupTitle
+        case intentStartBackupDesc
+        case intentGetStatusTitle
+        case intentGetStatusDesc
     }
 
 

@@ -213,6 +213,16 @@ public final class MaintenanceSettingsStore: Sendable {
     /// Draft quiet-window debouncing seconds for continuous mode.
     public var newProfileDebouncingSeconds: Int = 30
 
+    // MARK: - Draft Encryption & Emergency Kit State (2.1.0)
+    public var newProfileEnableEncryption: Bool = false
+    public var newProfileEncryptionPassphrase: String = ""
+    public var newProfileConfirmPassphrase: String = ""
+    public var newProfileIncludePassphraseInPDF: Bool = false
+    public var newProfileIsEmergencyKitExported: Bool = false
+
+    // MARK: - Biometric Security Preferences State (2.1.0)
+    public var biometricHardwareState: BiometricHardwareState = .unavailable(reason: "Checking...")
+
     /// Tag of the currently applied configuration preset.
     public var selectedPresetTag: String? = nil
 
@@ -320,6 +330,21 @@ public final class MaintenanceSettingsStore: Sendable {
     /// Start-minimized launch preference.
     public var startMinimized: Bool = LocalizationManager.shared.startMinimized
 
+    /// Biometric authentication active state.
+    public var isBiometricsEnabled: Bool = LocalizationManager.shared.isBiometricsEnabled
+
+    /// Require biometrics to restore files.
+    public var requireBiometricsForRestore: Bool = LocalizationManager.shared.requireBiometricsForRestore
+
+    /// Require biometrics to permanently delete profiles.
+    public var requireBiometricsForProfileDeletion: Bool = LocalizationManager.shared.requireBiometricsForProfileDeletion
+
+    /// Require biometrics to reveal passphrases or keys.
+    public var requireBiometricsForKeyReveal: Bool = LocalizationManager.shared.requireBiometricsForKeyReveal
+
+    /// Use hardware Secure Enclave protection for Keychain items.
+    public var useSecureEnclaveForKeychain: Bool = LocalizationManager.shared.useSecureEnclaveForKeychain
+
     /// Finder integration extension state.
     public var isFinderIntegrationEnabled: Bool = FinderIntegrationStore.shared.isEnabled
 
@@ -376,6 +401,11 @@ public final class MaintenanceSettingsStore: Sendable {
         newProfileAutoEjectOnCompletion = false
         newProfileIsContinuous = false
         newProfileDebouncingSeconds = 30
+        newProfileEnableEncryption = false
+        newProfileEncryptionPassphrase = ""
+        newProfileConfirmPassphrase = ""
+        newProfileIncludePassphraseInPDF = false
+        newProfileIsEmergencyKitExported = false
         selectedPresetTag = nil
     }
 

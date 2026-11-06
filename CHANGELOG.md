@@ -6,6 +6,22 @@ All notable changes to OtterKeep are documented in this file in accordance with 
 
 ## [Unreleased]
 
+### 📄 Emergency Recovery Kit (Vészhelyzeti PDF Kit)
+- **Profile-Creation-Only Download**: Zero-knowledge encryption passphrase and printable Emergency Kit PDF are downloadable strictly during initial profile creation (`NewProfileModalView`).
+- **Cryptographic Immutability**: Encryption passphrases and settings are permanently locked upon profile creation and cannot be revealed, changed, or toggled off later.
+- **A4 Sanctuary Design & Offline Restorability**: Standard A4 printable layout (`EmergencyKitDocumentView`), scannable QR code (`CIQRCodeGenerator`), PBKDF2-HMAC-SHA256 salt & key fingerprint, and complete headless Terminal CLI restore instructions.
+
+### ⚡ AppIntents & Shortcuts (Parancsikonok & Siri)
+- **Silent Background Execution**: Conforms to Apple's modern `AppIntents` framework (`StartBackupIntent`, `GetBackupStatusIntent`, `ProfileAppEntity`) with `openAppWhenRun: false` to perform silent incremental backups without focusing, activating, or surfacing GUI windows.
+- **Rich Status Feedback**: Natural language relative date reporting and automatic macOS local notification delivery on completion or error.
+- **Zero-Config Shortcuts**: Built-in Siri and Shortcuts integration via `OtterKeepShortcutsProvider`.
+
+### 🛡️ Touch ID & Apple Secure Enclave Protection
+- **Fail-Closed Biometrics (`BiometricSecurityService`)**: Evaluates sensor capability (`touchIDAvailable`, `passcodeOnly`, `unavailable`) and verifies user presence via `LocalAuthentication`.
+- **Sensitive Action Gates**: Gated profile deletion and restore operations in the GUI behind mandatory biometric or system passcode authorization.
+- **Hardware Secure Enclave Keychain**: Optional hardware-backed passphrase protection using macOS `SecAccessControl` (`.userPresence`).
+- **Security Preferences**: Dedicated *Biometrics & Hardware* tab in Preferences with granular toggles and hardware sensor telemetry.
+
 ### 🧭 Profile Workspace Focus
 
 - **Rules & Maintenance Moved Out of the Workspace Tabs**: The profile workspace now offers only the two daily surfaces — *Overview* and *Time Machine*. Rules, automation and maintenance open exclusively from the **Profile Settings** button (and `⌘3`), so configuration never competes with monitoring.

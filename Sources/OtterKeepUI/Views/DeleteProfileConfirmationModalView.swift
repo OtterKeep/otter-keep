@@ -85,10 +85,24 @@ public struct DeleteProfileConfirmationModalView: View {
 
                 Button(role: .destructive) {
                     if let profile = targetProfile {
-                        appState.deleteProfile(id: profile.id)
+                        Task { @MainActor in
+                            if appState.isBiometricsEnabled && appState.requireBiometricsForProfileDeletion {
+                                let authResult = await BiometricSecurityService.shared.authenticate(
+                                    reason: L10n.t(.biometricsAuthPromptDelete)
+                                )
+                                if case .failure = authResult {
+                                    appState.showError(L10n.t(.biometricsAuthFailed))
+                                    return
+                                }
+                            }
+                            appState.deleteProfile(id: profile.id)
+                            appState.showDeleteProfileConfirmation = false
+                            appState.profilePendingDeletion = nil
+                        }
+                    } else {
+                        appState.showDeleteProfileConfirmation = false
+                        appState.profilePendingDeletion = nil
                     }
-                    appState.showDeleteProfileConfirmation = false
-                    appState.profilePendingDeletion = nil
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "trash.fill")

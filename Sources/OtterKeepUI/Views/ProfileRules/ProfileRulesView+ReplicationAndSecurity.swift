@@ -511,72 +511,65 @@ extension ProfileRulesView {
             }
 
             VStack(alignment: .leading, spacing: 14) {
-                Toggle(isOn: Binding(
-                    get: { profile.encryptionConfig?.isEnabled ?? false },
-                    set: { enabled in
-                        var updated = profile
-                        var enc = updated.encryptionConfig ?? LocalEncryptionConfiguration()
-                        enc.isEnabled = enabled
-                        updated.encryptionConfig = enc
-                        appState.selectedProfile = updated
-                    }
-                )) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L10n.t(.enableLocalEncryptionLabel))
-                            .font(.body.weight(.medium))
-                        Text(L10n.t(.enableLocalEncryptionDesc))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .toggleStyle(.checkbox)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
                 if profile.encryptionConfig?.isEnabled == true {
+                    HStack(spacing: 10) {
+                        Image(systemName: "lock.shield.fill")
+                            .font(.title3)
+                            .foregroundStyle(OtterTheme.statusGreen)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L10n.t(.enableLocalEncryptionLabel) + " (OKENC2 - Végleges)")
+                                .font(.body.weight(.bold))
+                            Text(L10n.t(.encryptionLockedNotice))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+
                     Divider()
 
                     HStack {
                         Text(L10n.t(.encryptionSparsebundleLabel))
                             .font(.body)
                         Spacer()
-                        TextField("OtterKeepSanctuary", text: Binding(
-                            get: { profile.encryptionConfig?.containerName ?? "OtterKeepSanctuary" },
-                            set: { val in
-                                var updated = profile
-                                var enc = updated.encryptionConfig ?? LocalEncryptionConfiguration()
-                                enc.containerName = val.isEmpty ? "OtterKeepSanctuary" : val
-                                updated.encryptionConfig = enc
-                                appState.selectedProfile = updated
-                            }
-                        ))
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 220)
+                        Text(profile.encryptionConfig?.containerName ?? "OtterKeepSanctuary")
+                            .font(.body.monospaced())
+                            .foregroundStyle(.secondary)
                     }
 
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(L10n.t(.sparsebundlePasswordLabel))
                                 .font(.body)
-                            Text(L10n.t(.sparsebundlePasswordHint))
+                            Text("A jelszó a létrehozáskor a Keychainbe és a Secure Enclave-be került.")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        SecureField(L10n.t(.sparsebundlePasswordPlaceholder), text: Binding(
-                            get: {
-                                KeychainManager.getSecret(for: "sparsebundle_\(profile.id.uuidString)")
-                                    ?? KeychainManager.getPassphrase(for: profile.id)
-                                    ?? ""
-                            },
-                            set: { newPass in
-                                guard !newPass.isEmpty else { return }
-                                try? KeychainManager.saveSecret(newPass, for: "sparsebundle_\(profile.id.uuidString)")
-                                try? KeychainManager.savePassphrase(newPass, for: profile.id)
-                            }
-                        ))
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 220)
+                        Text("••••••••••••••••")
+                            .font(.body.monospaced())
+                            .foregroundStyle(.tertiary)
                     }
+                } else {
+                    HStack(spacing: 10) {
+                        Image(systemName: "lock.slash")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Titkosítás nélkül létrehozott profil")
+                                .font(.body.weight(.medium))
+                            Text(L10n.t(.encryptionLockedNotice))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
                 }
             }
         }

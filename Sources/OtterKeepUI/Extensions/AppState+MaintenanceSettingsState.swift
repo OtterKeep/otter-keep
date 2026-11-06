@@ -169,6 +169,39 @@ extension AppState {
         get { maintenanceSettings.newProfileDebouncingSeconds }
         set { maintenanceSettings.newProfileDebouncingSeconds = newValue }
     }
+    /// Draft encryption toggle for new profile creation.
+    public var newProfileEnableEncryption: Bool {
+        get { maintenanceSettings.newProfileEnableEncryption }
+        set { maintenanceSettings.newProfileEnableEncryption = newValue }
+    }
+    /// Draft encryption passphrase for new profile creation.
+    public var newProfileEncryptionPassphrase: String {
+        get { maintenanceSettings.newProfileEncryptionPassphrase }
+        set { maintenanceSettings.newProfileEncryptionPassphrase = newValue }
+    }
+    /// Draft confirmation passphrase for new profile creation.
+    public var newProfileConfirmPassphrase: String {
+        get { maintenanceSettings.newProfileConfirmPassphrase }
+        set { maintenanceSettings.newProfileConfirmPassphrase = newValue }
+    }
+    /// Draft option to include passphrase in Emergency Kit PDF.
+    public var newProfileIncludePassphraseInPDF: Bool {
+        get { maintenanceSettings.newProfileIncludePassphraseInPDF }
+        set { maintenanceSettings.newProfileIncludePassphraseInPDF = newValue }
+    }
+    /// Draft status flag whether Emergency Kit was exported.
+    public var newProfileIsEmergencyKitExported: Bool {
+        get { maintenanceSettings.newProfileIsEmergencyKitExported }
+        set { maintenanceSettings.newProfileIsEmergencyKitExported = newValue }
+    }
+    /// Hardware state for Biometrics (Touch ID / LocalAuthentication).
+    public var biometricHardwareState: BiometricHardwareState {
+        get { maintenanceSettings.biometricHardwareState }
+        set { maintenanceSettings.biometricHardwareState = newValue }
+    }
+    public func refreshBiometricHardwareState() {
+        biometricHardwareState = BiometricSecurityService.shared.evaluateHardwareState()
+    }
     /// Tag of the currently applied configuration preset.
     public var selectedPresetTag: String? { get { maintenanceSettings.selectedPresetTag } set { maintenanceSettings.selectedPresetTag = newValue } }
     /// Controls presentation of the rename profile sheet.
@@ -346,5 +379,50 @@ extension AppState {
     /// Computes the active SwiftUI color scheme, dynamically synchronizing system mode with the OS interface style.
     public var effectiveColorScheme: ColorScheme {
         maintenanceSettings.effectiveColorScheme
+    }
+
+    /// Whether biometric authentication (Touch ID) is active.
+    public var isBiometricsEnabled: Bool {
+        get { maintenanceSettings.isBiometricsEnabled }
+        set {
+            maintenanceSettings.isBiometricsEnabled = newValue
+            LocalizationManager.shared.isBiometricsEnabled = newValue
+        }
+    }
+
+    /// Require biometrics for restore operations.
+    public var requireBiometricsForRestore: Bool {
+        get { maintenanceSettings.requireBiometricsForRestore }
+        set {
+            maintenanceSettings.requireBiometricsForRestore = newValue
+            LocalizationManager.shared.requireBiometricsForRestore = newValue
+        }
+    }
+
+    /// Require biometrics for profile deletion.
+    public var requireBiometricsForProfileDeletion: Bool {
+        get { maintenanceSettings.requireBiometricsForProfileDeletion }
+        set {
+            maintenanceSettings.requireBiometricsForProfileDeletion = newValue
+            LocalizationManager.shared.requireBiometricsForProfileDeletion = newValue
+        }
+    }
+
+    /// Require biometrics to reveal passphrases and keys.
+    public var requireBiometricsForKeyReveal: Bool {
+        get { maintenanceSettings.requireBiometricsForKeyReveal }
+        set {
+            maintenanceSettings.requireBiometricsForKeyReveal = newValue
+            LocalizationManager.shared.requireBiometricsForKeyReveal = newValue
+        }
+    }
+
+    /// Use hardware Secure Enclave protection for Keychain items.
+    public var useSecureEnclaveForKeychain: Bool {
+        get { maintenanceSettings.useSecureEnclaveForKeychain }
+        set {
+            maintenanceSettings.useSecureEnclaveForKeychain = newValue
+            LocalizationManager.shared.useSecureEnclaveForKeychain = newValue
+        }
     }
 }

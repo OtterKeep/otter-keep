@@ -102,6 +102,8 @@ public struct PreferencesModalView: View {
                     switch appState.activePreferencesTab {
                     case .general:
                         generalTabContent
+                    case .security:
+                        SecurityPreferencesView(appState: appState)
                     case .finder:
                         finderTabContent
                     case .storage:

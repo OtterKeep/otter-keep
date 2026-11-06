@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import LocalAuthentication
 import os
 
 /// Thread-safe manager storing and retrieving encryption passphrases from the native macOS Keychain.
@@ -11,20 +12,36 @@ public enum KeychainManager {
     /// - Parameters:
     ///   - passphrase: The secret string.
     ///   - profileId: Backup profile UUID.
-    public static func savePassphrase(_ passphrase: String, for profileId: UUID) throws {
+    ///   - requireSecureEnclave: Whether to wrap the item with hardware Secure Enclave user-presence protection.
+    public static func savePassphrase(_ passphrase: String, for profileId: UUID, requireSecureEnclave: Bool = false) throws {
         guard let data = passphrase.data(using: .utf8) else { return }
         let account = profileId.uuidString
 
         // First remove any existing item
         deletePassphrase(for: profileId)
 
-        let query: [String: Any] = [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
             kSecAttrAccount as String: account,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            kSecValueData as String: data
         ]
+
+        if requireSecureEnclave {
+            var accessError: Unmanaged<CFError>?
+            if let accessControl = SecAccessControlCreateWithFlags(
+                kCFAllocatorDefault,
+                kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+                .userPresence,
+                &accessError
+            ) {
+                query[kSecAttrAccessControl as String] = accessControl
+            } else {
+                query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            }
+        } else {
+            query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        }
 
         let status = SecItemAdd(query as CFDictionary, nil)
         guard status == errSecSuccess else {
@@ -33,21 +50,28 @@ public enum KeychainManager {
                 NSLocalizedDescriptionKey: "Failed to store passphrase in macOS Keychain [Status: \(status)]"
             ])
         }
-        logger.info("Passphrase securely stored in Keychain for profile: \(account)")
+        logger.info("Passphrase securely stored in Keychain for profile: \(account) (SecureEnclave: \(requireSecureEnclave))")
     }
 
     /// Retrieves an encryption passphrase from the Keychain for a specific profile ID.
-    /// - Parameter profileId: Backup profile UUID.
+    /// - Parameters:
+    ///   - profileId: Backup profile UUID.
+    ///   - prompt: Optional user-visible prompt when Secure Enclave biometrics are required.
     /// - Returns: Passphrase string if found, nil otherwise.
-    public static func getPassphrase(for profileId: UUID) -> String? {
+    public static func getPassphrase(for profileId: UUID, prompt: String? = nil) -> String? {
         let account = profileId.uuidString
-        let query: [String: Any] = [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
             kSecAttrAccount as String: account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
+        if let prompt = prompt {
+            let authContext = LAContext()
+            authContext.localizedReason = prompt
+            query[kSecUseAuthenticationContext as String] = authContext
+        }
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)

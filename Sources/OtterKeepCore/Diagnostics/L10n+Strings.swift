@@ -1095,5 +1095,78 @@ extension L10n {
             hungarian: "Teljes lemezhozzáférés megnyitása"
         ),
         .recoveryViewLogs: Translation(english: "View Diagnostic Logs", hungarian: "Hibanapló megtekintése"),
+
+        // MARK: - Emergency Kit, Biometrics & Automation (v2.1)
+        .emergencyKitTitle: Translation(english: "Emergency Recovery Kit", hungarian: "Vészhelyzeti Helyreállítási Készlet"),
+        .emergencyKitSubtitle: Translation(
+            english: "Print or securely store this recovery document to restore encrypted backups in an emergency.",
+            hungarian: "Nyomtasd ki vagy mentsd el biztonságos helyre ezt a dokumentumot a titkosított mentések vészhelyzeti visszaállításához."
+        ),
+        .emergencyKitExportButton: Translation(english: "Download Emergency Kit (PDF)...", hungarian: "Vészhelyzeti Kit Letöltése (PDF)..."),
+        .emergencyKitExportedNotice: Translation(english: "Emergency Kit successfully saved.", hungarian: "A Vészhelyzeti Kit sikeresen elmentve."),
+        .emergencyKitDownloadPrompt: Translation(
+            english: "Download your Emergency Kit now. For your security, this document cannot be generated later.",
+            hungarian: "Töltsd le a Vészhelyzeti Kitet most. A biztonságod érdekében ez a dokumentum később már nem tölthető le."
+        ),
+        .emergencyKitCreatedOnlyWarning: Translation(
+            english: "The Emergency Kit is only available during profile creation. Keep it safe!",
+            hungarian: "A Vészhelyzeti Kit kizárólag a profil létrehozásakor tölthető le. Őrizd meg biztonságos helyen!"
+        ),
+        .emergencyKitIncludePassword: Translation(english: "Include Passphrase in PDF", hungarian: "Jelszó beágyazása a PDF-be"),
+        .emergencyKitIncludePasswordDesc: Translation(
+            english: "Warning: Anyone with this document can decrypt your backup. Keep paper copies in a safe.",
+            hungarian: "Figyelem: Bárki, aki hozzáfér ehhez a dokumentumhoz, feloldhatja a mentésedet. Tartsd páncélszekrényben a papírpéldányt."
+        ),
+        .emergencyKitHandwriteNotice: Translation(
+            english: "Write your encryption passphrase by hand in the boxes below:",
+            hungarian: "Írd be kézzel a titkosítási jelszavadat az alábbi mezőkbe:"
+        ),
+        .emergencyKitSecuritySummary: Translation(english: "Cryptographic Specifications", hungarian: "Kriptográfiai Jellemzők"),
+        .emergencyKitRestoreSteps: Translation(english: "Disaster Recovery Instructions", hungarian: "Katasztrófa-helyreállítási Lépések"),
+        .emergencyKitTerminalCommand: Translation(english: "Terminal Recovery Command", hungarian: "Terminál Helyreállító Parancs"),
+        .emergencyKitQRCodeLabel: Translation(english: "Scannable Recovery QR Code", hungarian: "Beolvasható Helyreállító QR Kód"),
+        .biometricsTabTitle: Translation(english: "Biometrics & Hardware", hungarian: "Biometria és Hardver"),
+        .biometricsEnableMasterToggle: Translation(english: "Enable Touch ID & Biometrics", hungarian: "Touch ID & Hitelesítés engedélyezése"),
+        .biometricsTouchIDAvailable: Translation(english: "Touch ID sensor active", hungarian: "Touch ID érzékelő aktív"),
+        .biometricsTouchIDUnavailable: Translation(english: "Biometrics unavailable (passcode fallback)", hungarian: "Biometria nem érhető el (jelszó fallback)"),
+        .biometricsRequireForRestore: Translation(english: "Require Touch ID to restore files", hungarian: "Touch ID megkövetelése fájlok visszaállításakor"),
+        .biometricsRequireForRestoreDesc: Translation(
+            english: "Prevents unauthorized users from restoring backups on an unlocked Mac.",
+            hungarian: "Megakadályozza, hogy illetéktelenek fájlokat állítsanak vissza egy feloldott Macen."
+        ),
+        .biometricsRequireForDelete: Translation(english: "Require Touch ID to delete profiles", hungarian: "Touch ID megkövetelése profil törlésekor"),
+        .biometricsRequireForDeleteDesc: Translation(
+            english: "Requires biometric confirmation before permanently removing a backup profile and history.",
+            hungarian: "Biometrikus megerősítést kér a mentési profil és előzmények végleges törlése előtt."
+        ),
+        .biometricsRequireForKeyReveal: Translation(english: "Require Touch ID to reveal encryption keys", hungarian: "Touch ID megkövetelése titkosítási kulcsok felfedésekor"),
+        .biometricsRequireForKeyRevealDesc: Translation(
+            english: "Demands Touch ID before viewing passphrases or exporting security kits.",
+            hungarian: "Touch ID-t kér a jelszavak megtekintése vagy a biztonsági készlet exportálása előtt."
+        ),
+        .biometricsHardwareSecureEnclave: Translation(english: "Hardware Secure Enclave Key Protection", hungarian: "Hardveres Secure Enclave Kulcsvédelem"),
+        .biometricsHardwareSecureEnclaveDesc: Translation(
+            english: "Stores encryption keys in the Apple Secure Enclave coprocessor, requiring user presence.",
+            hungarian: "A titkosítási kulcsokat az Apple Secure Enclave hardver chipjében tárolja, felhasználói jelenlétet igényelve."
+        ),
+        .biometricsAuthPromptRestore: Translation(english: "Authorize restoring files from OtterKeep backup", hungarian: "Fájlok visszaállításának jóváhagyása az OtterKeep mentésből"),
+        .biometricsAuthPromptDelete: Translation(english: "Authorize permanently deleting this backup profile", hungarian: "A mentési profil végleges törlésének jóváhagyása"),
+        .biometricsAuthPromptKeyReveal: Translation(english: "Authorize viewing encryption passphrase", hungarian: "Titkosítási jelszó megtekintésének jóváhagyása"),
+        .biometricsAuthPromptEmergencyKit: Translation(english: "Authorize exporting Emergency Recovery Kit", hungarian: "A Vészhelyzeti Helyreállítási Készlet exportálásának jóváhagyása"),
+        .biometricsAuthFailed: Translation(english: "Biometric authentication failed or was cancelled.", hungarian: "A biometrikus azonosítás sikertelen volt vagy meg lett szakítva."),
+        .encryptionLockedNotice: Translation(
+            english: "Encryption settings were permanently configured during profile creation and cannot be modified.",
+            hungarian: "A titkosítási beállítások a profil létrehozásakor véglegesen rögzültek, és a biztonság védelmében nem módosíthatók."
+        ),
+        .intentStartBackupTitle: Translation(english: "Start OtterKeep Backup", hungarian: "OtterKeep Mentés Indítása"),
+        .intentStartBackupDesc: Translation(
+            english: "Starts a silent background backup for the configured profile.",
+            hungarian: "Csendes háttérmentést indít a megadott profilhoz."
+        ),
+        .intentGetStatusTitle: Translation(english: "Get Backup Status", hungarian: "Mentési Állapot Lekérdezése"),
+        .intentGetStatusDesc: Translation(
+            english: "Returns the current health and timestamp of the latest backup.",
+            hungarian: "Visszaadja a legutóbbi mentés állapotát és időbélyegét."
+        ),
     ]
 }
