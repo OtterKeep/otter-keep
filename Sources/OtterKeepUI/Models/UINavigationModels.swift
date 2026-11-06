@@ -17,11 +17,36 @@ public enum NavigationSection: Hashable, Sendable {
     case settings
 }
 
+/// Every top-level modal the main window can present.
+///
+/// A single `activeModal` slot guarantees that only one sheet is ever requested at a time, which
+/// removes the competing-presentation glitches that arise when several independent `Bool` flags are
+/// bound to chained `.sheet(isPresented:)` modifiers on the same view.
+public enum AppModalRoute: String, CaseIterable, Identifiable, Sendable {
+    case preferences
+    case systemLogs
+    case inspector
+    case fileVersionHistory
+    case onboarding
+    case unadoptedDrive
+    case newProfile
+    case profileSettings
+    case deleteProfile
+    case feedback
+    case dryRun
+    case lastBackupSummary
+
+    public var id: String { rawValue }
+}
+
 /// Tabs within the unified Profile Workspace.
+///
+/// Rules, automation and maintenance deliberately live in `ProfileSettingsModalView` instead of a
+/// third tab: configuration is a deliberate, modal task, while the workspace stays focused on the
+/// two things a user checks daily — the live overview and the restore timeline.
 public enum ProfileWorkspaceTab: String, CaseIterable, Identifiable, Sendable {
     case overview = "overview"
     case timeMachine = "timeMachine"
-    case rulesAndMaintenance = "rulesAndMaintenance"
 
     public var id: String { rawValue }
 
@@ -29,7 +54,6 @@ public enum ProfileWorkspaceTab: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .overview: return L10n.t(.tabOverview)
         case .timeMachine: return L10n.t(.tabTimeMachine)
-        case .rulesAndMaintenance: return L10n.t(.tabRulesAndMaintenance)
         }
     }
 
@@ -37,7 +61,6 @@ public enum ProfileWorkspaceTab: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .overview: return "gauge.with.needle"
         case .timeMachine: return "clock.arrow.circlepath"
-        case .rulesAndMaintenance: return "slider.horizontal.3"
         }
     }
 }
@@ -197,6 +220,26 @@ public enum RestoreBrowseMode: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// A single restorative step offered to the user after a failed operation.
+///
+/// The three-part error architecture requires every failure to name a concrete next step, so the
+/// action is modelled as data instead of being re-derived from free-form advice text.
+public struct RecoveryAction: Sendable, Equatable {
+    public enum Kind: Sendable, Equatable {
+        /// Deep-links to the Full Disk Access pane in System Settings.
+        case openFullDiskAccess
+        /// Opens the diagnostic log workspace.
+        case viewLogs
+    }
+
+    public let kind: Kind
+    public let label: String
+
+    public init(kind: Kind, label: String) {
+        self.kind = kind
+        self.label = label
+    }
+}
 
 /// Modal feedback payload presenting Ottie mascot illustrations and actionable guidance.
 public struct OperationFeedback: Identifiable, Sendable {
@@ -210,6 +253,10 @@ public struct OperationFeedback: Identifiable, Sendable {
     public let title: String
     public let message: String
     public let detailedReason: String?
+    /// Sanctuary guarantee: what stayed safe, stated before any technical detail.
+    public let guaranteeText: String?
+    /// Restorative pathway: the single most useful next step.
+    public let recoveryAction: RecoveryAction?
     public let profileName: String?
     public let summary: BackupSessionSummary?
     public let restoreSummary: RestoreSessionSummary?
@@ -220,6 +267,8 @@ public struct OperationFeedback: Identifiable, Sendable {
         title: String,
         message: String,
         detailedReason: String? = nil,
+        guaranteeText: String? = nil,
+        recoveryAction: RecoveryAction? = nil,
         profileName: String? = nil,
         summary: BackupSessionSummary? = nil,
         restoreSummary: RestoreSessionSummary? = nil
@@ -229,6 +278,8 @@ public struct OperationFeedback: Identifiable, Sendable {
         self.title = title
         self.message = message
         self.detailedReason = detailedReason
+        self.guaranteeText = guaranteeText
+        self.recoveryAction = recoveryAction
         self.profileName = profileName
         self.summary = summary
         self.restoreSummary = restoreSummary

@@ -72,10 +72,6 @@ public struct RestoreExplorerView: View {
         .onDisappear {
             QuickLookCoordinator.shared.stopKeyboardMonitoring()
         }
-        .onKeyPress(.space) {
-            appState.toggleQuickLook()
-            return .handled
-        }
         .sheet(isPresented: showRestoreDialogBinding) {
             restoreSheetView
         }

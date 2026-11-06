@@ -38,6 +38,15 @@ public struct ProfileSettingsModalView: View {
 
                 Spacer()
 
+                // This modal is the only route to rules, automation and maintenance, so it must be
+                // dismissible without saving — otherwise a stray edit traps the user in the sheet.
+                Button(L10n.t(.cancel)) {
+                    appState.showProfileSettingsModal = false
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .keyboardShortcut(.cancelAction)
+
                 Button(L10n.t(.save)) {
                     appState.saveProfiles()
                     appState.showProfileSettingsModal = false
@@ -55,7 +64,7 @@ public struct ProfileSettingsModalView: View {
             // Tabbed Content
             ProfileRulesAndMaintenanceView(appState: appState, profile: profile)
         }
-        .frame(minWidth: 720, idealWidth: 760, minHeight: 520, idealHeight: 580)
+        .frame(minWidth: 720, idealWidth: 760, maxWidth: .infinity, minHeight: 520, idealHeight: 580, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 }

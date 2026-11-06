@@ -32,7 +32,7 @@ public struct DeleteProfileConfirmationModalView: View {
                     // Adorable questioning badge
                     HStack(spacing: 3) {
                         Image(systemName: "questionmark.bubble.fill")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.title3.bold())
                             .foregroundStyle(OtterTheme.otterAmber)
                     }
                     .padding(6)
@@ -104,7 +104,10 @@ public struct DeleteProfileConfirmationModalView: View {
             .padding(.vertical, 14)
             .background(.ultraThinMaterial)
         }
-        .frame(width: 440, height: 380)
+        .frame(
+            minWidth: 400, idealWidth: 440, maxWidth: 560,
+            minHeight: 320, idealHeight: 380, maxHeight: 620
+        )
         .background(Color(nsColor: .windowBackgroundColor))
     }
 }

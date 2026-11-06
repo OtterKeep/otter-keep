@@ -70,9 +70,8 @@ public struct SettingsView: View {
                             .pickerStyle(.radioGroup)
                             .font(.body)
                         }
-                        .padding(20)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .otterCard(padding: 20)
 
                         // 2. Appearance & Theme Selection Card
                         VStack(alignment: .leading, spacing: 14) {
@@ -97,9 +96,8 @@ public struct SettingsView: View {
                             }
                             .pickerStyle(.segmented)
                         }
-                        .padding(20)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .otterCard(padding: 20)
                     }
                 }
 
@@ -137,9 +135,8 @@ public struct SettingsView: View {
                     }
                     .toggleStyle(.switch)
                 }
-                .padding(20)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
-                .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
+                .otterCard(padding: 20)
 
                 // 4. Persistent Files & Storage Section
                 persistentFilesSection

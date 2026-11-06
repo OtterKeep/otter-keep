@@ -69,7 +69,7 @@ extension SettingsView {
                         }
                     }
                     .padding(12)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(hasFDA ? OtterTheme.statusSuccess.opacity(0.08) : OtterTheme.statusWarning.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
 
                     // Finder Extension Status Card
@@ -103,7 +103,7 @@ extension SettingsView {
                         }
                     }
                     .padding(12)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(isFinderEnabled ? OtterTheme.statusSuccess.opacity(0.08) : Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
 
                     // Background Daemon Service (SMAppService) Card
@@ -142,7 +142,7 @@ extension SettingsView {
                         }
                     }
                     .padding(12)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(isDaemonActive ? OtterTheme.statusSuccess.opacity(0.08) : (isRequiresApproval ? OtterTheme.statusWarning.opacity(0.1) : Color.primary.opacity(0.04)), in: RoundedRectangle(cornerRadius: 10))
                 }
             }

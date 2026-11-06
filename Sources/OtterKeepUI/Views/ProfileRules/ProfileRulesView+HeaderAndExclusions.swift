@@ -27,15 +27,6 @@ extension ProfileRulesView {
             }
 
             Spacer()
-
-            Button {
-                appState.activeProfileTab = .overview
-            } label: {
-                Label(L10n.t(.tabOverview), systemImage: "gauge.with.needle")
-                    .font(.caption.weight(.medium))
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
         .padding(14)
         .background(.background.secondary, in: RoundedRectangle(cornerRadius: 12))
@@ -182,6 +173,7 @@ extension ProfileRulesView {
                                 }
                                 .buttonStyle(.plain)
                                 .foregroundStyle(.secondary)
+                                .accessibilityLabel(L10n.t(.removeExclusionButton))
                             }
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)

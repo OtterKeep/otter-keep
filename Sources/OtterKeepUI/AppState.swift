@@ -429,7 +429,10 @@ public final class AppState: Sendable {
     // MARK: - Zero-Config Unadopted Drive Adoption
     public var discoveredUnadoptedMetadata: DriveProfileMetadata? = nil
     public var discoveredUnadoptedVolumeURL: URL? = nil
-    public var showUnadoptedDriveModal: Bool = false
+    public var showUnadoptedDriveModal: Bool {
+        get { activeModal == .unadoptedDrive }
+        set { setModalRoute(.unadoptedDrive, presented: newValue) }
+    }
 
     public func handleUnadoptedDriveDiscovered(metadata: DriveProfileMetadata, volumeURL: URL) {
         self.discoveredUnadoptedMetadata = metadata

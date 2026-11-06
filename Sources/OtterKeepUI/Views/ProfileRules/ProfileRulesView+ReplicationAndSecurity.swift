@@ -201,7 +201,7 @@ extension ProfileRulesView {
                                         if dest.isClientEncryptionEnabled {
                                             HStack(spacing: 3) {
                                                 Image(systemName: "lock.fill")
-                                                Text("AES-256")
+                                                Text(L10n.t(.replicationEncryptionBadge))
                                             }
                                             .font(.caption2.bold())
                                             .padding(.horizontal, 6)
@@ -212,7 +212,7 @@ extension ProfileRulesView {
                                         if dest.archivePackagingEnabled {
                                             HStack(spacing: 3) {
                                                 Image(systemName: "archivebox.fill")
-                                                Text("TAR.ZST (L\(dest.archiveCompressionLevel))")
+                                                Text(L10n.format(.replicationArchiveBadgeFormat, dest.archiveCompressionLevel))
                                             }
                                             .font(.caption2.bold().monospacedDigit())
                                             .padding(.horizontal, 6)
@@ -536,7 +536,7 @@ extension ProfileRulesView {
                     Divider()
 
                     HStack {
-                        Text("Sparsebundle:")
+                        Text(L10n.t(.encryptionSparsebundleLabel))
                             .font(.body)
                         Spacer()
                         TextField("OtterKeepSanctuary", text: Binding(

@@ -41,7 +41,7 @@ extension MenuBarContentView {
                 openRestoreExplorer()
             } label: {
                 Image(systemName: "clock.arrow.circlepath")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(OtterTheme.oceanicTeal)
                     .frame(width: 24, height: 24)
                     .contentShape(Rectangle())
@@ -54,7 +54,7 @@ extension MenuBarContentView {
                 cycleTheme()
             } label: {
                 Image(systemName: appState.currentTheme.iconName)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .frame(width: 24, height: 24)
                     .contentShape(Rectangle())
@@ -67,7 +67,7 @@ extension MenuBarContentView {
                 openSettings()
             } label: {
                 Image(systemName: "gearshape")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .frame(width: 24, height: 24)
                     .contentShape(Rectangle())

@@ -6,6 +6,17 @@ All notable changes to OtterKeep are documented in this file in accordance with 
 
 ## [Unreleased]
 
+### 🧭 Profile Workspace Focus
+
+- **Rules & Maintenance Moved Out of the Workspace Tabs**: The profile workspace now offers only the two daily surfaces — *Overview* and *Time Machine*. Rules, automation and maintenance open exclusively from the **Profile Settings** button (and `⌘3`), so configuration never competes with monitoring.
+- **Dismissible Profile Settings**: The settings sheet gained a **Cancel** button (`Esc`), since it is now the only route to those controls and must never trap the user into saving.
+- **Menu Bar Shortcut Alignment**: The menu bar "Open Rules & Schedule" actions now open the Profile Settings sheet instead of switching a workspace tab.
+
+### 🪟 Nested Sheet Presentation
+
+- **Add Remote Destination Opens On Top**: The remote destination editor is now a nested sheet inside the Profile Settings modal instead of a request for the global modal slot. Previously the request was queued behind the settings sheet, so the editor only appeared after that sheet closed — reading as a window opening underneath the one in use.
+- **Single Owner for the Editor**: The editor's presentation flag moved from the global `AppModalRoute` slot to `ReplicationDestinationStore`, so it can no longer be silently queued or lost while another modal is visible.
+
 ---
 
 ## [2.0.0] - 2026-10-14 (Build 2000)

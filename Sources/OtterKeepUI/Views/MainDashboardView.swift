@@ -1,6 +1,6 @@
-import SwiftUI
 import AppKit
 import OtterKeepCore
+import SwiftUI
 
 /// Overview and primary backup dashboard view for the currently selected folder profile,
 /// featuring the visual APFS CoW pipeline, Apple-style storage gauge, and live telemetry.
@@ -114,22 +114,6 @@ public struct MainDashboardView: View {
                 appState.refreshStorageForecast()
             }
         }
-        .sheet(isPresented: Binding(
-            get: { appState.showDryRunModal },
-            set: { appState.showDryRunModal = $0 }
-        )) {
-            if let summary = appState.dryRunSummary {
-                DryRunModalView(appState: appState, summary: summary)
-            }
-        }
-        .sheet(isPresented: Binding(
-            get: { appState.showLastBackupSummaryModal },
-            set: { appState.showLastBackupSummaryModal = $0 }
-        )) {
-            if let summary = appState.selectedProfile.flatMap({ appState.lastStatusInfo(for: $0).lastSessionSummary }) ?? appState.lastSessionSummary {
-                LastBackupSessionModalView(appState: appState, summary: summary)
-            }
-        }
     }
 
     private static let forecastDateFormatter: DateFormatter = {
@@ -179,167 +163,352 @@ public struct MainDashboardView: View {
         let forecast = appState.storageForecastReport
 
         return VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 16) {
-                // Ottie mascot with dynamic emotional state
-                OttieSanctuaryMascotView(mood: mood, size: 88)
+            // Leading cluster (mascot + status) and trailing cluster (actions) stack
+            // vertically on narrow windows instead of crushing each other.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 16) {
+                    HStack(alignment: .center, spacing: 16) {
+                        // Ottie mascot with dynamic emotional state
+                        OttieSanctuaryMascotView(mood: mood, size: 88)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        Text(sanctuaryTitle(for: mood))
-                            .font(OtterTheme.cardTitleFont)
-                            .foregroundStyle(.primary)
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 8) {
+                                Text(sanctuaryTitle(for: mood))
+                                    .font(OtterTheme.cardTitleFont)
+                                    .foregroundStyle(.primary)
 
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(mood == .safe ? OtterTheme.statusGreen : (mood == .warning ? OtterTheme.otterAmber : OtterTheme.statusError))
-                                .frame(width: 7, height: 7)
-                            Text(status.displayStatusText)
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(mood == .safe ? OtterTheme.statusGreen : (mood == .warning ? OtterTheme.otterAmber : OtterTheme.statusError))
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background((mood == .safe ? OtterTheme.statusGreen : (mood == .warning ? OtterTheme.otterAmber : OtterTheme.statusError)).opacity(0.12), in: Capsule())
-                    }
-
-                    if status.hasSnapshots {
-                        HStack(spacing: 8) {
-                            Text(status.displayDetailText)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-
-                            Text("•")
-                                .foregroundStyle(.tertiary)
-
-                            Text(L10n.format(.profileStatusSnapshotsFormat, status.totalSnapshots))
-                                .font(.subheadline.bold().monospacedDigit())
-                                .foregroundStyle(OtterTheme.oceanicTeal)
-                        }
-                    } else {
-                        Text(L10n.t(.sanctuaryNeverBackedUp))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    // S.M.A.R.T. Drive Health & Mode Badge
-                    let isDriveHealthy = appState.volumeEvaluation?.isTargetReadOnly != true &&
-                                         status.lastSessionSummary?.errorCount == 0 &&
-                                         forecast?.isQuotaExceeded != true
-
-                    HStack(spacing: 8) {
-                        HStack(spacing: 4) {
-                            Image(systemName: isDriveHealthy ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
-                                .font(.system(size: 10))
-                                .foregroundStyle(isDriveHealthy ? OtterTheme.statusGreen : OtterTheme.statusWarning)
-                            Text(isDriveHealthy ? L10n.t(.smartHeroHealthy) : L10n.t(.smartHeroWarning))
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(isDriveHealthy ? OtterTheme.statusGreen : OtterTheme.statusWarning)
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background((isDriveHealthy ? OtterTheme.statusGreen : OtterTheme.statusWarning).opacity(0.12), in: Capsule())
-
-                        if profile.executionMode.isContinuous {
-                            HStack(spacing: 4) {
-                                Image(systemName: "bolt.fill")
-                                    .font(.system(size: 9))
-                                    .foregroundStyle(OtterTheme.oceanicTeal)
-                                Text(L10n.t(.executionModeContinuous))
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(OtterTheme.oceanicTeal)
+                                HStack(spacing: 4) {
+                                    Circle()
+                                        .fill(mood == .safe ? OtterTheme.statusGreen : (mood == .warning ? OtterTheme.otterAmber : OtterTheme.statusError))
+                                        .frame(width: 7, height: 7)
+                                    Text(status.displayStatusText)
+                                        .font(.caption.bold())
+                                        .foregroundStyle(
+                                            mood == .safe ? OtterTheme.statusGreen : (mood == .warning ? OtterTheme.otterAmber : OtterTheme.statusError))
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    (mood == .safe ? OtterTheme.statusGreen : (mood == .warning ? OtterTheme.otterAmber : OtterTheme.statusError)).opacity(
+                                        0.12), in: Capsule())
                             }
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(OtterTheme.oceanicTeal.opacity(0.12), in: Capsule())
+
+                            if status.hasSnapshots {
+                                HStack(spacing: 8) {
+                                    Text(status.displayDetailText)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+
+                                    Text("•")
+                                        .foregroundStyle(.tertiary)
+
+                                    Text(L10n.format(.profileStatusSnapshotsFormat, status.totalSnapshots))
+                                        .font(.subheadline.bold().monospacedDigit())
+                                        .foregroundStyle(OtterTheme.oceanicTeal)
+                                }
+                            } else {
+                                Text(L10n.t(.sanctuaryNeverBackedUp))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            // S.M.A.R.T. Drive Health & Mode Badge
+                            let isDriveHealthy =
+                                appState.volumeEvaluation?.isTargetReadOnly != true && status.lastSessionSummary?.errorCount == 0
+                                && forecast?.isQuotaExceeded != true
+
+                            HStack(spacing: 8) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: isDriveHealthy ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(isDriveHealthy ? OtterTheme.statusGreen : OtterTheme.statusWarning)
+                                    Text(isDriveHealthy ? L10n.t(.smartHeroHealthy) : L10n.t(.smartHeroWarning))
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(isDriveHealthy ? OtterTheme.statusGreen : OtterTheme.statusWarning)
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background((isDriveHealthy ? OtterTheme.statusGreen : OtterTheme.statusWarning).opacity(0.12), in: Capsule())
+
+                                if profile.executionMode.isContinuous {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "bolt.fill")
+                                            .font(.caption2)
+                                            .foregroundStyle(OtterTheme.oceanicTeal)
+                                        Text(L10n.t(.executionModeContinuous))
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(OtterTheme.oceanicTeal)
+                                    }
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(OtterTheme.oceanicTeal.opacity(0.12), in: Capsule())
+                                }
+                            }
+                        }
+
+                    }
+
+                    Spacer(minLength: 12)
+
+                    VStack(alignment: .trailing, spacing: 8) {
+
+                        VStack(alignment: .trailing, spacing: 8) {
+                            if let sum = status.lastSessionSummary {
+                                Button {
+                                    appState.showLastBackupSummaryModal = true
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: sum.errorCount == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                            .font(.caption)
+                                            .foregroundStyle(sum.errorCount == 0 ? OtterTheme.statusGreen : OtterTheme.statusWarning)
+
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(sum.errorCount == 0 ? L10n.t(.lastBackupSuccess) : L10n.t(.lastBackupWarning))
+                                                .font(.caption.bold())
+                                            HStack(spacing: 4) {
+                                                Text(String(format: "%.1fs", sum.durationSeconds))
+                                                Text("•")
+                                                Text(ByteCountFormatter.string(fromByteCount: sum.totalScannedBytes, countStyle: .file))
+                                            }
+                                            .font(.caption2.monospacedDigit())
+                                            .foregroundStyle(.secondary)
+                                        }
+
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption2.bold())
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 5)
+                                    .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
+                                .help(L10n.t(.lastBackupResultSubtitle))
+                            }
+
+                            HStack(spacing: 8) {
+                                // Dry-Run Button
+                                Button {
+                                    appState.performDryRun()
+                                } label: {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: appState.isDryRunRunning ? "arrow.triangle.2.circlepath" : "magnifyingglass")
+                                            .symbolEffect(.rotate, isActive: appState.isDryRunRunning)
+                                        Text(appState.isDryRunRunning ? L10n.t(.analyzingProgress) : L10n.t(.quickDryRunAction))
+                                    }
+                                    .font(.callout.weight(.medium))
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.regular)
+                                .keyboardShortcut("d", modifiers: .command)
+                                .disabled(appState.isBackupRunning(for: profile.id) || appState.isDryRunRunning)
+
+                                // Backup Now / Stop Button
+                                if appState.isBackupRunning(for: profile.id) {
+                                    Button(role: .destructive) {
+                                        appState.cancelBackup(for: profile.id)
+                                    } label: {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: "stop.circle.fill")
+                                            Text(L10n.t(.stopBackupButton))
+                                        }
+                                        .font(.callout.bold())
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(OtterTheme.statusError)
+                                    .controlSize(.regular)
+                                    .keyboardShortcut(".", modifiers: .command)
+                                } else {
+                                    Button {
+                                        appState.startBackup(for: profile)
+                                    } label: {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: "arrow.clockwise.circle.fill")
+                                            Text(L10n.t(.quickBackupAction))
+                                        }
+                                        .font(.callout.bold())
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(OtterTheme.otterAmber)
+                                    .controlSize(.regular)
+                                    .keyboardShortcut("b", modifiers: .command)
+                                    .disabled(appState.isDryRunRunning)
+                                }
+                            }
                         }
                     }
                 }
 
-                Spacer(minLength: 12)
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .center, spacing: 16) {
+                        // Ottie mascot with dynamic emotional state
+                        OttieSanctuaryMascotView(mood: mood, size: 88)
 
-                VStack(alignment: .trailing, spacing: 8) {
-                    if let sum = status.lastSessionSummary {
-                        Button {
-                            appState.showLastBackupSummaryModal = true
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: sum.errorCount == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(sum.errorCount == 0 ? OtterTheme.statusGreen : OtterTheme.statusWarning)
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 8) {
+                                Text(sanctuaryTitle(for: mood))
+                                    .font(OtterTheme.cardTitleFont)
+                                    .foregroundStyle(.primary)
 
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(sum.errorCount == 0 ? L10n.t(.lastBackupSuccess) : L10n.t(.lastBackupWarning))
+                                HStack(spacing: 4) {
+                                    Circle()
+                                        .fill(mood == .safe ? OtterTheme.statusGreen : (mood == .warning ? OtterTheme.otterAmber : OtterTheme.statusError))
+                                        .frame(width: 7, height: 7)
+                                    Text(status.displayStatusText)
                                         .font(.caption.bold())
-                                    HStack(spacing: 4) {
-                                        Text(String(format: "%.1fs", sum.durationSeconds))
-                                        Text("•")
-                                        Text(ByteCountFormatter.string(fromByteCount: sum.totalScannedBytes, countStyle: .file))
-                                    }
-                                    .font(.caption2.monospacedDigit())
+                                        .foregroundStyle(
+                                            mood == .safe ? OtterTheme.statusGreen : (mood == .warning ? OtterTheme.otterAmber : OtterTheme.statusError))
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    (mood == .safe ? OtterTheme.statusGreen : (mood == .warning ? OtterTheme.otterAmber : OtterTheme.statusError)).opacity(
+                                        0.12), in: Capsule())
+                            }
+
+                            if status.hasSnapshots {
+                                HStack(spacing: 8) {
+                                    Text(status.displayDetailText)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+
+                                    Text("•")
+                                        .foregroundStyle(.tertiary)
+
+                                    Text(L10n.format(.profileStatusSnapshotsFormat, status.totalSnapshots))
+                                        .font(.subheadline.bold().monospacedDigit())
+                                        .foregroundStyle(OtterTheme.oceanicTeal)
+                                }
+                            } else {
+                                Text(L10n.t(.sanctuaryNeverBackedUp))
+                                    .font(.caption)
                                     .foregroundStyle(.secondary)
-                                }
-
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundStyle(.tertiary)
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                            // S.M.A.R.T. Drive Health & Mode Badge
+                            let isDriveHealthy =
+                                appState.volumeEvaluation?.isTargetReadOnly != true && status.lastSessionSummary?.errorCount == 0
+                                && forecast?.isQuotaExceeded != true
+
+                            HStack(spacing: 8) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: isDriveHealthy ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(isDriveHealthy ? OtterTheme.statusGreen : OtterTheme.statusWarning)
+                                    Text(isDriveHealthy ? L10n.t(.smartHeroHealthy) : L10n.t(.smartHeroWarning))
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(isDriveHealthy ? OtterTheme.statusGreen : OtterTheme.statusWarning)
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background((isDriveHealthy ? OtterTheme.statusGreen : OtterTheme.statusWarning).opacity(0.12), in: Capsule())
+
+                                if profile.executionMode.isContinuous {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "bolt.fill")
+                                            .font(.caption2)
+                                            .foregroundStyle(OtterTheme.oceanicTeal)
+                                        Text(L10n.t(.executionModeContinuous))
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(OtterTheme.oceanicTeal)
+                                    }
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(OtterTheme.oceanicTeal.opacity(0.12), in: Capsule())
+                                }
+                            }
                         }
-                        .buttonStyle(.plain)
-                        .help(L10n.t(.lastBackupResultSubtitle))
+
                     }
 
-                    HStack(spacing: 8) {
-                        // Dry-Run Button
-                        Button {
-                            appState.performDryRun()
-                        } label: {
-                            HStack(spacing: 5) {
-                                Image(systemName: appState.isDryRunRunning ? "arrow.triangle.2.circlepath" : "magnifyingglass")
-                                    .symbolEffect(.rotate, isActive: appState.isDryRunRunning)
-                                Text(appState.isDryRunRunning ? L10n.t(.analyzingProgress) : L10n.t(.quickDryRunAction))
-                            }
-                            .font(.callout.weight(.medium))
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.regular)
-                        .keyboardShortcut("d", modifiers: .command)
-                        .disabled(appState.isBackupRunning(for: profile.id) || appState.isDryRunRunning)
+                    VStack(alignment: .leading, spacing: 8) {
 
-                        // Backup Now / Stop Button
-                        if appState.isBackupRunning(for: profile.id) {
-                            Button(role: .destructive) {
-                                appState.cancelBackup(for: profile.id)
-                            } label: {
-                                HStack(spacing: 5) {
-                                    Image(systemName: "stop.circle.fill")
-                                    Text(L10n.t(.stopBackupButton))
+                        VStack(alignment: .trailing, spacing: 8) {
+                            if let sum = status.lastSessionSummary {
+                                Button {
+                                    appState.showLastBackupSummaryModal = true
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: sum.errorCount == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                            .font(.caption)
+                                            .foregroundStyle(sum.errorCount == 0 ? OtterTheme.statusGreen : OtterTheme.statusWarning)
+
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(sum.errorCount == 0 ? L10n.t(.lastBackupSuccess) : L10n.t(.lastBackupWarning))
+                                                .font(.caption.bold())
+                                            HStack(spacing: 4) {
+                                                Text(String(format: "%.1fs", sum.durationSeconds))
+                                                Text("•")
+                                                Text(ByteCountFormatter.string(fromByteCount: sum.totalScannedBytes, countStyle: .file))
+                                            }
+                                            .font(.caption2.monospacedDigit())
+                                            .foregroundStyle(.secondary)
+                                        }
+
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption2.bold())
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 5)
+                                    .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                                 }
-                                .font(.callout.bold())
+                                .buttonStyle(.plain)
+                                .help(L10n.t(.lastBackupResultSubtitle))
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(OtterTheme.statusError)
-                            .controlSize(.regular)
-                            .keyboardShortcut(".", modifiers: .command)
-                        } else {
-                            Button {
-                                appState.startBackup(for: profile)
-                            } label: {
-                                HStack(spacing: 5) {
-                                    Image(systemName: "arrow.clockwise.circle.fill")
-                                    Text(L10n.t(.quickBackupAction))
+
+                            HStack(spacing: 8) {
+                                // Dry-Run Button
+                                Button {
+                                    appState.performDryRun()
+                                } label: {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: appState.isDryRunRunning ? "arrow.triangle.2.circlepath" : "magnifyingglass")
+                                            .symbolEffect(.rotate, isActive: appState.isDryRunRunning)
+                                        Text(appState.isDryRunRunning ? L10n.t(.analyzingProgress) : L10n.t(.quickDryRunAction))
+                                    }
+                                    .font(.callout.weight(.medium))
                                 }
-                                .font(.callout.bold())
+                                .buttonStyle(.bordered)
+                                .controlSize(.regular)
+                                .keyboardShortcut("d", modifiers: .command)
+                                .disabled(appState.isBackupRunning(for: profile.id) || appState.isDryRunRunning)
+
+                                // Backup Now / Stop Button
+                                if appState.isBackupRunning(for: profile.id) {
+                                    Button(role: .destructive) {
+                                        appState.cancelBackup(for: profile.id)
+                                    } label: {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: "stop.circle.fill")
+                                            Text(L10n.t(.stopBackupButton))
+                                        }
+                                        .font(.callout.bold())
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(OtterTheme.statusError)
+                                    .controlSize(.regular)
+                                    .keyboardShortcut(".", modifiers: .command)
+                                } else {
+                                    Button {
+                                        appState.startBackup(for: profile)
+                                    } label: {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: "arrow.clockwise.circle.fill")
+                                            Text(L10n.t(.quickBackupAction))
+                                        }
+                                        .font(.callout.bold())
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(OtterTheme.otterAmber)
+                                    .controlSize(.regular)
+                                    .keyboardShortcut("b", modifiers: .command)
+                                    .disabled(appState.isDryRunRunning)
+                                }
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(OtterTheme.otterAmber)
-                            .controlSize(.regular)
-                            .keyboardShortcut("b", modifiers: .command)
-                            .disabled(appState.isDryRunRunning)
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
 
@@ -382,11 +551,11 @@ public struct MainDashboardView: View {
                         appState.refreshStorageForecast()
                     } label: {
                         Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 9))
+                            .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .help("Refresh Storage Forecast")
+                    .help(L10n.t(.forecastRefreshHelp))
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
@@ -423,11 +592,6 @@ public struct MainDashboardView: View {
             }
         }
         .otterHeroCard(padding: 18)
-        .onAppear {
-            if appState.storageForecastReport == nil {
-                appState.refreshStorageForecast()
-            }
-        }
     }
 
     // MARK: - Hardware Redundancy Recommendation Banner (SPOF)
@@ -509,7 +673,7 @@ public struct MainDashboardView: View {
             Image(systemName: "icloud.and.arrow.up.fill")
                 .font(.title3)
                 .foregroundStyle(OtterTheme.oceanicTeal)
-                .symbolEffect(.pulse)
+                .symbolEffect(.pulse, isActive: appState.isReplicationRunning)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(appState.replicationProgressState.statusMessage)

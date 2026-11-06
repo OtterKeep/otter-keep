@@ -52,6 +52,8 @@ extension AppState {
                             title: L10n.t(.scrubCorruptedTitle),
                             message: L10n.format(.scrubCorruptedMessage, prof.name, Int64(audit.corruptedFilesCount)),
                             detailedReason: audit.detailsJson,
+                            guaranteeText: L10n.t(.feedbackGuaranteeSnapshotsSafe),
+                            recoveryAction: RecoveryAction(kind: .viewLogs, label: L10n.t(.recoveryViewLogs)),
                             profileName: prof.name
                         )
                     }
@@ -67,6 +69,8 @@ extension AppState {
                         title: L10n.t(.scrubberCorruptedAlertTitle),
                         message: error.localizedDescription,
                         detailedReason: error.localizedDescription,
+                        guaranteeText: L10n.t(.feedbackGuaranteeSnapshotsSafe),
+                        recoveryAction: RecoveryAction(kind: .viewLogs, label: L10n.t(.recoveryViewLogs)),
                         profileName: prof.name
                     )
                     self.showFeedbackModal = true
@@ -226,6 +230,8 @@ extension AppState {
                         title: L10n.t(.feedbackRestoreFailedTitle),
                         message: L10n.format(.feedbackRestoreFailedMessage, error.localizedDescription),
                         detailedReason: error.localizedDescription,
+                        guaranteeText: L10n.t(.feedbackGuaranteeSnapshotsSafe),
+                        recoveryAction: RecoveryAction(kind: .viewLogs, label: L10n.t(.recoveryViewLogs)),
                         profileName: profile.name
                     )
                     self.showFeedbackModal = true

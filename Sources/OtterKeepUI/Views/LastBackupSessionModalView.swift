@@ -60,7 +60,7 @@ public struct LastBackupSessionModalView: View {
                     // Headline Banner
                     HStack(spacing: 14) {
                         Image(systemName: isSuccess ? "shield.checkmark.fill" : "shield.lefthalf.filled.trianglebadge.exclamationmark")
-                            .font(.system(size: 32))
+                            .font(.largeTitle)
                             .foregroundStyle(isSuccess ? OtterTheme.statusGreen : OtterTheme.statusWarning)
 
                         VStack(alignment: .leading, spacing: 4) {

@@ -17,22 +17,12 @@ public struct ProfileRulesView: View {
         )
     }
 
-    var showDestinationEditorBinding: Binding<Bool> {
-        Binding(
-            get: { appState.showRemoteDestinationEditorSheet },
-            set: { appState.showRemoteDestinationEditorSheet = $0 }
-        )
-    }
-
     public var body: some View {
         ScrollView {
             content
                 .padding(24)
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .sheet(isPresented: showDestinationEditorBinding) {
-            RemoteDestinationEditorModalView(appState: appState)
-        }
     }
 
     public var content: some View {

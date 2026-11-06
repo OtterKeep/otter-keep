@@ -69,7 +69,10 @@ public struct NewProfileModalView: View {
                 .padding(.vertical, 14)
                 .background(.ultraThinMaterial)
         }
-        .frame(width: 580, height: 600)
+        .frame(
+            minWidth: 520, idealWidth: 580, maxWidth: 720,
+            minHeight: 460, idealHeight: 600, maxHeight: 820
+        )
         .onAppear {
             if appState.newProfileName.isEmpty && appState.selectedPresetTag == nil {
                 appState.resetNewProfileDraft()
@@ -107,6 +110,7 @@ public struct NewProfileModalView: View {
                     .font(.title3)
                     .foregroundStyle(.secondary)
             }
+            .accessibilityLabel(L10n.t(.closeButton))
             .buttonStyle(.plain)
         }
     }

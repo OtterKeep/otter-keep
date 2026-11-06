@@ -181,12 +181,12 @@ public enum OtterTheme {
     }
 
     // MARK: - Typography Presets
-    public static let heroTitleFont = Font.system(size: 28, weight: .bold, design: .rounded)
-    public static let sectionTitleFont = Font.system(size: 15, weight: .semibold, design: .default)
-    public static let cardTitleFont = Font.system(size: 13, weight: .semibold, design: .default)
-    public static let valueMonoFont = Font.system(size: 13, weight: .medium, design: .monospaced)
-    public static let microLabelFont = Font.system(size: 11, weight: .regular, design: .default)
-    public static let captionFont = Font.system(size: 10, weight: .medium, design: .monospaced)
+    public static let heroTitleFont = Font.system(.largeTitle, design: .rounded).bold()
+    public static let sectionTitleFont = Font.system(.title3).weight(.semibold)
+    public static let cardTitleFont = Font.system(.headline)
+    public static let valueMonoFont = Font.system(.body, design: .monospaced).weight(.medium)
+    public static let microLabelFont = Font.system(.subheadline)
+    public static let captionFont = Font.system(.caption, design: .monospaced).weight(.medium)
 
     // MARK: - Animation Timings
     public static let standardSpring = Animation.spring(response: 0.35, dampingFraction: 0.8)

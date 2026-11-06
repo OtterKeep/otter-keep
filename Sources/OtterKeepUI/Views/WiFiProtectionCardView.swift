@@ -216,6 +216,7 @@ public struct WiFiProtectionCardView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            .accessibilityLabel(L10n.t(.removeExclusionButton))
             .buttonStyle(.plain)
         }
         .padding(.horizontal, OtterTheme.spacing8)

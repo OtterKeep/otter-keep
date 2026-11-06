@@ -277,6 +277,7 @@ public struct SnapshotDiffView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    .accessibilityLabel(L10n.t(.clearSearchButton))
                     .buttonStyle(.plain)
                 }
             }

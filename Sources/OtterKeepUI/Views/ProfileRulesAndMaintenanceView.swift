@@ -123,6 +123,9 @@ public struct ProfileRulesAndMaintenanceView: View {
         } message: {
             Text(L10n.t(.maintenanceRebuildConfirmMessage))
         }
+        // The remote destination editor is a nested sheet: every entry point lives in the 3-2-1
+        // replication section below, so presenting it from the global modal slot would queue it
+        // behind this settings sheet instead of stacking it on top.
         .sheet(isPresented: Binding(
             get: { appState.showRemoteDestinationEditorSheet },
             set: { appState.showRemoteDestinationEditorSheet = $0 }

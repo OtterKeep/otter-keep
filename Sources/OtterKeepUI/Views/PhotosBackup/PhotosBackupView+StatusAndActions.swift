@@ -4,6 +4,13 @@ import UniformTypeIdentifiers
 import OtterKeepCore
 
 extension PhotosBackupView {
+    private static let byteFormatter: ByteCountFormatter = {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .memory
+        formatter.allowedUnits = [.useMB, .useGB]
+        return formatter
+    }()
+
     // MARK: - Authorization Banner
     @ViewBuilder
     var authorizationBanner: some View {
@@ -70,7 +77,7 @@ extension PhotosBackupView {
                     .font(.caption.bold())
                     .foregroundStyle(.green)
 
-                Text("Max \(appState.photosConfig.maxInFlightCacheBytes / 1024 / 1024) MB")
+                Text(L10n.format(.photosMaxBufferFormat, Self.byteFormatter.string(fromByteCount: Int64(appState.photosConfig.maxInFlightCacheBytes))))
                     .font(.title2.bold().monospacedDigit())
             }
             .padding(14)

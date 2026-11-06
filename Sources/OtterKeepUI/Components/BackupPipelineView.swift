@@ -114,7 +114,7 @@ public struct BackupPipelineView: View {
                 .help(detail)
 
             Text(detail)
-                .font(.system(size: 9, design: .monospaced))
+                .font(.caption2.monospaced())
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -158,7 +158,7 @@ public struct BackupPipelineView: View {
                     Image(systemName: "folder.badge.gearshape")
                     Text(L10n.t(.changeFolderButton))
                 }
-                .font(.system(size: 10, weight: .medium))
+                .font(.caption.weight(.medium))
                 .lineLimit(1)
             }
             .buttonStyle(.bordered)
@@ -174,7 +174,7 @@ public struct BackupPipelineView: View {
                     Image(systemName: "arrow.up.forward.app")
                     Text(L10n.t(.revealInFinderButton))
                 }
-                .font(.system(size: 10, weight: .medium))
+                .font(.caption.weight(.medium))
                 .lineLimit(1)
             }
             .buttonStyle(.bordered)
@@ -190,17 +190,17 @@ public struct BackupPipelineView: View {
                     .frame(width: 32, height: 32)
 
                 Image(systemName: "cpu")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.subheadline.bold())
                     .foregroundStyle(OtterTheme.otterAmber)
                     .symbolEffect(.pulse, isActive: isActive)
             }
 
             Text(L10n.t(.apfsCowBadge))
-                .font(.system(size: 10, weight: .bold))
+                .font(.caption.bold())
                 .foregroundStyle(.primary)
 
             Text(cowMode == .intraVolumeCoW ? "clonefile(2)" : "Snapshot-CoW")
-                .font(.system(size: 8, weight: .medium, design: .monospaced))
+                .font(.caption2.weight(.medium).monospaced())
                 .foregroundStyle(.secondary)
         }
         .frame(width: 90)
@@ -214,7 +214,7 @@ public struct BackupPipelineView: View {
                     .frame(width: 3, height: 3)
             }
             Image(systemName: "chevron.right")
-                .font(.system(size: 9, weight: .bold))
+                .font(.caption2.bold())
                 .foregroundStyle(isActive ? OtterTheme.otterAmber : Color.secondary.opacity(0.4))
         }
         .padding(.horizontal, 6)

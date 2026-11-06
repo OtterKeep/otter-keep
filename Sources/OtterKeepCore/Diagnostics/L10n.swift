@@ -13,7 +13,13 @@ public enum L10n {
             return translation
         }
         // Fallback: English -> Raw key
-        return translations[.english]?[key] ?? key.rawValue
+        if let english = translations[.english]?[key] {
+            return english
+        }
+        #if DEBUG
+            assertionFailure("Missing localization entry for key '\(key.rawValue)'")
+        #endif
+        return key.rawValue
     }
 
     /// Checks whether an explicit translation entry exists for the given key in the specified language.
@@ -60,6 +66,8 @@ public enum L10n {
         case delete
         case confirm
         case details
+        case modalPayloadUnavailableTitle
+        case modalPayloadUnavailableMessage
         case searchPlaceholder
         case okDone
         case unitCountFormat
@@ -358,6 +366,7 @@ public enum L10n {
         case logEmptyDesc
         case logExportSuccess
         case logExportError
+        case supportBundleButton
 
         // MARK: - iCloud Strategies
         case icloudStrategyDownloadAndEvict
@@ -631,7 +640,6 @@ public enum L10n {
         // MARK: - Modern UI & Unified Workspace Tabs
         case tabOverview
         case tabTimeMachine
-        case tabRulesAndMaintenance
         case tabPhotosSync
         case tabPhotosSnapshots
         case pipelineSourceLabel
@@ -1149,6 +1157,55 @@ public enum L10n {
         case onboardingProtectionSubtitle
         case back
         case daysCountFormat
+
+        // MARK: - Hardcoded String Migration
+        case forecastRefreshHelp
+        case photosMaxBufferFormat
+        case replicationEncryptionBadge
+        case replicationArchiveBadgeFormat
+        case encryptionSparsebundleLabel
+        case debounceSecondsFormat
+        case snapshotPathLabelFormat
+        case aboutSubsystemComponentsTitle
+        case aboutCraftedBy
+        case aboutCopyrightNotice
+        case aboutSubsystemsSummaryFormat
+        case aboutVersionBuildFormat
+        case aboutBuildFormat
+        case aboutAppVersionFormat
+        case aboutTaglineEnglish
+        case aboutTaglineHungarian
+        case aboutBadgeApfsTitle
+        case aboutBadgeApfsSubtitle
+        case aboutBadgeSwiftTitle
+        case aboutBadgeSwiftSubtitle
+        case aboutBadgeLocalTitle
+        case aboutBadgeLocalSubtitle
+        case aboutBadgeTelemetryTitle
+        case aboutBadgeTelemetrySubtitle
+        case aboutLinkWebsite
+        case aboutLinkGitHub
+        case aboutLinkReleases
+        case aboutLinkLicense
+
+        // MARK: - Accessibility Labels for Icon-Only Controls
+        case closeButton
+        case clearSearchButton
+        case removeExclusionButton
+        case compareVersionsButton
+        case openInFinderButton
+        case previousSnapshotButton
+        case nextSnapshotButton
+        case refreshLogsButton
+        case stopBackupAccessibility
+        case startBackupAccessibility
+
+        // MARK: - Three-Part Error Architecture (Guarantee & Recovery)
+        case feedbackGuaranteeTitle
+        case feedbackGuaranteeSnapshotsSafe
+        case feedbackGuaranteeNothingModified
+        case recoveryOpenFullDiskAccess
+        case recoveryViewLogs
     }
 
 

@@ -25,9 +25,12 @@ extension AppState {
 
     // MARK: - Remote Destination Editor Sheet State
     /// Controls presentation of the remote destination editor sheet.
+    ///
+    /// The editor is a nested sheet inside the profile settings modal, so it must not compete for the
+    /// global `activeModal` slot.
     public var showRemoteDestinationEditorSheet: Bool {
-        get { replicationDestinations.showRemoteDestinationEditorSheet }
-        set { replicationDestinations.showRemoteDestinationEditorSheet = newValue }
+        get { replicationDestinations.isDestinationEditorPresented }
+        set { replicationDestinations.isDestinationEditorPresented = newValue }
     }
     /// Destination being edited, or `nil` when creating a new one.
     public var destinationEditorTargetId: UUID? {

@@ -40,6 +40,7 @@ extension RestoreExplorerView {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(L10n.t(.clearSearchButton))
                 }
             }
             .padding(.horizontal, 14)

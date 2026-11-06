@@ -24,7 +24,12 @@ public final class ReplicationDestinationStore: Sendable {
     // MARK: - Remote Destination Editor Sheet State
 
     /// Controls presentation of the remote destination editor sheet.
-    public var showRemoteDestinationEditorSheet: Bool = false
+    ///
+    /// The editor is a *nested* sheet owned by `ProfileRulesAndMaintenanceView`, because every entry
+    /// point lives in the 3-2-1 replication section of the profile settings modal. Routing it through
+    /// the global `activeModal` slot queued the request behind the settings sheet, so the editor only
+    /// appeared after that sheet closed — which read as "the window opened underneath".
+    public var isDestinationEditorPresented: Bool = false
 
     /// Destination being edited, or `nil` when creating a new one.
     public var destinationEditorTargetId: UUID? = nil

@@ -40,7 +40,7 @@ extension RestoreExplorerView {
                                         .font(.body.bold())
                                     if snap.backupType == "full" {
                                         Text(L10n.t(.backupTypeFull))
-                                            .font(.system(size: 9, weight: .bold))
+                                            .font(.caption2.bold())
                                             .padding(.horizontal, 5)
                                             .padding(.vertical, 1.5)
                                             .background(OtterTheme.oceanicTeal.opacity(0.20), in: Capsule())
@@ -51,7 +51,7 @@ extension RestoreExplorerView {
                                             Image(systemName: "lock.shield.fill")
                                             Text(L10n.t(.wormLockedBadge))
                                         }
-                                        .font(.system(size: 9, weight: .bold))
+                                        .font(.caption2.bold())
                                         .padding(.horizontal, 5)
                                         .padding(.vertical, 1.5)
                                         .background(OtterTheme.accentPurple.opacity(0.20), in: Capsule())
@@ -144,6 +144,7 @@ extension RestoreExplorerView {
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(L10n.t(.clearSearchButton))
                     }
                 }
                 .padding(8)

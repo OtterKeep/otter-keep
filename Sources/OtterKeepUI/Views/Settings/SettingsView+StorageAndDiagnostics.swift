@@ -109,8 +109,7 @@ extension SettingsView {
                 .controlSize(.regular)
             }
         }
-        .padding(20)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
+        .otterCard(padding: 20)
     }
 
     private var debugLoggingBinding: Binding<Bool> {
@@ -222,7 +221,6 @@ extension SettingsView {
             }
             .padding(.top, 2)
         }
-        .padding(20)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
+        .otterCard(padding: 20)
     }
 }

@@ -9,6 +9,37 @@ import OtterKeepCore
 ///
 /// Settings that previously carried `didSet` observers keep them in their setters here.
 extension AppState {
+    // MARK: - Central Modal Route
+    /// The single top-level modal currently presented by the main window.
+    public var activeModal: AppModalRoute? {
+        get { maintenanceSettings.activeModal }
+        set { maintenanceSettings.activeModal = newValue }
+    }
+    /// A modal requested while another one was still on screen.
+    public var pendingModal: AppModalRoute? {
+        get { maintenanceSettings.pendingModal }
+        set { maintenanceSettings.pendingModal = newValue }
+    }
+    /// Presents `route`, or queues it when another modal is already visible.
+    public func presentModal(_ route: AppModalRoute) { maintenanceSettings.presentModal(route) }
+    /// Queues `route` to be presented after the currently visible modal dismisses.
+    public func queueModalAfterDismiss(_ route: AppModalRoute) { maintenanceSettings.queueModalAfterDismiss(route) }
+    /// Clears the active modal.
+    public func dismissModal() { maintenanceSettings.dismissModal() }
+    /// Promotes a queued modal request once the previous sheet has finished dismissing.
+    public func promotePendingModal() { maintenanceSettings.promotePendingModal() }
+
+    /// Presents or dismisses `route` from a boolean flag owned by another feature store.
+    func setModalRoute(_ route: AppModalRoute, presented: Bool) {
+        if presented {
+            maintenanceSettings.presentModal(route)
+        } else if maintenanceSettings.activeModal == route {
+            maintenanceSettings.dismissModal()
+        } else if maintenanceSettings.pendingModal == route {
+            maintenanceSettings.pendingModal = nil
+        }
+    }
+
     // MARK: - Modal Operation Feedback State
     /// Feedback of the last modal operation.
     public var activeFeedback: OperationFeedback? { get { maintenanceSettings.activeFeedback } set { maintenanceSettings.activeFeedback = newValue } }
@@ -55,6 +86,13 @@ extension AppState {
     public var lastSessionSummary: BackupSessionSummary? {
         get { maintenanceSettings.lastSessionSummary }
         set { maintenanceSettings.lastSessionSummary = newValue }
+    }
+    /// Summary presented by the last-backup-summary modal, resolved from the selected profile first.
+    public var lastBackupSummaryForPresentation: BackupSessionSummary? {
+        if let profile = selectedProfile, let summary = lastStatusInfo(for: profile).lastSessionSummary {
+            return summary
+        }
+        return lastSessionSummary
     }
     /// Controls presentation of the backup inspector modal.
     public var showInspectorModal: Bool { get { maintenanceSettings.showInspectorModal } set { maintenanceSettings.showInspectorModal = newValue } }
@@ -187,6 +225,12 @@ extension AppState {
     public var alertMessage: String? { get { maintenanceSettings.alertMessage } set { maintenanceSettings.alertMessage = newValue } }
     /// Controls presentation of the global alert.
     public var showAlert: Bool { get { maintenanceSettings.showAlert } set { maintenanceSettings.showAlert = newValue } }
+
+    /// Transient success banner text; `nil` when no banner is visible.
+    public var successBannerMessage: String? {
+        get { maintenanceSettings.successBannerMessage }
+        set { maintenanceSettings.successBannerMessage = newValue }
+    }
     /// Active log level filter.
     public var selectedLogLevel: LogEntry.LogLevel? { get { maintenanceSettings.selectedLogLevel } set { maintenanceSettings.selectedLogLevel = newValue } }
     /// Free-text filter applied to diagnostics log entries.

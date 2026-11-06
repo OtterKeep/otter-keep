@@ -52,29 +52,41 @@ public struct SanctuaryOnboardingModalView: View {
             // Step Content
             ScrollView {
                 VStack(spacing: 18) {
-                    switch currentStep {
-                    case 0:
-                        welcomeStep
-                    case 1:
-                        fdaPermissionStep
-                    case 2:
-                        profileSetupStep
-                    case 3:
-                        protectionModeStep
-                    default:
-                        EmptyView()
+                    Group {
+                        switch currentStep {
+                        case 0:
+                            welcomeStep
+                        case 1:
+                            fdaPermissionStep
+                        case 2:
+                            profileSetupStep
+                        case 3:
+                            protectionModeStep
+                        default:
+                            EmptyView()
+                        }
                     }
+                    .id(currentStep)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
                 }
                 .padding(.horizontal, 28)
                 .padding(.vertical, 20)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .animation(OtterTheme.smoothEase, value: currentStep)
 
             Divider()
 
             // Bottom Navigation Actions
             footerView
         }
-        .frame(width: 600, height: 560)
+        .frame(
+            minWidth: 520, idealWidth: 600, maxWidth: 760,
+            minHeight: 440, idealHeight: 560, maxHeight: 780
+        )
         .background(Color(NSColor.windowBackgroundColor))
         .onAppear {
             checkPermissions()
@@ -154,7 +166,8 @@ public struct SanctuaryOnboardingModalView: View {
         let hasFDA = appState.maintenanceSettings.onboardingHasFDAPermission
         return VStack(spacing: 20) {
             Image(systemName: hasFDA ? "checkmark.seal.fill" : "lock.open.trianglebadge.exclamationmark.fill")
-                .font(.system(size: 48))
+                .font(.largeTitle)
+                .imageScale(.large)
                 .foregroundStyle(hasFDA ? Color.green : Color.orange)
                 .padding(.top, 10)
 
@@ -318,9 +331,7 @@ public struct SanctuaryOnboardingModalView: View {
         HStack {
             if currentStep > 0 {
                 Button(L10n.t(.back)) {
-                    withAnimation {
-                        appState.maintenanceSettings.onboardingCurrentStep -= 1
-                    }
+                    appState.maintenanceSettings.onboardingCurrentStep -= 1
                 }
                 .controlSize(.regular)
             }
@@ -338,9 +349,7 @@ public struct SanctuaryOnboardingModalView: View {
 
             if currentStep < 3 {
                 Button(L10n.t(.onboardingContinue)) {
-                    withAnimation {
-                        appState.maintenanceSettings.onboardingCurrentStep += 1
-                    }
+                    appState.maintenanceSettings.onboardingCurrentStep += 1
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)

@@ -20,13 +20,15 @@ public struct MainWindowView: View {
                 .frame(minWidth: 640, minHeight: 500)
                 .background(Color(nsColor: .windowBackgroundColor))
                 .navigationTitle("")
+                .overlay(alignment: .top) {
+                    SuccessBannerView(appState: appState)
+                }
         }
         .toolbar {
             windowToolbar
         }
         .modifier(MainWindowLifecycleModifier(appState: appState))
-        .modifier(MainWindowSystemSheetsModifier(appState: appState))
-        .modifier(MainWindowProfileSheetsModifier(appState: appState))
+        .modifier(MainWindowModalRouteModifier(appState: appState))
         .modifier(MainWindowAlertsModifier(appState: appState))
         .preferredColorScheme(appState.effectiveColorScheme)
     }
@@ -235,7 +237,6 @@ public struct MainWindowView: View {
             }
             .listStyle(.sidebar)
         }
-        .background(.ultraThinMaterial)
     }
 
     private var brandHeader: some View {
@@ -248,7 +249,7 @@ public struct MainWindowView: View {
                         .font(.subheadline.bold())
 
                     Text("v\(CoreEngine.version)")
-                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .font(.caption2.bold().monospaced())
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)
                         .background(OtterTheme.otterAmber.opacity(0.15), in: RoundedRectangle(cornerRadius: 3))
@@ -270,19 +271,6 @@ public struct MainWindowView: View {
             }
 
             Spacer()
-
-            Button {
-                appState.resetNewProfileDraft()
-                appState.showNewProfileSheet = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(OtterTheme.otterAmber)
-                    .frame(width: 24, height: 24)
-                    .background(OtterTheme.otterAmber.opacity(0.12), in: Circle())
-            }
-            .buttonStyle(.plain)
-            .help(L10n.t(.newProfileButton))
         }
     }
 }
@@ -394,125 +382,170 @@ private struct MainWindowLifecycleModifier: ViewModifier {
     }
 }
 
-private struct MainWindowSystemSheetsModifier: ViewModifier {
+/// Presents every top-level modal through a single `sheet(item:)` slot.
+///
+/// Chaining one `.sheet(isPresented:)` per modal made SwiftUI compete for the same presentation
+/// slot: the second request in a run loop was silently dropped and a `true` flag without its
+/// backing payload produced an empty sheet. Routing through `AppModalRoute` makes the route itself
+/// the identity, so a modal can only appear when its payload is ready.
+private struct MainWindowModalRouteModifier: ViewModifier {
     let appState: AppState
 
     func body(content: Content) -> some View {
         content
             .sheet(
-                isPresented: Binding(
-                    get: { appState.showPreferencesModal },
-                    set: { appState.showPreferencesModal = $0 }
-                )
-            ) {
-                PreferencesModalView(appState: appState)
+                item: Binding(
+                    get: { appState.activeModal },
+                    set: { appState.activeModal = $0 }
+                ),
+                onDismiss: { appState.promotePendingModal() },
+                content: modalContent(for:)
+            )
+    }
+
+    @ViewBuilder
+    private func modalContent(for route: AppModalRoute) -> some View {
+        switch route {
+        case .preferences:
+            PreferencesModalView(appState: appState)
+        case .systemLogs:
+            SystemLogsModalView(appState: appState)
+        case .inspector:
+            BackupInspectorModalView(appState: appState)
+        case .fileVersionHistory:
+            FileVersionHistoryModalView(appState: appState)
+        case .onboarding:
+            SanctuaryOnboardingModalView(appState: appState)
+        case .unadoptedDrive:
+            UnadoptedDriveModalView(appState: appState)
+        case .newProfile:
+            NewProfileModalView(appState: appState)
+        case .profileSettings:
+            if let profile = appState.selectedProfile {
+                ProfileSettingsModalView(appState: appState, profile: profile)
+            } else {
+                MissingModalPayloadView(appState: appState)
             }
-            .sheet(
-                isPresented: Binding(
-                    get: { appState.showSystemLogsModal },
-                    set: { appState.showSystemLogsModal = $0 }
+        case .deleteProfile:
+            DeleteProfileConfirmationModalView(appState: appState)
+        case .feedback:
+            if let feedback = appState.activeFeedback {
+                OperationFeedbackModalView(
+                    feedback: feedback,
+                    onDismiss: {
+                        appState.activeFeedback = nil
+                        appState.dismissModal()
+                    },
+                    onViewDetails: {
+                        appState.activeFeedback = nil
+                        appState.queueModalAfterDismiss(.inspector)
+                        appState.dismissModal()
+                    },
+                    onViewLogs: {
+                        appState.activeFeedback = nil
+                        appState.activeNavigation = .logs
+                        appState.dismissModal()
+                    }
                 )
-            ) {
-                SystemLogsModalView(appState: appState)
+            } else {
+                MissingModalPayloadView(appState: appState)
             }
-            .sheet(
-                isPresented: Binding(
-                    get: { appState.showInspectorModal },
-                    set: { appState.showInspectorModal = $0 }
-                )
-            ) {
-                BackupInspectorModalView(appState: appState)
+        case .dryRun:
+            if let summary = appState.dryRunSummary {
+                DryRunModalView(appState: appState, summary: summary)
+            } else {
+                MissingModalPayloadView(appState: appState)
             }
-            .sheet(
-                isPresented: Binding(
-                    get: { appState.showFileVersionHistoryModal },
-                    set: { appState.showFileVersionHistoryModal = $0 }
-                )
-            ) {
-                FileVersionHistoryModalView(appState: appState)
+        case .lastBackupSummary:
+            if let summary = appState.lastBackupSummaryForPresentation {
+                LastBackupSessionModalView(appState: appState, summary: summary)
+            } else {
+                MissingModalPayloadView(appState: appState)
             }
-            .sheet(
-                isPresented: Binding(
-                    get: { appState.showOnboardingModal },
-                    set: { appState.showOnboardingModal = $0 }
-                )
-            ) {
-                SanctuaryOnboardingModalView(appState: appState)
-            }
-            .sheet(
-                isPresented: Binding(
-                    get: { appState.showUnadoptedDriveModal },
-                    set: { appState.showUnadoptedDriveModal = $0 }
-                )
-            ) {
-                UnadoptedDriveModalView(appState: appState)
-            }
+        }
     }
 }
 
-private struct MainWindowProfileSheetsModifier: ViewModifier {
+/// Fallback shown when a modal route is requested without its backing payload.
+///
+/// Reaching this view means a call site set the route before preparing its data; it keeps the
+/// window responsive instead of leaving an empty sheet on screen.
+private struct MissingModalPayloadView: View {
     let appState: AppState
 
-    func body(content: Content) -> some View {
-        content
-            .sheet(
-                isPresented: Binding(
-                    get: { appState.showRemoteDestinationEditorSheet },
-                    set: { appState.showRemoteDestinationEditorSheet = $0 }
-                )
-            ) {
-                RemoteDestinationEditorModalView(appState: appState)
+    var body: some View {
+        VStack(spacing: OtterTheme.spacing16) {
+            Image(systemName: "tray")
+                .font(.title.weight(.light))
+                .foregroundStyle(OtterTheme.pebbleGrey)
+            Text(L10n.t(.modalPayloadUnavailableTitle))
+                .font(OtterTheme.sectionTitleFont)
+            Text(L10n.t(.modalPayloadUnavailableMessage))
+                .font(OtterTheme.captionFont)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button(L10n.t(.cancel)) { appState.dismissModal() }
+                .keyboardShortcut(.cancelAction)
+        }
+        .padding(OtterTheme.spacing24)
+        .frame(minWidth: 360, minHeight: 200)
+    }
+}
+
+/// Non-blocking confirmation banner for successful operations.
+///
+/// Successes used to be presented through the same modal alert as errors, forcing an extra click for
+/// something that needs no decision. The banner fades in, auto-dismisses, and never steals focus.
+private struct SuccessBannerView: View {
+    let appState: AppState
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if let message = appState.successBannerMessage {
+                banner(for: message)
             }
-            .sheet(
-                isPresented: Binding(
-                    get: { appState.showNewProfileSheet },
-                    set: { appState.showNewProfileSheet = $0 }
-                )
-            ) {
-                NewProfileModalView(appState: appState)
+        }
+        .animation(OtterTheme.smoothEase, value: appState.successBannerMessage)
+    }
+
+    private func banner(for message: String) -> some View {
+        HStack(spacing: OtterTheme.spacing8) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(OtterTheme.statusGreen)
+
+            Text(message)
+                .font(.callout)
+                .foregroundStyle(.primary)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: OtterTheme.spacing8)
+
+            Button {
+                appState.successBannerMessage = nil
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.bold())
+                    .foregroundStyle(.secondary)
             }
-            .sheet(
-                isPresented: Binding(
-                    get: { appState.showProfileSettingsModal },
-                    set: { appState.showProfileSettingsModal = $0 }
-                )
-            ) {
-                if let profile = appState.selectedProfile {
-                    ProfileSettingsModalView(appState: appState, profile: profile)
-                }
-            }
-            .sheet(
-                isPresented: Binding(
-                    get: { appState.showDeleteProfileConfirmation },
-                    set: { appState.showDeleteProfileConfirmation = $0 }
-                )
-            ) {
-                DeleteProfileConfirmationModalView(appState: appState)
-            }
-            .sheet(
-                isPresented: Binding(
-                    get: { appState.showFeedbackModal },
-                    set: { appState.showFeedbackModal = $0 }
-                )
-            ) {
-                if let feedback = appState.activeFeedback {
-                    OperationFeedbackModalView(
-                        feedback: feedback,
-                        onDismiss: {
-                            appState.showFeedbackModal = false
-                            appState.activeFeedback = nil
-                        },
-                        onViewDetails: {
-                            appState.showFeedbackModal = false
-                            appState.showInspectorModal = true
-                        },
-                        onViewLogs: {
-                            appState.showFeedbackModal = false
-                            appState.activeNavigation = .logs
-                        }
-                    )
-                }
-            }
+            .buttonStyle(.plain)
+            .help(L10n.t(.cancel))
+        }
+        .padding(.horizontal, OtterTheme.spacing12)
+        .padding(.vertical, OtterTheme.spacing8)
+        .background(OtterTheme.statusGreen.opacity(0.12), in: RoundedRectangle(cornerRadius: OtterTheme.cardCornerRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: OtterTheme.cardCornerRadius, style: .continuous)
+                .strokeBorder(OtterTheme.statusGreen.opacity(0.35), lineWidth: 1)
+        )
+        .padding(.horizontal, OtterTheme.spacing16)
+        .padding(.top, OtterTheme.spacing12)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .task(id: message) {
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            appState.successBannerMessage = nil
+        }
     }
 }
 

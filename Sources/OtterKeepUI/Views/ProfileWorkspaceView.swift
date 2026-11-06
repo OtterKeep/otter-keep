@@ -3,7 +3,10 @@ import AppKit
 import OtterKeepCore
 
 /// Unified workspace for an individual backup profile, featuring a top segmented navigation bar
-/// between Overview (live telemetry & pipeline), Time Machine (restore explorer), and Rules & Maintenance.
+/// between Overview (live telemetry & pipeline) and Time Machine (restore explorer).
+///
+/// Rules, automation and maintenance are intentionally *not* a tab here — they open from the
+/// Profile Settings button, so configuration never competes with the daily monitoring surface.
 public struct ProfileWorkspaceView: View {
     public let profile: BackupProfile
     public let appState: AppState
@@ -28,17 +31,19 @@ public struct ProfileWorkspaceView: View {
             Divider()
 
             // Tab Content
-            switch appState.activeProfileTab {
-            case .overview:
-                MainDashboardView(appState: appState)
-            case .timeMachine:
-                RestoreExplorerView(appState: appState)
-            case .rulesAndMaintenance:
-                ProfileRulesAndMaintenanceView(appState: appState, profile: profile)
+            Group {
+                switch appState.activeProfileTab {
+                case .overview:
+                    MainDashboardView(appState: appState)
+                case .timeMachine:
+                    RestoreExplorerView(appState: appState)
+                }
             }
+            .transition(.opacity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
+        .animation(OtterTheme.smoothEase, value: appState.activeProfileTab)
     }
 
     // MARK: - Modern Workspace Header Bar
@@ -63,11 +68,11 @@ public struct ProfileWorkspaceView: View {
                             Image(systemName: cowMode == .nonAPFS ? "exclamationmark.shield.fill" : "checkmark.shield.fill")
                             Text(L10n.t(cowMode.badgeKey))
                         }
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.caption2.bold())
                         .foregroundStyle(cowMode == .nonAPFS ? OtterTheme.statusWarning : OtterTheme.statusGreen)
 
                         Text("•")
-                            .font(.system(size: 9))
+                            .font(.caption2)
                             .foregroundStyle(.tertiary)
 
                         HStack(spacing: 4) {
@@ -76,25 +81,27 @@ public struct ProfileWorkspaceView: View {
                                 .frame(width: 5, height: 5)
                             Text(statusInfo.displayDetailText)
                         }
-                        .font(.system(size: 9, weight: .medium))
+                        .font(.caption2.weight(.medium))
                         .foregroundStyle(.secondary)
                     }
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 12)
 
             // Centered Segmented Workspace Tabs
             Picker("", selection: activeTabBinding) {
-                ForEach([ProfileWorkspaceTab.overview, ProfileWorkspaceTab.timeMachine]) { tab in
+                ForEach(ProfileWorkspaceTab.allCases) { tab in
                     Label(tab.localizedTitle, systemImage: tab.iconName).tag(tab)
                 }
             }
             .pickerStyle(.segmented)
             .controlSize(.regular)
-            .frame(maxWidth: 320)
+            .labelsHidden()
+            .frame(minWidth: 240, idealWidth: 340, maxWidth: 420)
+            .layoutPriority(1)
 
-            Spacer()
+            Spacer(minLength: 12)
 
             // Profile Configuration & Quick Action Buttons
             HStack(spacing: 8) {
@@ -131,7 +138,7 @@ public struct ProfileWorkspaceView: View {
         .padding(.vertical, 12)
         .background(.ultraThinMaterial)
         .background {
-            // Invisible keyboard shortcut targets for ⌘1, ⌘2 tab switching
+            // Invisible keyboard shortcut targets for ⌘1 / ⌘2 tab switching
             Group {
                 Button("") { appState.activeProfileTab = .overview }
                     .keyboardShortcut("1", modifiers: .command)

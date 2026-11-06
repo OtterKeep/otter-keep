@@ -57,10 +57,9 @@ extension ProfileRulesView {
                                     appState.saveProfiles()
                                 }
                             )) {
-                                Text("10 s").tag(10)
-                                Text("30 s").tag(30)
-                                Text("60 s").tag(60)
-                                Text("120 s").tag(120)
+                                ForEach([10, 30, 60, 120], id: \.self) { seconds in
+                                    Text(L10n.format(.debounceSecondsFormat, seconds)).tag(seconds)
+                                }
                             }
                             .pickerStyle(.menu)
                             .frame(width: 120)
@@ -138,8 +137,8 @@ extension ProfileRulesView {
                                             appState.selectedProfile = updated
                                         }
                                     )) {
-                                        ForEach(0..<24, id: \.self) { h in
-                                            Text(String(format: "%02d:00", h)).tag(h)
+                                        ForEach(ScheduleTimeFormatting.hourLabels, id: \.hour) { entry in
+                                            Text(entry.label).tag(entry.hour)
                                         }
                                     }
                                     .labelsHidden()
@@ -153,8 +152,8 @@ extension ProfileRulesView {
                                             appState.selectedProfile = updated
                                         }
                                     )) {
-                                        ForEach([0, 15, 30, 45], id: \.self) { m in
-                                            Text(String(format: ":%02d", m)).tag(m)
+                                        ForEach(ScheduleTimeFormatting.minuteOptions, id: \.self) { m in
+                                            Text(ScheduleTimeFormatting.minuteLabel(m)).tag(m)
                                         }
                                     }
                                     .labelsHidden()
@@ -194,8 +193,8 @@ extension ProfileRulesView {
                                         appState.selectedProfile = updated
                                     }
                                 )) {
-                                    ForEach(0..<24, id: \.self) { h in
-                                        Text(String(format: "%02d:00", h)).tag(h)
+                                    ForEach(ScheduleTimeFormatting.hourLabels, id: \.hour) { entry in
+                                        Text(entry.label).tag(entry.hour)
                                     }
                                 }
                                 .labelsHidden()

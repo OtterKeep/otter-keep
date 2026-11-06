@@ -17,13 +17,63 @@ import OtterKeepCore
 @MainActor
 @Observable
 public final class MaintenanceSettingsStore: Sendable {
+    // MARK: - Central Modal Route
+
+    /// The single top-level modal currently presented by the main window.
+    ///
+    /// Every modal flag below is a computed shim over this slot, so two modals can never compete for
+    /// the same presentation slot.
+    public var activeModal: AppModalRoute? = nil
+
+    /// A modal requested while another one was still on screen; promoted once the current sheet dismisses.
+    public var pendingModal: AppModalRoute? = nil
+
+    /// Presents `route`, or queues it when another modal is already visible.
+    public func presentModal(_ route: AppModalRoute) {
+        if activeModal == nil {
+            activeModal = route
+        } else if activeModal != route {
+            pendingModal = route
+        }
+    }
+
+    /// Queues `route` to be presented after the currently visible modal dismisses.
+    public func queueModalAfterDismiss(_ route: AppModalRoute) {
+        pendingModal = route
+    }
+
+    /// Clears the active modal. Promotion of a queued request happens in the sheet's `onDismiss`.
+    public func dismissModal() {
+        activeModal = nil
+    }
+
+    /// Promotes a queued modal request once the previous sheet has finished dismissing.
+    public func promotePendingModal() {
+        guard activeModal == nil, let next = pendingModal else { return }
+        pendingModal = nil
+        activeModal = next
+    }
+
+    private func setModal(_ route: AppModalRoute, presented: Bool) {
+        if presented {
+            presentModal(route)
+        } else if activeModal == route {
+            dismissModal()
+        } else if pendingModal == route {
+            pendingModal = nil
+        }
+    }
+
     // MARK: - Modal Operation Feedback State
 
     /// Feedback of the last modal operation.
     public var activeFeedback: OperationFeedback? = nil
 
     /// Controls presentation of the operation feedback modal.
-    public var showFeedbackModal: Bool = false
+    public var showFeedbackModal: Bool {
+        get { activeModal == .feedback }
+        set { setModal(.feedback, presented: newValue) }
+    }
 
     // MARK: - Software Updates State
 
@@ -48,7 +98,10 @@ public final class MaintenanceSettingsStore: Sendable {
     public var dryRunSummary: DryRunSummary?
 
     /// Controls presentation of the dry-run modal.
-    public var showDryRunModal: Bool = false
+    public var showDryRunModal: Bool {
+        get { activeModal == .dryRun }
+        set { setModal(.dryRun, presented: newValue) }
+    }
 
     /// Category filter of the dry-run modal.
     public var dryRunSelectedCategory: String = "all"
@@ -59,25 +112,43 @@ public final class MaintenanceSettingsStore: Sendable {
     public var lastSessionSummary: BackupSessionSummary?
 
     /// Controls presentation of the backup inspector modal.
-    public var showInspectorModal: Bool = false
+    public var showInspectorModal: Bool {
+        get { activeModal == .inspector }
+        set { setModal(.inspector, presented: newValue) }
+    }
 
     /// Controls presentation of the global preferences modal.
-    public var showPreferencesModal: Bool = false
+    public var showPreferencesModal: Bool {
+        get { activeModal == .preferences }
+        set { setModal(.preferences, presented: newValue) }
+    }
 
     /// Active tab in the preferences modal sheet.
     public var activePreferencesTab: PreferencesTab = .general
 
     /// Controls presentation of the system logs modal.
-    public var showSystemLogsModal: Bool = false
+    public var showSystemLogsModal: Bool {
+        get { activeModal == .systemLogs }
+        set { setModal(.systemLogs, presented: newValue) }
+    }
 
     /// Controls presentation of the tabbed profile settings modal.
-    public var showProfileSettingsModal: Bool = false
+    public var showProfileSettingsModal: Bool {
+        get { activeModal == .profileSettings }
+        set { setModal(.profileSettings, presented: newValue) }
+    }
 
     /// Controls presentation of the last backup session summary modal.
-    public var showLastBackupSummaryModal: Bool = false
+    public var showLastBackupSummaryModal: Bool {
+        get { activeModal == .lastBackupSummary }
+        set { setModal(.lastBackupSummary, presented: newValue) }
+    }
 
     /// Controls presentation of the delete profile confirmation dialog.
-    public var showDeleteProfileConfirmation: Bool = false
+    public var showDeleteProfileConfirmation: Bool {
+        get { activeModal == .deleteProfile }
+        set { setModal(.deleteProfile, presented: newValue) }
+    }
 
     /// Profile queued for deletion confirmation.
     public var profilePendingDeletion: BackupProfile?
@@ -91,7 +162,10 @@ public final class MaintenanceSettingsStore: Sendable {
     // MARK: - Profile Management Dialogs
 
     /// Controls presentation of the 4-step Sanctuary Onboarding Wizard modal.
-    public var showOnboardingModal: Bool = false
+    public var showOnboardingModal: Bool {
+        get { activeModal == .onboarding }
+        set { setModal(.onboarding, presented: newValue) }
+    }
     public var onboardingCurrentStep: Int = 0
     public var onboardingProfileName: String = ""
     public var onboardingSourceURL: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents")
@@ -101,7 +175,10 @@ public final class MaintenanceSettingsStore: Sendable {
     public var onboardingHasFDAPermission: Bool = false
 
     /// Controls presentation of the new profile sheet.
-    public var showNewProfileSheet: Bool = false
+    public var showNewProfileSheet: Bool {
+        get { activeModal == .newProfile }
+        set { setModal(.newProfile, presented: newValue) }
+    }
 
     /// Draft profile name.
     public var newProfileName: String = ""
@@ -196,6 +273,9 @@ public final class MaintenanceSettingsStore: Sendable {
 
     /// Controls presentation of the global alert.
     public var showAlert: Bool = false
+
+    /// Transient, non-blocking success message shown as a banner instead of a modal alert.
+    public var successBannerMessage: String?
 
     /// Active log level filter.
     public var selectedLogLevel: LogEntry.LogLevel? = nil
@@ -356,9 +436,11 @@ public final class MaintenanceSettingsStore: Sendable {
         self.showAlert = true
     }
 
-    /// Presents a success alert with the given message.
+    /// Presents a transient success banner with the given message.
+    ///
+    /// Successes are confirmations, not decisions: they must never interrupt the user with a modal
+    /// alert that demands an acknowledgement click.
     public func showSuccess(_ message: String) {
-        self.alertMessage = message
-        self.showAlert = true
+        self.successBannerMessage = message
     }
 }

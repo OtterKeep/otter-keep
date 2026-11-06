@@ -149,6 +149,8 @@ extension AppState {
                     title: analyzed.title,
                     message: analyzed.message,
                     detailedReason: analyzed.detailedReason,
+                    guaranteeText: analyzed.guaranteeText,
+                    recoveryAction: analyzed.recoveryAction,
                     profileName: profile.name
                 )
                 self.showFeedbackModal = true
@@ -180,7 +182,12 @@ extension AppState {
     }
 
     /// Analyzes backup failure errors to produce precise, non-misleading user guidance.
-    public static func analyzeBackupError(_ error: Error, destinationURL: URL?, sourceURL: URL?) -> (title: String, message: String, detailedReason: String) {
+    ///
+    /// Every branch fills all three parts of the error architecture: what happened (`title`/`message`),
+    /// the sanctuary guarantee (`guaranteeText`), and the restorative pathway (`recoveryAction`).
+    public static func analyzeBackupError(_ error: Error, destinationURL: URL?, sourceURL: URL?) -> (
+        title: String, message: String, detailedReason: String, guaranteeText: String, recoveryAction: RecoveryAction
+    ) {
         let errorDesc = error.localizedDescription
 
         // 1. External drive disconnected or destination directory vanished
@@ -188,7 +195,9 @@ extension AppState {
             return (
                 title: L10n.t(.feedbackExternalDriveMissingTitle),
                 message: L10n.format(.feedbackExternalDriveMissingMessage, dest.lastPathComponent),
-                detailedReason: L10n.t(.feedbackExternalDriveMissingAdvice)
+                detailedReason: L10n.t(.feedbackExternalDriveMissingAdvice),
+                guaranteeText: L10n.t(.feedbackGuaranteeSnapshotsSafe),
+                recoveryAction: RecoveryAction(kind: .viewLogs, label: L10n.t(.recoveryViewLogs))
             )
         }
 
@@ -197,7 +206,9 @@ extension AppState {
             return (
                 title: L10n.t(.feedbackSourceFolderMissingTitle),
                 message: L10n.format(.feedbackSourceFolderMissingMessage, src.lastPathComponent),
-                detailedReason: L10n.t(.feedbackSourceFolderMissingAdvice)
+                detailedReason: L10n.t(.feedbackSourceFolderMissingAdvice),
+                guaranteeText: L10n.t(.feedbackGuaranteeNothingModified),
+                recoveryAction: RecoveryAction(kind: .viewLogs, label: L10n.t(.recoveryViewLogs))
             )
         }
 
@@ -208,7 +219,9 @@ extension AppState {
             return (
                 title: L10n.t(.feedbackDiskFullTitle),
                 message: L10n.t(.feedbackDiskFullMessage),
-                detailedReason: L10n.t(.feedbackDiskFullAdvice)
+                detailedReason: L10n.t(.feedbackDiskFullAdvice),
+                guaranteeText: L10n.t(.feedbackGuaranteeSnapshotsSafe),
+                recoveryAction: RecoveryAction(kind: .viewLogs, label: L10n.t(.recoveryViewLogs))
             )
         }
 
@@ -219,7 +232,9 @@ extension AppState {
             return (
                 title: L10n.t(.feedbackPermissionDeniedTitle),
                 message: L10n.t(.feedbackPermissionDeniedMessage),
-                detailedReason: L10n.t(.feedbackPermissionDeniedAdvice)
+                detailedReason: L10n.t(.feedbackPermissionDeniedAdvice),
+                guaranteeText: L10n.t(.feedbackGuaranteeNothingModified),
+                recoveryAction: RecoveryAction(kind: .openFullDiskAccess, label: L10n.t(.recoveryOpenFullDiskAccess))
             )
         }
 
@@ -227,7 +242,9 @@ extension AppState {
         return (
             title: L10n.t(.feedbackGeneralErrorTitle),
             message: errorDesc,
-            detailedReason: L10n.t(.feedbackGeneralErrorAdvice)
+            detailedReason: L10n.t(.feedbackGeneralErrorAdvice),
+            guaranteeText: L10n.t(.feedbackGuaranteeSnapshotsSafe),
+            recoveryAction: RecoveryAction(kind: .viewLogs, label: L10n.t(.recoveryViewLogs))
         )
     }
 

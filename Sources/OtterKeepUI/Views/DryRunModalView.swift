@@ -36,6 +36,7 @@ public struct DryRunModalView: View {
                         .font(.title3)
                         .foregroundStyle(.secondary)
                 }
+                .accessibilityLabel(L10n.t(.closeButton))
                 .buttonStyle(.plain)
             }
 

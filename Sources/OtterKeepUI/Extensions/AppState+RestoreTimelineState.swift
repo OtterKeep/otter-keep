@@ -95,8 +95,8 @@ extension AppState {
     // MARK: - Direct File Version History & Finder In-Place Restore
     /// Controls presentation of the file version history modal.
     public var showFileVersionHistoryModal: Bool {
-        get { restoreTimeline.showFileVersionHistoryModal }
-        set { restoreTimeline.showFileVersionHistoryModal = newValue }
+        get { activeModal == .fileVersionHistory }
+        set { setModalRoute(.fileVersionHistory, presented: newValue) }
     }
     /// On-disk URL of the file whose version history is displayed.
     public var activeVersionHistoryFile: URL? { get { restoreTimeline.activeVersionHistoryFile } set { restoreTimeline.activeVersionHistoryFile = newValue } }
