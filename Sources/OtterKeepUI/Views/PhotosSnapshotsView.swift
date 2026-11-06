@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import OtterKeepCore
-import OtterKeepDatabase
+import OtterKeepDomain
 
 /// Dedicated explorer view for browsing and restoring historical Apple Photos backup snapshots and media assets.
 public struct PhotosSnapshotsView: View {

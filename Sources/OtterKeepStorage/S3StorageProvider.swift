@@ -1,5 +1,6 @@
 import Foundation
 import os
+import OtterKeepDomain
 
 /// Metadata representation of an object stored in S3-compatible cloud storage.
 public struct S3ObjectMetadata: Sendable, Equatable {
@@ -17,38 +18,6 @@ public struct S3ObjectMetadata: Sendable, Equatable {
         self.size = size
         self.etag = etag
         self.lastModified = lastModified
-    }
-}
-
-/// S3 Configuration parameters.
-public struct S3Configuration: Sendable, Codable, Equatable {
-    /// S3 REST API endpoint URL string (e.g. "https://s3.eu-central-1.amazonaws.com" or "https://<accountid>.r2.cloudflarestorage.com").
-    public var endpoint: String
-    /// Target bucket name.
-    public var bucket: String
-    /// S3 Region (e.g. "eu-central-1", "us-east-1", "auto").
-    public var region: String
-    /// S3 Access Key ID.
-    public var accessKeyId: String
-    /// Base prefix folder in the bucket (e.g. "OtterKeep/MacBookPro").
-    public var pathPrefix: String
-    /// Whether to force path-style addressing (`endpoint/bucket/key`) instead of virtual hosted style (`bucket.endpoint/key`).
-    public var forcePathStyle: Bool
-
-    public init(
-        endpoint: String = "https://s3.amazonaws.com",
-        bucket: String = "",
-        region: String = "us-east-1",
-        accessKeyId: String = "",
-        pathPrefix: String = "",
-        forcePathStyle: Bool = true
-    ) {
-        self.endpoint = endpoint
-        self.bucket = bucket
-        self.region = region
-        self.accessKeyId = accessKeyId
-        self.pathPrefix = pathPrefix
-        self.forcePathStyle = forcePathStyle
     }
 }
 

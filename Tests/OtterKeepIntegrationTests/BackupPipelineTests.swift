@@ -40,6 +40,86 @@ struct BackupPipelineTests {
         try assertTrue(negationRule?.isNegative == true)
     }
 
+    @Test func testExclusionRuleGlobSemantics() throws {
+        // Suffix rule: the UI preset `*.tmp` must match files, not directories or unrelated names.
+        let tmpRule = ExclusionRule(pattern: "*.tmp")
+        try assertTrue(tmpRule.matches(name: "scratch.tmp", relativePath: "docs/scratch.tmp"))
+        try assertTrue(tmpRule.matches(absolutePath: "/Users/me/Documents/scratch.tmp"))
+        try assertFalse(tmpRule.matches(name: "scratch.txt", relativePath: "docs/scratch.txt"))
+        try assertFalse(tmpRule.matches(absolutePath: "/Users/me/Documents/scratch.txt"))
+
+        // Prefix rule.
+        let prefixRule = ExclusionRule(pattern: "temp*")
+        try assertTrue(prefixRule.matches(name: "tempfile", relativePath: "tempfile"))
+        try assertFalse(prefixRule.matches(name: "mytempfile", relativePath: "mytempfile"))
+
+        // Exact rule must not match a parent directory segment of the absolute path.
+        let exactRule = ExclusionRule(pattern: ".DS_Store")
+        try assertTrue(exactRule.matches(absolutePath: "/Users/me/.DS_Store"))
+        try assertFalse(exactRule.matches(absolutePath: "/Users/me/.DS_Store/notes.txt"))
+
+        // Contains rule inspects the full path so nested directories are excluded.
+        let containsRule = ExclusionRule(pattern: "*cache*")
+        try assertTrue(containsRule.matches(absolutePath: "/Users/me/Library/cache/blob.bin"))
+        try assertFalse(containsRule.matches(absolutePath: "/Users/me/Documents/report.pdf"))
+    }
+
+    @Test func testVolumeMountDestinationMatching() throws {
+        // A destination nested below the mount point belongs to the mounted volume.
+        try assertTrue(
+            BackupScheduler.destination(
+                URL(fileURLWithPath: "/Volumes/Backup/OtterKeep"),
+                residesOn: "/Volumes/Backup",
+                volumeUUID: nil,
+                knownVolumeUUIDs: []
+            )
+        )
+        // The mount point itself is a valid destination.
+        try assertTrue(
+            BackupScheduler.destination(
+                URL(fileURLWithPath: "/Volumes/Backup"),
+                residesOn: "/Volumes/Backup",
+                volumeUUID: nil,
+                knownVolumeUUIDs: []
+            )
+        )
+        // A destination on a different volume must not be triggered by this mount event.
+        try assertFalse(
+            BackupScheduler.destination(
+                URL(fileURLWithPath: "/Volumes/Other/OtterKeep"),
+                residesOn: "/Volumes/Backup",
+                volumeUUID: nil,
+                knownVolumeUUIDs: []
+            )
+        )
+        // A sibling path sharing a name prefix is not nested inside the mount point.
+        try assertFalse(
+            BackupScheduler.destination(
+                URL(fileURLWithPath: "/Volumes/Backup2/OtterKeep"),
+                residesOn: "/Volumes/Backup",
+                volumeUUID: nil,
+                knownVolumeUUIDs: []
+            )
+        )
+        // Registered rotation drive UUIDs match regardless of the mount path.
+        try assertTrue(
+            BackupScheduler.destination(
+                URL(fileURLWithPath: "/Volumes/Anywhere"),
+                residesOn: "/Volumes/Backup",
+                volumeUUID: "AAAA-BBBB",
+                knownVolumeUUIDs: ["AAAA-BBBB"]
+            )
+        )
+        try assertFalse(
+            BackupScheduler.destination(
+                URL(fileURLWithPath: "/Volumes/Anywhere"),
+                residesOn: "/Volumes/Backup",
+                volumeUUID: "CCCC-DDDD",
+                knownVolumeUUIDs: ["AAAA-BBBB"]
+            )
+        )
+    }
+
     @Test func testChangeDetectorPrecision() throws {
         let detector = ChangeDetector()
         let t1 = Date(timeIntervalSince1970: 1000.0)

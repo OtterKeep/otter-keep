@@ -1,4 +1,5 @@
 import Foundation
+import OtterKeepDomain
 import Darwin
 
 /// Apple APFS driver providing block-level Copy-on-Write cloning (`clonefile`),

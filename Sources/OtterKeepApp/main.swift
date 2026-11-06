@@ -1,31 +1,36 @@
-import SwiftUI
 import AppKit
 import OtterKeepCore
 import OtterKeepUI
+import SwiftUI
+
 #if canImport(Sparkle)
-import Sparkle
+    import Sparkle
 
-/// In-app software update controller bridging the official Sparkle 2.x framework.
-final class SparkleUpdaterBridge: NSObject, SPUUpdaterDelegate {
-    static let shared = SparkleUpdaterBridge()
-    private var updaterController: SPUStandardUpdaterController?
+    /// In-app software update controller bridging the official Sparkle 2.x framework.
+    final class SparkleUpdaterBridge: NSObject, SPUUpdaterDelegate {
+        static let shared = SparkleUpdaterBridge()
+        private var updaterController: SPUStandardUpdaterController?
 
-    func setup() {
-        updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: self, userDriverDelegate: nil)
+        func setup() {
+            updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: self, userDriverDelegate: nil)
+        }
+
+        func checkForUpdates() {
+            updaterController?.checkForUpdates(nil)
+        }
     }
-
-    func checkForUpdates() {
-        updaterController?.checkForUpdates(nil)
-    }
-}
 #endif
 
 /// Shared application context holding the central `@Observable` AppState.
 @MainActor
 final class AppContext {
     static let shared = AppContext()
-    let appState = AppState()
-    private init() {}
+    let appState: AppState
+    private init() {
+        let state = AppState()
+        state.bootstrap()
+        self.appState = state
+    }
 }
 
 /// Application delegate handling single-instance lifecycle events, application dock icon, and cleanup.
@@ -37,10 +42,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         #if canImport(Sparkle)
-        SparkleUpdaterBridge.shared.setup()
-        AppContext.shared.appState.onCheckForUpdatesNative = {
-            SparkleUpdaterBridge.shared.checkForUpdates()
-        }
+            SparkleUpdaterBridge.shared.setup()
+            AppContext.shared.appState.onCheckForUpdatesNative = {
+                SparkleUpdaterBridge.shared.checkForUpdates()
+            }
         #endif
 
         // Register macOS Services provider for universal right-click context menu integration
@@ -78,8 +83,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func openVersionHistoryService(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         if let types = pboard.types, types.contains(.fileURL),
-           let urls = pboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
-           let firstURL = urls.first {
+            let urls = pboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
+            let firstURL = urls.first
+        {
             Task { @MainActor in
                 WindowManager.showAndFocusMainWindow()
                 AppContext.shared.appState.openVersionHistory(for: firstURL)
@@ -116,7 +122,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for url in urls {
             if url.scheme == "otterkeep" && url.host == "restore-versions" {
                 if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-                   let pathItem = components.queryItems?.first(where: { $0.name == "path" })?.value {
+                    let pathItem = components.queryItems?.first(where: { $0.name == "path" })?.value
+                {
                     let fileURL = URL(fileURLWithPath: pathItem)
                     Task { @MainActor in
                         WindowManager.showAndFocusMainWindow()
@@ -182,4 +189,3 @@ SingleInstanceManager.shared.startServer { message in
 
 // 3. Launch the native SwiftUI application
 OtterKeepApplication.main()
-

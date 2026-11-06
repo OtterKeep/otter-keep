@@ -1,4 +1,5 @@
 import Foundation
+import OtterKeepDomain
 import Darwin
 
 /// General-purpose POSIX driver supporting HFS+, NFS, SMB, and other POSIX-compatible mounts.

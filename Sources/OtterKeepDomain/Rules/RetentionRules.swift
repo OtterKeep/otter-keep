@@ -23,19 +23,21 @@ public struct RetentionPolicyCalculator: Sendable {
     ///   - keepDailyDays: Number of days to keep daily snapshots (nil = unlimited).
     ///   - keepWeeklyWeeks: Number of weeks to keep weekly snapshots (nil = unlimited).
     ///   - keepMonthlyMonths: Number of months to keep monthly snapshots (nil = unlimited).
+    ///   - maxSnapshotsToKeep: Hard cap on the number of retained snapshots (nil = no cap).
     /// - Returns: A `Decision` with kept and pruned snapshot IDs.
     public static func evaluate(
         snapshots: [SnapshotRecord],
         now: Date = Date(),
         keepDailyDays: Int? = 7,
         keepWeeklyWeeks: Int? = 4,
-        keepMonthlyMonths: Int? = 12
+        keepMonthlyMonths: Int? = 12,
+        maxSnapshotsToKeep: Int? = nil
     ) -> Decision {
         guard !snapshots.isEmpty else {
             return Decision(keepSnapshotIds: [], pruneSnapshotIds: [])
         }
 
-        let oneDayAgo = now.addingTimeInterval(-86400) // 24 hours
+        let oneDayAgo = now.addingTimeInterval(-86400)  // 24 hours
 
         let dayFormatter = DateFormatter()
         dayFormatter.dateFormat = "yyyy-MM-dd"
@@ -77,10 +79,43 @@ public struct RetentionPolicyCalculator: Sendable {
             }
         }
 
-        let pruneIds = snapshots
+        snapshotsToKeep = applySnapshotCap(
+            snapshots: snapshots,
+            keepSnapshotIds: snapshotsToKeep,
+            maxSnapshotsToKeep: maxSnapshotsToKeep
+        )
+
+        let pruneIds =
+            snapshots
             .filter { !snapshotsToKeep.contains($0.id) && !$0.isLocked }
             .map { $0.id }
 
         return Decision(keepSnapshotIds: snapshotsToKeep, pruneSnapshotIds: pruneIds)
+    }
+
+    /// Applies a hard cap on the number of retained snapshots while preserving the newest and all locked snapshots.
+    /// - Parameters:
+    ///   - snapshots: Chronologically ordered list of snapshot records (newest to oldest).
+    ///   - keepSnapshotIds: Snapshot IDs already selected for retention by the GFS rules.
+    ///   - maxSnapshotsToKeep: Hard cap on the number of retained snapshots (nil or non-positive = no cap).
+    /// - Returns: The capped set of retained snapshot IDs.
+    public static func applySnapshotCap(
+        snapshots: [SnapshotRecord],
+        keepSnapshotIds: Set<String>,
+        maxSnapshotsToKeep: Int?
+    ) -> Set<String> {
+        guard let maxKeep = maxSnapshotsToKeep, maxKeep > 0 else { return keepSnapshotIds }
+
+        let candidates = snapshots.filter { keepSnapshotIds.contains($0.id) }
+        guard candidates.count > maxKeep else { return keepSnapshotIds }
+
+        var trimmed = Set(candidates.prefix(maxKeep).map(\.id))
+        if let newest = snapshots.first {
+            trimmed.insert(newest.id)
+        }
+        for snap in snapshots where snap.isLocked {
+            trimmed.insert(snap.id)
+        }
+        return trimmed
     }
 }

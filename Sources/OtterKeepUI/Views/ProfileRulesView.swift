@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import OtterKeepStorage
 import OtterKeepCore
 
 /// Dedicated view for managing profile rules, directories, exclusions, iCloud, and backup schedules.

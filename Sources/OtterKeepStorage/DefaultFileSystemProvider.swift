@@ -1,4 +1,5 @@
 import Foundation
+import OtterKeepDomain
 import Darwin
 
 /// Default macOS storage engine providing unified filesystem abstraction across APFS, exFAT, NTFS, and FAT

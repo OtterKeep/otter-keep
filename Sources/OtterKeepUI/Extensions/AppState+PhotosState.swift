@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 import Photos
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 /// Forwarding accessors exposing the Apple Photos backup and browsing state owned by

@@ -1,5 +1,4 @@
 import Foundation
-import OtterKeepApplication
 
 /// Strategy for handling dataless/ubiquitous iCloud Drive items during backups.
 public enum ICloudBackupStrategy: String, Codable, Sendable, CaseIterable {
@@ -423,6 +422,21 @@ public struct BackupProfile: Identifiable, Codable, Sendable, Equatable {
         manifestDatabaseURL.standardizedFileURL.path(percentEncoded: false)
     }
 
+    /// Directory URL holding internal manifest artifacts for an arbitrary destination (`<destination>/.otterkeep/`).
+    public static func manifestDirectoryURL(forDestination destinationURL: URL) -> URL {
+        destinationURL.appendingPathComponent(".otterkeep", isDirectory: true)
+    }
+
+    /// URL to the SQLite manifest database for an arbitrary destination (`<destination>/.otterkeep/manifest.sqlite`).
+    public static func manifestDatabaseURL(forDestination destinationURL: URL) -> URL {
+        manifestDirectoryURL(forDestination: destinationURL).appendingPathComponent("manifest.sqlite")
+    }
+
+    /// Standardized filesystem path to the SQLite manifest database for an arbitrary destination.
+    public static func manifestDatabasePath(forDestination destinationURL: URL) -> String {
+        manifestDatabaseURL(forDestination: destinationURL).standardizedFileURL.path(percentEncoded: false)
+    }
+
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         if let id = try container.decodeIfPresent(UUID.self, forKey: .id) {
@@ -607,34 +621,3 @@ public struct BackupProfile: Identifiable, Codable, Sendable, Equatable {
         return rel
     }
 }
-
-// MARK: - Application DTO Mapping
-extension BackupProfile {
-    /// Maps domain/core profile to clean architecture Application layer DTO.
-    public func toDTO() -> ProfileConfigurationDTO {
-        ProfileConfigurationDTO(
-            id: id,
-            name: name,
-            sourcePath: sourceURL.path,
-            destinationPath: destinationURL.path,
-            excludePatterns: excludePatterns,
-            isImmutabilityLockEnabled: isImmutabilityLockEnabled,
-            immutabilityLockDays: immutabilityLockDays
-        )
-    }
-
-    /// Initializes profile from Application layer DTO.
-    public init(from dto: ProfileConfigurationDTO) {
-        self.init(
-            id: dto.id,
-            name: dto.name,
-            sourceURL: URL(fileURLWithPath: dto.sourcePath),
-            destinationURL: URL(fileURLWithPath: dto.destinationPath),
-            excludePatterns: dto.excludePatterns,
-            isImmutabilityLockEnabled: dto.isImmutabilityLockEnabled,
-            immutabilityLockDays: dto.immutabilityLockDays
-        )
-    }
-}
-
-

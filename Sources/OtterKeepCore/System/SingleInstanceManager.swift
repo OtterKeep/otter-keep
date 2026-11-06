@@ -275,6 +275,18 @@ public final class SingleInstanceManager: @unchecked Sendable {
         return isListening
     }
 
+    /// Decides whether an IPC peer may talk to this process.
+    ///
+    /// Only peers running as the same effective user are accepted; the check is intentionally
+    /// fail-closed so that an unverifiable peer can never be trusted.
+    /// - Parameters:
+    ///   - peerUID: Effective user ID reported by `getpeereid`.
+    ///   - currentUID: Effective user ID of the current process.
+    /// - Returns: `true` when the peer belongs to the current user.
+    public static func isPeerAllowed(peerUID: uid_t, currentUID: uid_t) -> Bool {
+        peerUID == currentUID
+    }
+
     private func runServerLoop(onMessage: @escaping @Sendable (SingleInstanceMessage) -> Void) {
         while safeIsListening {
             let clientFD = accept(serverSocketFD, nil, nil)
@@ -283,15 +295,19 @@ public final class SingleInstanceManager: @unchecked Sendable {
                 continue
             }
 
-            // Verify peer UID matches current process UID to prevent cross-user spoofing
+            // Verify peer UID matches current process UID to prevent cross-user spoofing.
+            // Fail closed: an unverifiable peer is rejected rather than trusted.
             var peerUID: uid_t = 0
             var peerGID: gid_t = 0
-            if getpeereid(clientFD, &peerUID, &peerGID) == 0 {
-                if peerUID != geteuid() {
-                    logger.error("Rejected unauthorized IPC connection from UID \(peerUID) (expected \(geteuid()))")
-                    close(clientFD)
-                    continue
-                }
+            guard getpeereid(clientFD, &peerUID, &peerGID) == 0 else {
+                logger.error("Rejected IPC connection: peer credentials could not be verified (errno \(errno)).")
+                close(clientFD)
+                continue
+            }
+            guard Self.isPeerAllowed(peerUID: peerUID, currentUID: geteuid()) else {
+                logger.error("Rejected unauthorized IPC connection from UID \(peerUID) (expected \(geteuid()))")
+                close(clientFD)
+                continue
             }
 
             var nosigpipe: Int32 = 1

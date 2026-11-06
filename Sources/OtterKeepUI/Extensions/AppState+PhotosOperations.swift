@@ -3,8 +3,7 @@ import AppKit
 import Observation
 import Photos
 import UniformTypeIdentifiers
-import OtterKeepStorage
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 extension AppState {
@@ -60,7 +59,7 @@ extension AppState {
         Task { [weak self] in
             guard let self = self else { return }
             do {
-                let summary = try await self.photosCoordinator.executeBackup(configuration: self.photosConfig) { [weak self] progress in
+                let summary = try await self.engines.photos.executeBackup(configuration: self.photosConfig) { [weak self] progress in
                     Task { @MainActor in
                         self?.photosProgressState = progress
                     }
@@ -99,7 +98,7 @@ extension AppState {
     @MainActor
     public func cancelPhotosBackup() {
         Task {
-            await photosCoordinator.cancel()
+            await engines.photos.cancel()
             Task { @MainActor in
                 self.isPhotosBackupRunning = false
                 self.photosProgressState.isRunning = false
@@ -108,7 +107,7 @@ extension AppState {
     }
 
     func photosDatabasePath(for destURL: URL) -> String? {
-        let unifiedPath = destURL.appendingPathComponent(".otterkeep/manifest.sqlite").path(percentEncoded: false)
+        let unifiedPath = BackupProfile.manifestDatabasePath(forDestination: destURL)
         if FileManager.default.fileExists(atPath: unifiedPath) {
             return unifiedPath
         }
@@ -118,7 +117,7 @@ extension AppState {
     @MainActor
     public func loadPhotosSnapshots(force: Bool = false) {
         let destURL = photosConfig.destinationURL
-        guard let dbPath = photosDatabasePath(for: destURL) else {
+        guard photosDatabasePath(for: destURL) != nil else {
             self.photosSnapshots = []
             self.loadedPhotosSnapshotId = nil
             return
@@ -126,8 +125,7 @@ extension AppState {
 
         Task {
             do {
-                try await database.open(at: dbPath)
-                let snaps = try await database.fetchSnapshots()
+                let snaps = try await SnapshotCatalogService.shared.listSnapshots(atDestination: destURL)
                 Task { @MainActor in
                     let snapsChanged = self.photosSnapshots.map(\.id) != snaps.map(\.id)
                     if snapsChanged || self.photosSnapshots.isEmpty {
@@ -163,12 +161,11 @@ extension AppState {
             return
         }
         let destURL = photosConfig.destinationURL
-        guard let dbPath = photosDatabasePath(for: destURL) else { return }
+        guard photosDatabasePath(for: destURL) != nil else { return }
 
         Task {
             do {
-                try await database.open(at: dbPath)
-                let assets = try await database.fetchPhotosAssetRecords(for: snapshotId)
+                let assets = try await SnapshotCatalogService.shared.listPhotosAssets(forSnapshotId: snapshotId, atDestination: destURL)
                 Task { @MainActor in
                     self.loadedPhotosSnapshotId = snapshotId
                     self.photosAssets = assets

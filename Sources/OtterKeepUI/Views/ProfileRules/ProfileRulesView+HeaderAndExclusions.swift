@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import OtterKeepStorage
 import OtterKeepCore
 
 extension ProfileRulesView {

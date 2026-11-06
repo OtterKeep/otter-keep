@@ -2,7 +2,6 @@ import SwiftUI
 import Photos
 import UniformTypeIdentifiers
 import OtterKeepCore
-import OtterKeepDatabase
 
 /// Modern Apple Photos backup view presenting library metrics, export settings, and live synchronization.
 public struct PhotosBackupView: View {

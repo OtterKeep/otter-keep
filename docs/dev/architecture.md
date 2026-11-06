@@ -11,11 +11,11 @@ OtterKeep conforms to a strict **Clean Architecture (Hexagonal / Ports & Adapter
 | Layer / Package | Purpose | Inward Dependencies |
 | :--- | :--- | :--- |
 | **`OtterKeepDomain`** | Pure enterprise business rules: entities (`SnapshotRecord`, `FileCatalogRecord`, `PendingReplicationRecord`, `PhotosAssetRecord`), GFS retention calculator, and domain invariants. | Zero dependencies (pure Swift). |
-| **`OtterKeepApplication`** | Application business rules: abstract repository & storage ports (`SnapshotRepositoryProtocol`, `FileCatalogRepositoryProtocol`, `FileSystemPort`, `PlatformPorts`), and Use Cases (`ListSnapshotsUseCase`, `GetSnapshotDetailsUseCase`, `UpdateSnapshotLockUseCase`, `ApplyRetentionPruningUseCase`). | Depends strictly on `OtterKeepDomain`. |
-| **`OtterKeepStorage`** | Infrastructure adapter for filesystem & cloud I/O: APFS `clonefile`, POSIX hardlinks, xattr, BSD `uchg`, SFTP, S3, Backblaze B2, conforming to `FileSystemPort`. | Depends on `OtterKeepDomain`, `OtterKeepApplication`. |
-| **`OtterKeepDatabase`** | Infrastructure adapter for persistence: SQLite WAL cataloging, schema migrations, diffing engines, implementing `SQLiteSnapshotRepository` and `SQLiteFileCatalogRepository`. | Depends on `OtterKeepDomain`, `OtterKeepApplication`, `OtterKeepStorage`. |
-| **`OtterKeepCore`** | Domain services & application orchestration: backup coordination, background data scrubber, replication catch-up, anomaly guard, restore engine, encryption. | Depends on `OtterKeepDomain`, `OtterKeepApplication`, `OtterKeepStorage`, `OtterKeepDatabase`. |
-| **`OtterKeepUI`** | Presentation layer: SwiftUI sanctuary interface, menu bar popovers, side-by-side diff modal, timeline explorer. | `@MainActor` isolated `AppState` and views. |
+| **`OtterKeepApplication`** | Application business rules: abstract repository & capability ports (`SnapshotRepositoryProtocol`, `FileCatalogRepositoryProtocol`, `FileSystemPort`, `RemoteDestinationProbing`, `NetworkStatusProviding`, `StorageCapacityProviding`, `DatabaseDiagnosticsProviding`), boundary DTOs, and Use Cases (`ListSnapshotsUseCase`, `GetSnapshotDetailsUseCase`). | Depends strictly on `OtterKeepDomain`. |
+| **`OtterKeepStorage`** | Infrastructure adapter for filesystem & cloud I/O: APFS `clonefile`, POSIX hardlinks, xattr, BSD `uchg`, SFTP, S3, Backblaze B2, conforming to `FileSystemPort` and `RemoteDestinationProbing`. | Depends on `OtterKeepDomain`, `OtterKeepApplication`. |
+| **`OtterKeepDatabase`** | Infrastructure adapter for persistence: SQLite WAL cataloging, schema migrations, diffing engines, implementing `SQLiteSnapshotRepository`, `SQLiteFileCatalogRepository` and `DatabaseDiagnosticsProviding`. | Depends on `OtterKeepDomain`, `OtterKeepApplication`, `OtterKeepStorage`. |
+| **`OtterKeepCore`** | Domain services & application orchestration: backup coordination, background data scrubber, replication catch-up, anomaly guard, restore engine, encryption, plus the `EngineContainer` composition root and the `SnapshotCatalogService` catalog facade. | Depends on `OtterKeepDomain`, `OtterKeepApplication`, `OtterKeepStorage`, `OtterKeepDatabase`. |
+| **`OtterKeepUI`** | Presentation layer: SwiftUI sanctuary interface, menu bar popovers, side-by-side diff modal, timeline explorer. | Depends on `OtterKeepDomain`, `OtterKeepApplication`, `OtterKeepCore` only. |
 | **`OtterKeepCLI`** | Command-line utility (`otterkeep`): terminal commands invoking use cases through the composition root. | Headless Swift execution. |
 | **`OtterKeepFinderSyncExtension`**| Context-menu integration in macOS Finder. | Sandboxed App Extension communicating over Darwin IPC. |
 
@@ -152,17 +152,50 @@ Decouples UI browsing and profile management from physical storage availability:
 
 ## 13. Data Transfer Objects (DTOs) & Boundary Enforcement
 
-To enforce Clean Architecture separation between `OtterKeepDomain`, `OtterKeepApplication`, and `OtterKeepUI`/`OtterKeepCLI`:
-- Pure domain models (`SnapshotRecord`, `FileCatalogRecord`, `BackupProfile`) are mapped into immutable, Sendable DTOs:
-  - `SnapshotSummaryDTO`: Lightweight timeline metadata for UI lists and selector menus.
-  - `SnapshotDetailDTO`: Complete snapshot telemetry, including lock state and verification checksums.
-  - `FileCatalogItemDTO`: File metadata records for the snapshot explorer and diffing views.
-  - `BackupProfileDTO`: Profile configuration data transferred across presentation and use case layers.
-- Presentation layers interact exclusively with Use Cases and DTOs, keeping presentation decoupled from domain entity mutability or persistence implementations.
+The Application layer owns the only types that cross the presentation boundary:
+- `Sources/OtterKeepApplication/DTOs/SnapshotDTO.swift` — `SnapshotDTO`, `FileCatalogDTO`, `SnapshotDetailsDTO`.
+- `Sources/OtterKeepApplication/DTOs/RetentionDTO.swift` — `RetentionEvaluationDTO`.
+- `Sources/OtterKeepApplication/UseCases/SnapshotCatalogUseCases.swift` — `ListSnapshotsUseCase` (`executeDTOs()`) and `GetSnapshotDetailsUseCase` (`executeDTO()`).
+
+These DTOs are immutable `Sendable` value types used by the use cases and by the integration suite.
+The SwiftUI presentation layer does **not** consume DTOs directly: it reads domain entities
+(`SnapshotRecord`, `FileCatalogRecord`, `BackupProfile`) through the `SnapshotCatalogService` facade
+in `OtterKeepCore`. Those entities are already immutable `Sendable` value types, so an additional
+DTO hop would only duplicate them without adding isolation. The former `ProfileConfigurationDTO`
+was removed because `BackupProfile` is itself a `Codable` value type and the mapping existed solely
+to satisfy the documentation.
 
 ---
 
 ## 14. Layering Invariants & Single Sources of Truth
+
+### Target dependency graph
+`Domain` (no dependencies) → `Application` (Domain) → `Storage` (Domain, Application) →
+`Database` (Domain, Application, Storage) → `Core` (Domain, Application, Storage, Database) →
+`UI` (Domain, Application, Core) → `App` / `CLI` / `FinderSyncExtension`.
+
+`OtterKeepUI` deliberately does **not** depend on `OtterKeepStorage` or `OtterKeepDatabase`. Every
+concrete engine, provider and database handle is reachable only through `EngineContainer`
+(`Sources/OtterKeepCore/EngineContainer.swift`), the composition root that the UI stores as
+`AppState.engines`. Adding a `Storage`/`Database` import to a UI file is a layering violation.
+
+### Application ports consumed by the UI
+The UI talks to the outside world exclusively through `OtterKeepApplication` protocols:
+- `RemoteDestinationProbing` — probes S3, B2, SMB, WebDAV and SFTP destinations and returns the
+  semantic `RemoteDestinationProbeResult` (`RemoteProbeSuccess` / `RemoteProbeFailure`). The Storage
+  implementation is `RemoteDestinationProbe`; user-facing strings are resolved in the UI, because
+  `L10n` lives in `OtterKeepCore` and lower layers must not depend on it.
+- `NetworkStatusProviding` — reachability, metering and the current Wi-Fi SSID.
+- `StorageCapacityProviding` — volume capacity metrics.
+- `DatabaseDiagnosticsProviding` — central catalog path and self-healing maintenance.
+- `SnapshotRepositoryProtocol` / `FileCatalogRepositoryProtocol` — catalog access used by the use cases.
+
+### Catalog facade
+`SnapshotCatalogService` (`Sources/OtterKeepCore/Pipeline/SnapshotCatalogService.swift`) is the single
+entry point for snapshot, file, diff, search and Photos-asset queries. It resolves the per-profile
+database, falls back to the central cache when a destination is offline, and exposes destination-scoped
+overloads (`listSnapshots(atDestination:)`, `listPhotosAssets(forSnapshotId:atDestination:)`) for the
+Photos workspace, which has no `BackupProfile`.
 
 ### Versioning
 `version.json` is the only authored version source. `scripts/sync_version.sh` derives the
@@ -174,6 +207,13 @@ derived values drift apart.
 `Sources/OtterKeepCore/Diagnostics/L10n+Strings.swift` holds every key exactly once as a
 `L10n.Translation(english:hungarian:)` pair. Both languages therefore cannot diverge structurally,
 and the `L10n.t(_:lang:)` API stays unchanged. The legacy per-language dictionaries were removed.
+
+### Retention rules
+`RetentionPolicyCalculator` (`Sources/OtterKeepDomain/Rules/RetentionRules.swift`) is the single
+implementation of the Grandfather-Father-Son decision, including the `maxSnapshotsToKeep` cap
+(`applySnapshotCap`). `RetentionManager` only performs the I/O: it asks the calculator for a
+`Decision` and deletes the pruned snapshots. WORM-locked snapshots and the newest snapshot are
+protected inside the domain rule, so no caller can bypass them.
 
 ### Platform boundaries
 The backup pipeline depends only on the `VolumeEjecting` protocol
@@ -189,15 +229,20 @@ records, file records, progress emission, logging and `DestinationSyncResult` co
 once by the shared pipeline.
 
 ### Verification
-The integration suite is a `swift-testing` target (`Tests/OtterKeepIntegrationTests`, 12 modules)
+The integration suite is a `swift-testing` target (`Tests/OtterKeepIntegrationTests`, 13 suites)
 executed through `swift test`; see [testing.md](./testing.md).
 
 ### Feature state stores
-`AppState` is a thin composition root: it owns the profile list, navigation and the engine instances,
+`AppState` is a thin composition root: it owns the profile list, navigation and the engine container,
 and forwards feature state to `@MainActor @Observable` stores in `Sources/OtterKeepUI/Stores/`
 (`BackupRuntimeStore`, `RestoreTimelineStore`, `PhotosStore`, `ReplicationDestinationStore`,
 `MaintenanceSettingsStore`). The forwarding accessors keep every view call site unchanged, and views
 observe the store directly.
+
+`AppState.init()` only wires the engine container and the Photos store; all persisted state loading
+and background subsystem startup (profile load, scheduler, volume monitor, theme observer) happens in
+`AppState.bootstrap()`, which the app shell calls once from `AppContext`. Tests and previews therefore
+construct a side-effect-free `AppState`. Test-only mutators are compiled under `#if DEBUG`.
 
 ### Platform capability seams
 AppKit is confined to four leaf adapters — `SystemVolumeEjector`, `SystemVolumeObserver`,
@@ -206,6 +251,10 @@ AppKit is confined to four leaf adapters — `SystemVolumeEjector`, `SystemVolum
 consumed by the core. `Pipeline` is AppKit-free and the remaining services can be driven headlessly
 by injecting their no-op/default implementations; the shells leave the defaults in place so runtime
 behavior is unchanged.
+
+The Photos framework is likewise confined to the four files in `Sources/OtterKeepCore/Photos/`
+(`PhotosBackupModels`, `PhotoMetadataExtractor`, `PhotosBackupCoordinator`, `PhotosDeltaScanner`).
+No other target imports `Photos`; the UI reaches the coordinator through `EngineContainer.photos`.
 
 ---
 

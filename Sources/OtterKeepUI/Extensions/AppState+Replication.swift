@@ -3,8 +3,8 @@ import AppKit
 import Observation
 import Photos
 import UniformTypeIdentifiers
-import OtterKeepStorage
-import OtterKeepDatabase
+import OtterKeepDomain
+import OtterKeepApplication
 import OtterKeepCore
 
 extension AppState {
@@ -28,12 +28,9 @@ extension AppState {
             isRunning: true,
             statusMessage: "Starting 3-2-1 replication..."
         )
-        let localStorage = self.storage
-        let localDatabase = self.database
-
         Task { [weak self] in
             guard let self = self else { return }
-            let copyCoordinator = BackupCopyJobCoordinator(storage: localStorage, database: localDatabase)
+            let copyCoordinator = self.engines.makeReplicationCoordinator()
             await copyCoordinator.setProgressHandler { [weak self] state in
                 Task { @MainActor in
                     self?.replicationProgressState = state
@@ -272,9 +269,14 @@ extension AppState {
         destinationEditorTestSuccessMessage = nil
         destinationEditorTestErrorMessage = nil
 
+        let probe = engines.remoteDestinationProbe
+        let typeIndex = destinationEditorTypeIndex
+
         Task { @MainActor [weak self] in
             guard let self = self else { return }
-            if self.destinationEditorTypeIndex == 0 {
+            let result: RemoteDestinationProbeResult
+            switch typeIndex {
+            case 0:
                 let config = S3Configuration(
                     endpoint: self.destinationEditorS3Endpoint.trimmingCharacters(in: .whitespacesAndNewlines),
                     bucket: self.destinationEditorS3Bucket.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -283,65 +285,30 @@ extension AppState {
                     pathPrefix: self.destinationEditorS3PathPrefix.trimmingCharacters(in: .whitespacesAndNewlines),
                     forcePathStyle: self.destinationEditorS3ForcePathStyle
                 )
-                let provider = S3StorageProvider(config: config, secretAccessKey: self.destinationEditorS3SecretAccessKey)
-                do {
-                    _ = try await provider.testConnection()
-                    self.destinationEditorTestSuccessMessage = L10n.format(.testConnectionSuccessS3Format, config.bucket)
-                } catch {
-                    self.destinationEditorTestErrorMessage = L10n.format(.s3ConnectionErrorFormat, error.localizedDescription)
-                }
-            } else if self.destinationEditorTypeIndex == 1 {
-                let shareTrimmed = self.destinationEditorSmbShareURL.trimmingCharacters(in: .whitespacesAndNewlines)
-                do {
-                    let components = try NetworkShareMounter.parseShareURL(shareTrimmed)
-                    guard !components.host.isEmpty else {
-                        self.destinationEditorTestErrorMessage = L10n.t(.testConnectionMissingSMBHost)
-                        self.destinationEditorIsTesting = false
-                        return
-                    }
-
-                    if !NetworkReachability.shared.isConnected {
-                        self.destinationEditorTestErrorMessage = L10n.t(.testConnectionNoNetwork)
-                        self.destinationEditorIsTesting = false
-                        return
-                    }
-
-                    let portReachable = NetworkShareMounter.testTCPPort(host: components.host, port: 445, timeoutSeconds: 3.0)
-                    if portReachable {
-                        self.destinationEditorTestSuccessMessage = L10n.format(.testConnectionSuccessSMBFormat, components.host)
-                    } else {
-                        self.destinationEditorTestErrorMessage = "A NAS szerver ('\(components.host)') nem érhető el a 445-ös (SMB) porton."
-                    }
-                } catch {
-                    self.destinationEditorTestErrorMessage = error.localizedDescription
-                }
-            } else if self.destinationEditorTypeIndex == 2 {
+                result = await probe.probeS3(
+                    configuration: config,
+                    secretAccessKey: self.destinationEditorS3SecretAccessKey
+                )
+            case 1:
+                let config = NetworkShareConfiguration(
+                    shareURL: self.destinationEditorSmbShareURL.trimmingCharacters(in: .whitespacesAndNewlines),
+                    username: self.destinationEditorSmbUsername.trimmingCharacters(in: .whitespacesAndNewlines),
+                    subfolder: self.destinationEditorSmbMountPath.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+                result = await probe.probeNetworkShare(configuration: config)
+            case 2:
                 let urlString = self.destinationEditorWebDAVURL.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard let base = URL(string: urlString), base.scheme != nil else {
-                    self.destinationEditorTestErrorMessage = "Érvénytelen WebDAV URL cím."
-                    self.destinationEditorIsTesting = false
-                    return
-                }
                 let config = WebDAVConfiguration(
                     serverURL: urlString,
                     destinationPath: self.destinationEditorWebDAVPath.trimmingCharacters(in: .whitespacesAndNewlines),
                     username: self.destinationEditorWebDAVUsername.trimmingCharacters(in: .whitespacesAndNewlines),
                     useSSL: urlString.lowercased().hasPrefix("https")
                 )
-                let provider = WebDAVStorageProvider(config: config, password: self.destinationEditorWebDAVPassword)
-                do {
-                    _ = try await provider.testConnection()
-                    self.destinationEditorTestSuccessMessage = L10n.format(.testConnectionSuccessWebDAVFormat, urlString)
-                } catch {
-                    self.destinationEditorTestErrorMessage = error.localizedDescription
-                }
-            } else if self.destinationEditorTypeIndex == 3 {
-                let host = self.destinationEditorSFTPHost.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !host.isEmpty else {
-                    self.destinationEditorTestErrorMessage = "A megadott SFTP szerver cím érvénytelen."
-                    self.destinationEditorIsTesting = false
-                    return
-                }
+                result = await probe.probeWebDAV(
+                    configuration: config,
+                    password: self.destinationEditorWebDAVPassword
+                )
+            case 3:
                 let secret = self.destinationEditorSFTPPasswordOrKey.trimmingCharacters(in: .whitespacesAndNewlines)
                 let auth: SFTPAuthMethod
                 if secret.hasPrefix("/") || secret.hasPrefix("~") || FileManager.default.fileExists(atPath: secret) {
@@ -350,36 +317,67 @@ extension AppState {
                     auth = .password
                 }
                 let config = SFTPConfiguration(
-                    host: host,
+                    host: self.destinationEditorSFTPHost.trimmingCharacters(in: .whitespacesAndNewlines),
                     port: self.destinationEditorSFTPPort,
                     username: self.destinationEditorSFTPUsername.trimmingCharacters(in: .whitespacesAndNewlines),
                     remotePath: self.destinationEditorSFTPPath.trimmingCharacters(in: .whitespacesAndNewlines),
                     authMethod: auth
                 )
-                let provider = SFTPStorageProvider(config: config)
-                do {
-                    _ = try await provider.testConnection()
-                    self.destinationEditorTestSuccessMessage = L10n.format(.testConnectionSuccessSFTPFormat, host)
-                } catch {
-                    self.destinationEditorTestErrorMessage = error.localizedDescription
-                }
-            } else {
+                result = await probe.probeSFTP(configuration: config, secret: secret)
+            default:
+                let customEndpoint = self.destinationEditorB2CustomEndpoint.trimmingCharacters(in: .whitespacesAndNewlines)
                 let config = B2Configuration(
                     keyId: self.destinationEditorB2KeyId.trimmingCharacters(in: .whitespacesAndNewlines),
                     bucketName: self.destinationEditorB2BucketName.trimmingCharacters(in: .whitespacesAndNewlines),
                     region: self.destinationEditorB2Region.trimmingCharacters(in: .whitespacesAndNewlines),
-                    customEndpoint: self.destinationEditorB2CustomEndpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self.destinationEditorB2CustomEndpoint.trimmingCharacters(in: .whitespacesAndNewlines),
+                    customEndpoint: customEndpoint.isEmpty ? nil : customEndpoint,
                     pathPrefix: self.destinationEditorB2PathPrefix.trimmingCharacters(in: .whitespacesAndNewlines)
                 )
-                let provider = B2StorageProvider(config: config, applicationKey: self.destinationEditorB2AppKey)
-                do {
-                    _ = try await provider.testConnection()
-                    self.destinationEditorTestSuccessMessage = L10n.format(.testConnectionSuccessS3Format, config.bucketName)
-                } catch {
-                    self.destinationEditorTestErrorMessage = L10n.format(.s3ConnectionErrorFormat, error.localizedDescription)
-                }
+                result = await probe.probeB2(
+                    configuration: config,
+                    applicationKey: self.destinationEditorB2AppKey
+                )
+            }
+
+            switch result {
+            case .success(let success):
+                self.destinationEditorTestSuccessMessage = Self.successMessage(for: success)
+            case .failure(let failure):
+                self.destinationEditorTestErrorMessage = Self.failureMessage(for: failure)
             }
             self.destinationEditorIsTesting = false
+        }
+    }
+
+    /// Maps a semantic probe success outcome to a localized user-facing message.
+    private static func successMessage(for success: RemoteProbeSuccess) -> String {
+        switch success {
+        case .s3Bucket(let bucket), .b2Bucket(let bucket):
+            return L10n.format(.testConnectionSuccessS3Format, bucket)
+        case .networkShareHost(let host):
+            return L10n.format(.testConnectionSuccessSMBFormat, host)
+        case .webDAVEndpoint(let endpoint):
+            return L10n.format(.testConnectionSuccessWebDAVFormat, endpoint)
+        case .sftpHost(let host):
+            return L10n.format(.testConnectionSuccessSFTPFormat, host)
+        }
+    }
+
+    /// Maps a semantic probe failure outcome to a localized user-facing message.
+    private static func failureMessage(for failure: RemoteProbeFailure) -> String {
+        switch failure {
+        case .missingSMBHost:
+            return L10n.t(.testConnectionMissingSMBHost)
+        case .noNetwork:
+            return L10n.t(.testConnectionNoNetwork)
+        case .smbPortUnreachable(let host):
+            return L10n.format(.testConnectionSMBPortUnreachableFormat, host)
+        case .invalidWebDAVURL:
+            return L10n.t(.testConnectionInvalidWebDAVURL)
+        case .invalidSFTPHost:
+            return L10n.t(.testConnectionInvalidSFTPHost)
+        case .underlying(let message):
+            return L10n.format(.s3ConnectionErrorFormat, message)
         }
     }
 

@@ -3,8 +3,6 @@ import AppKit
 import Observation
 import Photos
 import UniformTypeIdentifiers
-import OtterKeepStorage
-import OtterKeepDatabase
 import OtterKeepCore
 
 /// Primary navigation sections within the modern sidebar.

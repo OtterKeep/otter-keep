@@ -1,13 +1,13 @@
-import SwiftUI
 import AppKit
 import OtterKeepCore
+import SwiftUI
 
 /// Main application window featuring a native macOS Source List sidebar, streamlined 4-area workspace structure,
 /// and unified profile & photos workspaces.
 public struct MainWindowView: View {
     private let appState: AppState
 
-    public init(appState: AppState = AppState()) {
+    public init(appState: AppState) {
         self.appState = appState
     }
 
@@ -86,17 +86,19 @@ public struct MainWindowView: View {
                 .padding(.horizontal, 10)
 
             // Navigation List
-            List(selection: Binding(
-                get: { appState.activeNavigation },
-                set: { newNav in
-                    if let newNav = newNav {
-                        appState.activeNavigation = newNav
-                        if case .profile(let id) = newNav {
-                            appState.selectProfile(id: id)
+            List(
+                selection: Binding(
+                    get: { appState.activeNavigation },
+                    set: { newNav in
+                        if let newNav = newNav {
+                            appState.activeNavigation = newNav
+                            if case .profile(let id) = newNav {
+                                appState.selectProfile(id: id)
+                            }
                         }
                     }
-                }
-            )) {
+                )
+            ) {
                 // MARK: 1. Backup Profiles Section
                 Section {
                     ForEach(appState.profiles) { profile in
@@ -291,7 +293,7 @@ public final class MainWindowDelegate: NSObject, NSWindowDelegate, @unchecked Se
 
     public func windowShouldClose(_ sender: NSWindow) -> Bool {
         sender.orderOut(nil)
-        return false // Intercept window close to preserve single-instance state and prevent scene destruction
+        return false  // Intercept window close to preserve single-instance state and prevent scene destruction
     }
 }
 
@@ -304,7 +306,8 @@ public enum WindowManager {
     public static func showAndFocusMainWindow() {
         NSApp.activate(ignoringOtherApps: true)
 
-        let targetWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == mainWindowIdentifier })
+        let targetWindow =
+            NSApp.windows.first(where: { $0.identifier?.rawValue == mainWindowIdentifier })
             ?? NSApp.windows.first(where: { !($0 is NSPanel) && $0.canBecomeMain })
             ?? NSApp.mainWindow
 
@@ -381,7 +384,8 @@ private struct MainWindowLifecycleModifier: ViewModifier {
             .onOpenURL { url in
                 if url.scheme == "otterkeep" && url.host == "restore-versions" {
                     if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-                       let pathItem = components.queryItems?.first(where: { $0.name == "path" })?.value {
+                        let pathItem = components.queryItems?.first(where: { $0.name == "path" })?.value
+                    {
                         let fileURL = URL(fileURLWithPath: pathItem)
                         appState.openVersionHistory(for: fileURL)
                     }
@@ -395,40 +399,52 @@ private struct MainWindowSystemSheetsModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(isPresented: Binding(
-                get: { appState.showPreferencesModal },
-                set: { appState.showPreferencesModal = $0 }
-            )) {
+            .sheet(
+                isPresented: Binding(
+                    get: { appState.showPreferencesModal },
+                    set: { appState.showPreferencesModal = $0 }
+                )
+            ) {
                 PreferencesModalView(appState: appState)
             }
-            .sheet(isPresented: Binding(
-                get: { appState.showSystemLogsModal },
-                set: { appState.showSystemLogsModal = $0 }
-            )) {
+            .sheet(
+                isPresented: Binding(
+                    get: { appState.showSystemLogsModal },
+                    set: { appState.showSystemLogsModal = $0 }
+                )
+            ) {
                 SystemLogsModalView(appState: appState)
             }
-            .sheet(isPresented: Binding(
-                get: { appState.showInspectorModal },
-                set: { appState.showInspectorModal = $0 }
-            )) {
+            .sheet(
+                isPresented: Binding(
+                    get: { appState.showInspectorModal },
+                    set: { appState.showInspectorModal = $0 }
+                )
+            ) {
                 BackupInspectorModalView(appState: appState)
             }
-            .sheet(isPresented: Binding(
-                get: { appState.showFileVersionHistoryModal },
-                set: { appState.showFileVersionHistoryModal = $0 }
-            )) {
+            .sheet(
+                isPresented: Binding(
+                    get: { appState.showFileVersionHistoryModal },
+                    set: { appState.showFileVersionHistoryModal = $0 }
+                )
+            ) {
                 FileVersionHistoryModalView(appState: appState)
             }
-            .sheet(isPresented: Binding(
-                get: { appState.showOnboardingModal },
-                set: { appState.showOnboardingModal = $0 }
-            )) {
+            .sheet(
+                isPresented: Binding(
+                    get: { appState.showOnboardingModal },
+                    set: { appState.showOnboardingModal = $0 }
+                )
+            ) {
                 SanctuaryOnboardingModalView(appState: appState)
             }
-            .sheet(isPresented: Binding(
-                get: { appState.showUnadoptedDriveModal },
-                set: { appState.showUnadoptedDriveModal = $0 }
-            )) {
+            .sheet(
+                isPresented: Binding(
+                    get: { appState.showUnadoptedDriveModal },
+                    set: { appState.showUnadoptedDriveModal = $0 }
+                )
+            ) {
                 UnadoptedDriveModalView(appState: appState)
             }
     }
@@ -439,36 +455,46 @@ private struct MainWindowProfileSheetsModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(isPresented: Binding(
-                get: { appState.showRemoteDestinationEditorSheet },
-                set: { appState.showRemoteDestinationEditorSheet = $0 }
-            )) {
+            .sheet(
+                isPresented: Binding(
+                    get: { appState.showRemoteDestinationEditorSheet },
+                    set: { appState.showRemoteDestinationEditorSheet = $0 }
+                )
+            ) {
                 RemoteDestinationEditorModalView(appState: appState)
             }
-            .sheet(isPresented: Binding(
-                get: { appState.showNewProfileSheet },
-                set: { appState.showNewProfileSheet = $0 }
-            )) {
+            .sheet(
+                isPresented: Binding(
+                    get: { appState.showNewProfileSheet },
+                    set: { appState.showNewProfileSheet = $0 }
+                )
+            ) {
                 NewProfileModalView(appState: appState)
             }
-            .sheet(isPresented: Binding(
-                get: { appState.showProfileSettingsModal },
-                set: { appState.showProfileSettingsModal = $0 }
-            )) {
+            .sheet(
+                isPresented: Binding(
+                    get: { appState.showProfileSettingsModal },
+                    set: { appState.showProfileSettingsModal = $0 }
+                )
+            ) {
                 if let profile = appState.selectedProfile {
                     ProfileSettingsModalView(appState: appState, profile: profile)
                 }
             }
-            .sheet(isPresented: Binding(
-                get: { appState.showDeleteProfileConfirmation },
-                set: { appState.showDeleteProfileConfirmation = $0 }
-            )) {
+            .sheet(
+                isPresented: Binding(
+                    get: { appState.showDeleteProfileConfirmation },
+                    set: { appState.showDeleteProfileConfirmation = $0 }
+                )
+            ) {
                 DeleteProfileConfirmationModalView(appState: appState)
             }
-            .sheet(isPresented: Binding(
-                get: { appState.showFeedbackModal },
-                set: { appState.showFeedbackModal = $0 }
-            )) {
+            .sheet(
+                isPresented: Binding(
+                    get: { appState.showFeedbackModal },
+                    set: { appState.showFeedbackModal = $0 }
+                )
+            ) {
                 if let feedback = appState.activeFeedback {
                     OperationFeedbackModalView(
                         feedback: feedback,
@@ -500,14 +526,19 @@ private struct MainWindowAlertsModifier: ViewModifier {
             } message: {
                 Text(appState.alertMessage ?? "")
             }
-            .alert(L10n.t(.renameProfileSheetTitle), isPresented: Binding(
-                get: { appState.showRenameProfileSheet },
-                set: { appState.showRenameProfileSheet = $0 }
-            )) {
-                TextField(L10n.t(.renameProfileSheetPrompt), text: Binding(
-                    get: { appState.renameProfileName },
-                    set: { appState.renameProfileName = $0 }
-                ))
+            .alert(
+                L10n.t(.renameProfileSheetTitle),
+                isPresented: Binding(
+                    get: { appState.showRenameProfileSheet },
+                    set: { appState.showRenameProfileSheet = $0 }
+                )
+            ) {
+                TextField(
+                    L10n.t(.renameProfileSheetPrompt),
+                    text: Binding(
+                        get: { appState.renameProfileName },
+                        set: { appState.renameProfileName = $0 }
+                    ))
                 Button(L10n.t(.save)) {
                     if let id = appState.selectedProfileId {
                         appState.renameProfile(id: id, newName: appState.renameProfileName)

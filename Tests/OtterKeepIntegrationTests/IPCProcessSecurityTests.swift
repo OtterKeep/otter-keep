@@ -64,6 +64,18 @@ struct IPCProcessSecurityTests {
         try assertTrue(myGID >= 0)
     }
 
+    @Test func testPeerUIDPolicyIsFailClosed() throws {
+        let myUID = geteuid()
+
+        // Same UID is the only accepted peer.
+        try assertTrue(SingleInstanceManager.isPeerAllowed(peerUID: myUID, currentUID: myUID))
+
+        // Any other UID must be rejected, including root and the "unknown" sentinel.
+        try assertFalse(SingleInstanceManager.isPeerAllowed(peerUID: myUID &+ 1, currentUID: myUID))
+        try assertFalse(SingleInstanceManager.isPeerAllowed(peerUID: 0, currentUID: myUID))
+        try assertFalse(SingleInstanceManager.isPeerAllowed(peerUID: myUID, currentUID: myUID &+ 1))
+    }
+
     @Test func testMessageSerialization() throws {
         let msg = SingleInstanceMessage(action: .openVersionHistory, filePath: "/Users/test/Documents/report.pdf")
         let encoder = JSONEncoder()

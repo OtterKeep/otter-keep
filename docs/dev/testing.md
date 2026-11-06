@@ -47,7 +47,7 @@ still reported immediately.
 
 ---
 
-## 2. The 13 Semantic Test Suites (82 Tests Total)
+## 2. The 13 Semantic Test Suites (92 Tests Total)
 
 | Test Suite File | Subsystem & Focus |
 | :--- | :--- |
@@ -63,7 +63,7 @@ still reported immediately.
 | **`LocalizationTests.swift`** | Unified string table bilingual parity (English / Hungarian), non-empty translations, format-specifier safety, localized suffix formatting |
 | **`PresentationUITests.swift`** | `OtterTheme` tokens, three-part error architecture, configuration archive serialization, multi-profile tracking, settings side-effect propagation |
 | **`ReplicationAndComplianceTests.swift`** | 3-2-1 compliance evaluator rules, offsite remote copy jobs, catch-up replication coordination |
-| **`CleanArchitectureTests.swift`** | Pure Domain entities, Repository Ports & Adapters, DTO mappings across boundaries, Use Cases, CentralDatabase profiles & JSON export/import |
+| **`CleanArchitectureTests.swift`** | Pure Domain entities, Repository Ports & Adapters, DTO mappings across boundaries, Use Cases, GFS retention rules & snapshot cap, CentralDatabase profiles & JSON export/import |
 
 ---
 

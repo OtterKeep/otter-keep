@@ -1,5 +1,5 @@
 import SwiftUI
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 /// Interactive spatial timeline scrubber allowing fluid scrubbing and step navigation across snapshots.

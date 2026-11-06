@@ -3,8 +3,6 @@ import AppKit
 import Observation
 import Photos
 import UniformTypeIdentifiers
-import OtterKeepStorage
-import OtterKeepDatabase
 import OtterKeepCore
 
 extension AppState {
@@ -88,14 +86,7 @@ extension AppState {
         refreshLogs()
 
         // Create dedicated, isolated session coordinator and SQLite database to support zero-contention parallel backups
-        let sessionDb = DatabaseEngine()
-        let sessionRetention = RetentionManager(storage: self.storage, database: sessionDb)
-        let sessionCoordinator = BackupSessionCoordinator(
-            storage: self.storage,
-            database: sessionDb,
-            retentionManager: sessionRetention,
-            volumeEjector: SystemVolumeEjector()
-        )
+        let sessionCoordinator = self.engines.makeBackupSessionCoordinator()
 
         let task = Task { [weak self] in
             guard let self = self else { return }
@@ -251,7 +242,8 @@ extension AppState {
         Task { [weak self] in
             guard let self = self else { return }
             do {
-                let summary = try await self.coordinator.performDryRun(profile: profile, mode: mode)
+                let dryRunCoordinator = self.engines.makeBackupSessionCoordinator()
+                let summary = try await dryRunCoordinator.performDryRun(profile: profile, mode: mode)
                 Task { @MainActor in
                     self.isDryRunRunning = false
                     self.dryRunSummary = summary

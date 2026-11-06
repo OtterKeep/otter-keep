@@ -3,8 +3,7 @@ import AppKit
 import Observation
 import Photos
 import UniformTypeIdentifiers
-import OtterKeepStorage
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 extension AppState {
@@ -23,8 +22,6 @@ extension AppState {
             self.loadedSnapshotId = nil
             return
         }
-        let dbPath = profile.destinationURL.appendingPathComponent(".otterkeep/manifest.sqlite").path(percentEncoded: false)
-
         let profileChanged = self.loadedProfileId != profile.id
         if profileChanged {
             self.loadedProfileId = profile.id
@@ -33,14 +30,7 @@ extension AppState {
 
         Task {
             do {
-                let list: [SnapshotRecord]
-                if FileManager.default.fileExists(atPath: dbPath) {
-                    try await database.open(at: dbPath)
-                    list = try await database.listSnapshots()
-                    try? CentralDatabase.shared.cacheSnapshots(list, forProfileId: profile.id.uuidString)
-                } else {
-                    list = try CentralDatabase.shared.listCachedSnapshots(forProfileId: profile.id.uuidString)
-                }
+                let list = try await SnapshotCatalogService.shared.listSnapshots(for: profile)
 
                 Task { @MainActor in
                     let snapshotsChanged = profileChanged || (self.snapshots.map(\.id) != list.map(\.id))
@@ -80,31 +70,19 @@ extension AppState {
     @MainActor
     public func preloadAllProfilesStatus() {
         for profile in profiles {
-            let dbURL = profile.destinationURL.appendingPathComponent(".otterkeep/manifest.sqlite")
-            if FileManager.default.fileExists(atPath: dbURL.path) {
-                Task {
-                    let probeDB = DatabaseEngine()
-                    do {
-                        try await probeDB.open(at: dbURL.path)
-                        let snaps = try await probeDB.listSnapshots()
-                        await probeDB.close()
-                        try? CentralDatabase.shared.cacheSnapshots(snaps, forProfileId: profile.id.uuidString)
-                        Task { @MainActor in
-                            self.profileLatestSnapshots[profile.id] = snaps.first
-                            self.profileSnapshotCounts[profile.id] = snaps.count
-                        }
-                    } catch {}
+            Task {
+                guard let snaps = try? await SnapshotCatalogService.shared.listSnapshots(for: profile) else { return }
+                Task { @MainActor in
+                    self.profileLatestSnapshots[profile.id] = snaps.first
+                    self.profileSnapshotCounts[profile.id] = snaps.count
                 }
-            } else if let cached = try? CentralDatabase.shared.listCachedSnapshots(forProfileId: profile.id.uuidString), !cached.isEmpty {
-                self.profileLatestSnapshots[profile.id] = cached.first
-                self.profileSnapshotCounts[profile.id] = cached.count
             }
         }
     }
 
     @MainActor
     public func loadFilesForSelectedSnapshot(force: Bool = false) {
-        guard let snapshotId = selectedSnapshotId else {
+        guard let profile = selectedProfile, let snapshotId = selectedSnapshotId else {
             self.snapshotFiles = []
             self.snapshotTreeNodes = []
             self.loadedSnapshotId = nil
@@ -115,28 +93,15 @@ extension AppState {
             return
         }
 
-        let currentProfileId = selectedProfile?.id.uuidString ?? ""
-
         Task {
-            let isDbAvailable = await database.isOpen
             do {
-                let files: [FileCatalogRecord]
-                if isDbAvailable {
-                    files = try await database.listFiles(forSnapshotId: snapshotId)
-                } else {
-                    files = try CentralDatabase.shared.listCachedFiles(forSnapshotId: snapshotId, profileId: currentProfileId)
-                }
+                let files = try await SnapshotCatalogService.shared.listFiles(forSnapshotId: snapshotId, in: profile)
                 let tree = FileTreeBuilder.buildTree(from: files)
 
                 let previousSnapshot = self.snapshots.drop(while: { $0.id != snapshotId }).dropFirst().first
                 var statuses: [String: DiffChangeType] = [:]
                 if let prevSnap = previousSnapshot {
-                    let prevFiles: [FileCatalogRecord]
-                    if isDbAvailable {
-                        prevFiles = (try? await database.listFiles(forSnapshotId: prevSnap.id)) ?? []
-                    } else {
-                        prevFiles = (try? CentralDatabase.shared.listCachedFiles(forSnapshotId: prevSnap.id, profileId: currentProfileId)) ?? []
-                    }
+                    let prevFiles = (try? await SnapshotCatalogService.shared.listFiles(forSnapshotId: prevSnap.id, in: profile)) ?? []
                     var prevMap: [String: FileCatalogRecord] = [:]
                     prevMap.reserveCapacity(prevFiles.count)
                     for f in prevFiles { prevMap[f.relativePath] = f }
@@ -193,17 +158,15 @@ extension AppState {
             return
         }
         self.timelineSearchQuery = query
-        let currentProfileId = selectedProfile?.id.uuidString ?? ""
+        guard let profile = selectedProfile else {
+            self.timelinePaths = []
+            self.timelineTreeNodes = []
+            return
+        }
 
         Task {
-            let isDbAvailable = await database.isOpen
             do {
-                let paths: [String]
-                if isDbAvailable {
-                    paths = try await database.searchDistinctRelativePaths(matching: query)
-                } else {
-                    paths = try CentralDatabase.shared.searchCachedRelativePaths(matching: query, profileId: currentProfileId)
-                }
+                let paths = try await SnapshotCatalogService.shared.searchDistinctRelativePaths(matching: query, in: profile)
                 let tree = FileTreeBuilder.buildTree(from: paths)
                 Task { @MainActor in
                     self.timelinePaths = paths
@@ -232,17 +195,15 @@ extension AppState {
     @MainActor
     public func loadTimelineVersions(for relativePath: String) {
         self.selectedTimelinePath = relativePath
-        let currentProfileId = selectedProfile?.id.uuidString ?? ""
+        guard let profile = selectedProfile else {
+            self.selectedPathVersions = []
+            self.selectedTimelineVersion = nil
+            return
+        }
 
         Task {
-            let isDbAvailable = await database.isOpen
             do {
-                let versions: [(snapshot: SnapshotRecord, file: FileCatalogRecord)]
-                if isDbAvailable {
-                    versions = try await database.listVersions(ofRelativePath: relativePath)
-                } else {
-                    versions = try CentralDatabase.shared.listCachedVersions(ofRelativePath: relativePath, profileId: currentProfileId)
-                }
+                let versions = try await SnapshotCatalogService.shared.listFileVersions(relativePath: relativePath, in: profile)
                 Task { @MainActor in
                     self.selectedPathVersions = versions
                     self.selectedTimelineVersion = versions.first
@@ -270,9 +231,15 @@ extension AppState {
         }
 
         self.isGlobalSearching = true
+        guard let profile = selectedProfile else {
+            self.globalSearchResults = []
+            self.selectedGlobalSearchResult = nil
+            self.isGlobalSearching = false
+            return
+        }
         Task {
             do {
-                let results = try await database.searchFilesAcrossSnapshots(query: trimmed, limit: 200)
+                let results = try await SnapshotCatalogService.shared.searchFilesAcrossSnapshots(query: trimmed, in: profile, limit: 200)
                 Task { @MainActor in
                     guard self.globalSearchQuery == query else { return }
                     self.globalSearchResults = results
@@ -335,12 +302,10 @@ extension AppState {
 
         Task {
             do {
-                let dbPath = profile.destinationURL.appendingPathComponent(".otterkeep/manifest.sqlite").path
-                try await self.database.open(at: dbPath)
-                let report = try await SnapshotDiffEngine.shared.diff(
-                    database: self.database,
+                let report = try await SnapshotCatalogService.shared.diffSnapshots(
                     targetSnapshotId: effectiveTarget,
-                    baseSnapshotId: baseId
+                    baseSnapshotId: baseId,
+                    in: profile
                 )
                 Task { @MainActor in
                     self.snapshotDiffReport = report
@@ -378,7 +343,7 @@ extension AppState {
         let urlB = profile.destinationURL.appendingPathComponent(snapTarget.snapshotPath).appendingPathComponent("root").appendingPathComponent(item.relativePath)
 
         Task {
-            let result = try? TextDiffEngine().diffFiles(leftURL: urlA, rightURL: urlB, relativePath: item.relativePath)
+            let result = try? SnapshotCatalogService.shared.diffFiles(leftURL: urlA, rightURL: urlB, relativePath: item.relativePath)
             Task { @MainActor in
                 self.activeSideBySideDiffComparison = result
                 self.isLoadingSideBySideDiff = false
@@ -404,9 +369,7 @@ extension AppState {
 
         Task {
             do {
-                let dbPath = profile.destinationURL.appendingPathComponent(".otterkeep/manifest.sqlite").path
-                try await self.database.open(at: dbPath)
-                let versions = try await self.database.listVersions(ofRelativePath: result.relativePath)
+                let versions = try await SnapshotCatalogService.shared.listFileVersions(relativePath: result.relativePath, in: profile)
 
                 let targetSnap: SnapshotRecord
                 let baseSnap: SnapshotRecord?
@@ -449,7 +412,7 @@ extension AppState {
                     urlBase = nil
                 }
 
-                let comparison = try TextDiffEngine().diffFiles(
+                let comparison = try SnapshotCatalogService.shared.diffFiles(
                     leftURL: urlBase,
                     rightURL: urlTarget,
                     relativePath: result.relativePath

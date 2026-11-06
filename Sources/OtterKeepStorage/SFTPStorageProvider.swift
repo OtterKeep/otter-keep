@@ -1,66 +1,7 @@
 import Foundation
 import Network
 import os
-
-/// Authentication method for SFTP connection.
-public enum SFTPAuthMethod: Sendable, Codable, Equatable {
-    case password
-    case privateKey(keyPath: String)
-
-    enum CodingKeys: String, CodingKey {
-        case type, keyPath
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let typeStr = try container.decode(String.self, forKey: .type)
-        if typeStr == "privateKey" {
-            let path = try container.decode(String.self, forKey: .keyPath)
-            self = .privateKey(keyPath: path)
-        } else {
-            self = .password
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        switch self {
-        case .password:
-            try container.encode("password", forKey: .type)
-        case .privateKey(let path):
-            try container.encode("privateKey", forKey: .type)
-            try container.encode(path, forKey: .keyPath)
-        }
-    }
-}
-
-/// Configuration options for connecting to an SFTP (SSH File Transfer Protocol) remote storage server.
-public struct SFTPConfiguration: Sendable, Codable, Equatable {
-    /// Remote server hostname or IP address (e.g. "nas.local", "192.168.1.100", "sftp.example.com").
-    public var host: String
-    /// SSH port number (default: 22).
-    public var port: Int
-    /// Username for SSH authentication.
-    public var username: String
-    /// Base destination subfolder path on the remote filesystem (e.g. "/data/backups/otterkeep").
-    public var remotePath: String
-    /// Selected authentication mechanism (password or private key).
-    public var authMethod: SFTPAuthMethod
-
-    public init(
-        host: String = "",
-        port: Int = 22,
-        username: String = "",
-        remotePath: String = "/backups",
-        authMethod: SFTPAuthMethod = .password
-    ) {
-        self.host = host
-        self.port = port
-        self.username = username
-        self.remotePath = remotePath
-        self.authMethod = authMethod
-    }
-}
+import OtterKeepDomain
 
 /// Metadata item returned by an SFTP directory listing.
 public struct SFTPItem: Sendable, Equatable {

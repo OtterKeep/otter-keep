@@ -6,20 +6,20 @@
 //  Repository Ports & Adapters, DTO Data Transfer, Use Cases, and Central Profile Storage.
 //
 
-import Foundation
-import os
-import Darwin
-import Photos
-import CryptoKit
 import AppKit
+import CryptoKit
+import Darwin
+import Foundation
+import OtterKeepApplication
+import OtterKeepCore
+import OtterKeepDatabase
+import OtterKeepDomain
+import OtterKeepStorage
+import OtterKeepUI
+import Photos
 import SwiftUI
 import Testing
-import OtterKeepDomain
-import OtterKeepApplication
-import OtterKeepStorage
-import OtterKeepDatabase
-import OtterKeepCore
-import OtterKeepUI
+import os
 
 /// Executed serially: these tests exercise process-wide singletons and fixed paths.
 @MainActor
@@ -123,7 +123,7 @@ struct CleanArchitectureTests {
         )
         let snapOldUnlocked = SnapshotRecord(
             id: "snap-old-unlocked",
-            timestamp: now.addingTimeInterval(-10 * 86400), // 10 days ago
+            timestamp: now.addingTimeInterval(-10 * 86400),  // 10 days ago
             status: "completed",
             totalFiles: 1,
             totalBytes: 100,
@@ -132,12 +132,12 @@ struct CleanArchitectureTests {
         )
         let snapOldLocked = SnapshotRecord(
             id: "snap-old-locked",
-            timestamp: now.addingTimeInterval(-10 * 86400), // 10 days ago
+            timestamp: now.addingTimeInterval(-10 * 86400),  // 10 days ago
             status: "completed",
             totalFiles: 1,
             totalBytes: 100,
             snapshotPath: "snap-old-locked",
-            lockedUntil: now.addingTimeInterval(86400) // Locked for 1 more day
+            lockedUntil: now.addingTimeInterval(86400)  // Locked for 1 more day
         )
 
         // Evaluate pure domain rules
@@ -154,6 +154,36 @@ struct CleanArchitectureTests {
         // Unlocked older than 7 days must be pruned
         try assertTrue(decision.pruneSnapshotIds.contains("snap-old-unlocked"))
         try assertFalse(decision.pruneSnapshotIds.contains("snap-old-locked"))
+    }
+
+    @Test func testRetentionSnapshotCapPreservesNewestAndLocked() throws {
+        let now = Date()
+        let snapshots = (0..<6).map { index in
+            SnapshotRecord(
+                id: "snap-\(index)",
+                timestamp: now.addingTimeInterval(-Double(index) * 3600),
+                status: "completed",
+                totalFiles: 1,
+                totalBytes: 100,
+                snapshotPath: "snap-\(index)",
+                lockedUntil: index == 5 ? now.addingTimeInterval(86400) : nil
+            )
+        }
+
+        let decision = RetentionPolicyCalculator.evaluate(
+            snapshots: snapshots,
+            now: now,
+            keepDailyDays: 30,
+            maxSnapshotsToKeep: 3
+        )
+
+        // The cap trims the retained set, but the newest and locked snapshots survive.
+        try assertTrue(decision.keepSnapshotIds.contains("snap-0"))
+        try assertTrue(decision.keepSnapshotIds.contains("snap-5"))
+        try assertTrue(decision.keepSnapshotIds.count <= 4)
+        try assertFalse(decision.pruneSnapshotIds.contains("snap-0"))
+        try assertFalse(decision.pruneSnapshotIds.contains("snap-5"))
+        try assertTrue(decision.pruneSnapshotIds.contains("snap-3"))
     }
 
     @Test func testCentralDatabaseProfileStorageAndMigration() throws {
@@ -192,7 +222,8 @@ struct CleanArchitectureTests {
 
         // 2. Test JSON export/import preservation
         let exportURL = tempDir.appendingPathComponent("config_backup.json")
-        let settings = AppSettings(language: .english, launchAtLogin: false, startMinimized: false, debugFileLoggingEnabled: true, finderIntegrationEnabled: true, themeMode: .system)
+        let settings = AppSettings(
+            language: .english, launchAtLogin: false, startMinimized: false, debugFileLoggingEnabled: true, finderIntegrationEnabled: true, themeMode: .system)
         try ConfigurationBackupManager.shared.exportConfiguration(
             to: exportURL,
             profiles: [profile1, profile2],
@@ -224,7 +255,7 @@ struct CleanArchitectureTests {
             timestamp: now,
             status: "completed",
             totalFiles: 42,
-            totalBytes: 1048576,
+            totalBytes: 1_048_576,
             snapshotPath: "2026-10-13-dto",
             backupType: "incremental",
             lockedUntil: lockTime
@@ -232,7 +263,7 @@ struct CleanArchitectureTests {
         let snapDTO = SnapshotDTO(from: snapEntity)
         try assertEqual(snapDTO.id, "snap-dto-01")
         try assertEqual(snapDTO.totalFiles, 42)
-        try assertEqual(snapDTO.totalBytes, 1048576)
+        try assertEqual(snapDTO.totalBytes, 1_048_576)
         try assertTrue(snapDTO.isLocked)
         try assertEqual(snapDTO.backupType, "incremental")
 
@@ -275,23 +306,7 @@ struct CleanArchitectureTests {
         try assertEqual(detailsDomain.snapshot.id, "snap-dto-01")
         try assertEqual(detailsDomain.files.count, 1)
 
-        // 4. ProfileConfigurationDTO mapping
-        let profile = BackupProfile(
-            name: "DTO Test Profile",
-            sourceURL: URL(fileURLWithPath: "/tmp/src"),
-            destinationURL: URL(fileURLWithPath: "/tmp/dst")
-        )
-        let profileDTO = profile.toDTO()
-        try assertEqual(profileDTO.id, profile.id)
-        try assertEqual(profileDTO.name, "DTO Test Profile")
-        try assertEqual(profileDTO.sourcePath, "/tmp/src")
-        try assertEqual(profileDTO.destinationPath, "/tmp/dst")
-
-        let profileFromDTO = BackupProfile(from: profileDTO)
-        try assertEqual(profileFromDTO.id, profile.id)
-        try assertEqual(profileFromDTO.name, profile.name)
-
-        // 5. RetentionEvaluationDTO mapping
+        // 4. RetentionEvaluationDTO mapping
         let decision = RetentionDecision(
             keepSnapshotIds: Set(["snap-keep-1", "snap-keep-2"]),
             pruneSnapshotIds: ["snap-prune-1"]

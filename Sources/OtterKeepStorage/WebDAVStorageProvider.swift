@@ -1,29 +1,6 @@
 import Foundation
 import os
-
-/// Configuration options for connecting to a WebDAV remote storage backend.
-public struct WebDAVConfiguration: Sendable, Codable, Equatable {
-    /// Remote server base URL string (e.g. "https://nas.local:5006" or "https://cloud.example.com").
-    public var serverURL: String
-    /// Base destination subfolder path on the WebDAV server (e.g. "/remote.php/dav/files/user/OtterKeep").
-    public var destinationPath: String
-    /// Username for HTTP Basic Authentication.
-    public var username: String
-    /// Whether TLS / HTTPS is enforced.
-    public var useSSL: Bool
-
-    public init(
-        serverURL: String = "https://",
-        destinationPath: String = "/backups",
-        username: String = "",
-        useSSL: Bool = true
-    ) {
-        self.serverURL = serverURL
-        self.destinationPath = destinationPath
-        self.username = username
-        self.useSSL = useSSL
-    }
-}
+import OtterKeepDomain
 
 /// Metadata describing a file or directory item returned by a WebDAV PROPFIND operation.
 public struct WebDAVItem: Sendable, Equatable {

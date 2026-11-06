@@ -1,7 +1,6 @@
 import SwiftUI
 import AppKit
 import Photos
-import OtterKeepDatabase
 import OtterKeepCore
 
 /// Forwarding accessors exposing the 3-2-1 replication runtime state and the remote destination

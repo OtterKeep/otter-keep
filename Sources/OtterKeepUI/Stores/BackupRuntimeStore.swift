@@ -1,7 +1,6 @@
 import Foundation
 import Observation
-import OtterKeepStorage
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 /// Per-profile runtime state for parallel background backups.

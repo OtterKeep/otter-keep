@@ -1,7 +1,6 @@
 import SwiftUI
 import AppKit
 import OtterKeepCore
-import OtterKeepDatabase
 
 extension SettingsView {
     var persistentFilesSection: some View {
@@ -82,7 +81,7 @@ extension SettingsView {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(LocalizationManager.shared.effectiveLanguage == .hungarian ? "Központi SQLite Adatbázis" : "Central SQLite Database")
                         .font(.body.weight(.medium))
-                    Text(CentralDatabase.shared.databasePath)
+                    Text(appState.centralDatabasePath)
                         .font(.callout.monospaced())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -90,7 +89,7 @@ extension SettingsView {
                 }
                 Spacer()
                 Button {
-                    let dbURL = URL(fileURLWithPath: CentralDatabase.shared.databasePath)
+                    let dbURL = URL(fileURLWithPath: appState.centralDatabasePath)
                     NSWorkspace.shared.activateFileViewerSelecting([dbURL])
                 } label: {
                     Text(L10n.t(.settingsOpenFolder))
@@ -100,7 +99,7 @@ extension SettingsView {
 
                 Button {
                     Task {
-                        try? CentralDatabase.shared.performSelfHealingMaintenance()
+                        try? appState.performCentralDatabaseSelfHealing()
                     }
                 } label: {
                     Label(LocalizationManager.shared.effectiveLanguage == .hungarian ? "Öngyógyítás & VACUUM" : "Self-Healing & VACUUM", systemImage: "bandage")

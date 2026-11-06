@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 import Observation
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 /// Maintenance, diagnostics and user-settings state.

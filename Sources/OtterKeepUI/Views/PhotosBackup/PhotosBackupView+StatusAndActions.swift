@@ -2,7 +2,6 @@ import SwiftUI
 import Photos
 import UniformTypeIdentifiers
 import OtterKeepCore
-import OtterKeepDatabase
 
 extension PhotosBackupView {
     // MARK: - Authorization Banner

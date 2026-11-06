@@ -1,7 +1,6 @@
 import SwiftUI
 import AppKit
 import OtterKeepCore
-import OtterKeepStorage
 
 /// MenuBar popup window interface presenting live backup status, all configured profiles, quick trigger actions, and system shortcuts.
 public struct MenuBarContentView: View {

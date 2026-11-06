@@ -2,7 +2,6 @@ import SwiftUI
 import AppKit
 import Network
 import OtterKeepCore
-import OtterKeepStorage
 
 /// Modal sheet for adding and editing remote 3-2-1 backup targets (S3 Cloud / SMB NAS).
 public struct RemoteDestinationEditorModalView: View {

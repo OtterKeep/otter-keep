@@ -1,53 +1,6 @@
 import Foundation
 import os
-
-/// Configuration settings for Backblaze B2 cloud storage.
-public struct B2Configuration: Sendable, Codable, Equatable {
-    /// Backblaze Application Key ID (Key ID).
-    public var keyId: String
-    /// Target B2 bucket name.
-    public var bucketName: String
-    /// B2 S3 Region (e.g. "us-west-004", "eu-central-003").
-    public var region: String
-    /// Optional custom B2 S3 endpoint URL (defaults to "https://s3.<region>.backblazeb2.com").
-    public var customEndpoint: String?
-    /// Path prefix inside the bucket (e.g. "OtterKeep/MacBook").
-    public var pathPrefix: String
-
-    public init(
-        keyId: String = "",
-        bucketName: String = "",
-        region: String = "us-west-004",
-        customEndpoint: String? = nil,
-        pathPrefix: String = ""
-    ) {
-        self.keyId = keyId
-        self.bucketName = bucketName
-        self.region = region
-        self.customEndpoint = customEndpoint
-        self.pathPrefix = pathPrefix
-    }
-
-    /// Resolves the effective B2 S3 REST endpoint URL.
-    public var resolvedEndpoint: String {
-        if let custom = customEndpoint, !custom.isEmpty {
-            return custom.hasPrefix("http") ? custom : "https://\(custom)"
-        }
-        return "https://s3.\(region).backblazeb2.com"
-    }
-
-    /// Converts this `B2Configuration` into an `S3Configuration` for S3-compatible protocol execution.
-    public func toS3Configuration() -> S3Configuration {
-        S3Configuration(
-            endpoint: resolvedEndpoint,
-            bucket: bucketName,
-            region: region,
-            accessKeyId: keyId,
-            pathPrefix: pathPrefix,
-            forcePathStyle: true
-        )
-    }
-}
+import OtterKeepDomain
 
 /// Dedicated Backblaze B2 Storage Engine providing resilient cloud backup and object lifecycle management.
 public actor B2StorageProvider {

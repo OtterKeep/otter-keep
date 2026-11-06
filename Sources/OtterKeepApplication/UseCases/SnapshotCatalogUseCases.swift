@@ -57,27 +57,3 @@ public struct GetSnapshotDetailsUseCase: Sendable {
         return SnapshotDetailsDTO(snapshot: snapshot, files: files)
     }
 }
-
-/// Interactor / Use Case for updating WORM immutability locks on snapshots.
-public struct UpdateSnapshotLockUseCase: Sendable {
-    private let snapshotRepository: SnapshotRepositoryProtocol
-    private let fileSystem: FileSystemPort?
-
-    public init(snapshotRepository: SnapshotRepositoryProtocol, fileSystem: FileSystemPort? = nil) {
-        self.snapshotRepository = snapshotRepository
-        self.fileSystem = fileSystem
-    }
-
-    public func execute(
-        snapshotId: String,
-        lockedUntil: Date?,
-        snapshotRootURL: URL? = nil
-    ) async throws {
-        try await snapshotRepository.updateSnapshotLockedUntil(id: snapshotId, lockedUntil: lockedUntil)
-
-        if let rootURL = snapshotRootURL, let fs = fileSystem {
-            let isLockActive = (lockedUntil != nil && lockedUntil! > Date())
-            try? fs.setImmutable(at: rootURL, immutable: isLockActive, recursive: true)
-        }
-    }
-}

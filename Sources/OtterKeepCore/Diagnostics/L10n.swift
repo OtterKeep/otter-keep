@@ -854,6 +854,9 @@ public enum L10n {
         case remoteDestEditorSFTPPathPlaceholder
         case testConnectionSuccessWebDAVFormat
         case testConnectionSuccessSFTPFormat
+        case testConnectionSMBPortUnreachableFormat
+        case testConnectionInvalidWebDAVURL
+        case testConnectionInvalidSFTPHost
         case testConnectionFailedFormat
         case remoteDestEditorSFTPAuthMethodLabel
         case remoteDestEditorSFTPAuthPassword

@@ -2,6 +2,7 @@ import Foundation
 import SQLite3
 import os
 import OtterKeepDomain
+import OtterKeepApplication
 
 /// Profile row stored in the central SQLite database.
 public struct CentralProfileRecord: Sendable, Equatable {
@@ -26,7 +27,7 @@ public struct CentralProfileRecord: Sendable, Equatable {
 /// 1. Backup profile configurations (`profiles` table), making local configuration central, durable, and queryable.
 /// 2. Offline snapshot and file catalog metadata (`cached_snapshots`, `cached_file_records`), allowing the UI
 ///    and services to inspect backup history and browse file timelines even when the target destination drive is unmounted/detached.
-public final class CentralDatabase: @unchecked Sendable {
+public final class CentralDatabase: DatabaseDiagnosticsProviding, @unchecked Sendable {
     /// Shared singleton instance pointing to `~/.otterkeep/central.sqlite`.
     public static let shared = CentralDatabase()
 

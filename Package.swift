@@ -74,7 +74,7 @@ let package = Package(
         // MARK: - UI
         .target(
             name: "OtterKeepUI",
-            dependencies: ["OtterKeepDomain", "OtterKeepApplication", "OtterKeepStorage", "OtterKeepDatabase", "OtterKeepCore"],
+            dependencies: ["OtterKeepDomain", "OtterKeepApplication", "OtterKeepCore"],
             path: "Sources/OtterKeepUI",
             resources: [
                 .process("Resources")

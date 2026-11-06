@@ -1,7 +1,6 @@
 import SwiftUI
 import AppKit
 import OtterKeepCore
-import OtterKeepStorage
 
 extension MenuBarContentView {
     private var statusSummaryText: String {

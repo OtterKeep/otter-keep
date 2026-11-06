@@ -1,6 +1,6 @@
 import Foundation
 import Observation
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 /// Snapshot browsing, file timeline and diff-comparison state for the Restore workspace.

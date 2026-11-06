@@ -1,26 +1,6 @@
 import Foundation
 import Darwin
-
-/// Storage capacity metrics for a filesystem or volume.
-public struct StorageCapacity: Sendable, Equatable {
-    /// Total capacity in bytes.
-    public let totalBytes: Int64
-    /// Free storage space in bytes.
-    public let freeBytes: Int64
-    /// Available storage space in bytes (accounting for system reservations).
-    public let availableBytes: Int64
-
-    /// Initializes a new `StorageCapacity` instance.
-    /// - Parameters:
-    ///   - totalBytes: Total capacity in bytes.
-    ///   - freeBytes: Free bytes available on disk.
-    ///   - availableBytes: Available bytes usable by unprivileged applications.
-    public init(totalBytes: Int64, freeBytes: Int64, availableBytes: Int64) {
-        self.totalBytes = totalBytes
-        self.freeBytes = freeBytes
-        self.availableBytes = availableBytes
-    }
-}
+import OtterKeepDomain
 
 /// Volume capabilities and supported filesystem features.
 public struct FileSystemCapabilities: Sendable, Equatable {

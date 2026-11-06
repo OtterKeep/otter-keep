@@ -3,12 +3,26 @@ import CoreServices
 
 /// Real-time filesystem event stream watcher with event debouncing and exclusion filtering.
 public final class FSEventWatcher: @unchecked Sendable {
+    /// Heap box handed to the FSEvent stream callback.
+    ///
+    /// The stream owns the box for its whole lifetime, while the box only holds a weak reference
+    /// to the watcher. This keeps the callback free of dangling pointers without creating a
+    /// retain cycle between the watcher and its own stream.
+    private final class CallbackContext: @unchecked Sendable {
+        weak var watcher: FSEventWatcher?
+
+        init(watcher: FSEventWatcher) {
+            self.watcher = watcher
+        }
+    }
+
     private let watchedPath: String
-    private let excludePatterns: [String]
+    private let exclusionRules: [ExclusionRule]
     private let debouncingSeconds: Int
     private let onChangeDetected: @Sendable (Date) -> Void
 
     private var eventStream: FSEventStreamRef?
+    private var callbackContext: CallbackContext?
     private let lock = NSLock()
     private var debounceTimer: DispatchSourceTimer?
     private let queue = DispatchQueue(label: "com.otterkeep.fseventwatcher", qos: .utility)
@@ -17,7 +31,7 @@ public final class FSEventWatcher: @unchecked Sendable {
     /// Initializes a filesystem event watcher.
     /// - Parameters:
     ///   - watchedPath: Root directory path to monitor.
-    ///   - excludePatterns: Substring or glob-like patterns to ignore.
+    ///   - excludePatterns: Glob-like patterns to ignore (same semantics as the backup scanner).
     ///   - debouncingSeconds: Number of seconds of silence to wait before dispatching trigger.
     ///   - onChangeDetected: Closure called when changes settle.
     public init(
@@ -27,7 +41,7 @@ public final class FSEventWatcher: @unchecked Sendable {
         onChangeDetected: @escaping @Sendable (Date) -> Void
     ) {
         self.watchedPath = (watchedPath as NSString).standardizingPath
-        self.excludePatterns = excludePatterns
+        self.exclusionRules = excludePatterns.map { ExclusionRule(pattern: $0) }
         self.debouncingSeconds = max(1, debouncingSeconds)
         self.onChangeDetected = onChangeDetected
     }
@@ -39,9 +53,13 @@ public final class FSEventWatcher: @unchecked Sendable {
 
         guard !isRunning else { return }
 
-        var context = FSEventStreamContext(
+        // The stream owns a context box that holds only a weak reference to this watcher, so the
+        // callback can never observe a deallocated instance and no retain cycle is created.
+        let context = CallbackContext(watcher: self)
+        let contextPointer = Unmanaged.passRetained(context).toOpaque()
+        var streamContext = FSEventStreamContext(
             version: 0,
-            info: Unmanaged.passUnretained(self).toOpaque(),
+            info: contextPointer,
             retain: nil,
             release: nil,
             copyDescription: nil
@@ -64,24 +82,27 @@ public final class FSEventWatcher: @unchecked Sendable {
             eventIds: UnsafePointer<FSEventStreamEventId>
         ) in
             guard let clientInfo = clientCallBackInfo else { return }
-            let watcher = Unmanaged<FSEventWatcher>.fromOpaque(clientInfo).takeUnretainedValue()
-            let paths = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue() as! [String]
+            let context = Unmanaged<CallbackContext>.fromOpaque(clientInfo).takeUnretainedValue()
+            guard let watcher = context.watcher else { return }
+            guard let paths = FSEventWatcher.decodeEventPaths(eventPaths) else { return }
             watcher.handleEvents(paths: paths, count: numEvents)
         }
 
         guard let stream = FSEventStreamCreate(
             kCFAllocatorDefault,
             callback,
-            &context,
+            &streamContext,
             pathsToWatch,
             FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
             1.0, // latency in seconds
             flags
         ) else {
+            Unmanaged<CallbackContext>.fromOpaque(contextPointer).release()
             return
         }
 
         self.eventStream = stream
+        self.callbackContext = context
         FSEventStreamSetDispatchQueue(stream, queue)
         if FSEventStreamStart(stream) {
             isRunning = true
@@ -89,6 +110,8 @@ public final class FSEventWatcher: @unchecked Sendable {
             FSEventStreamInvalidate(stream)
             FSEventStreamRelease(stream)
             self.eventStream = nil
+            self.callbackContext = nil
+            Unmanaged<CallbackContext>.fromOpaque(contextPointer).release()
         }
     }
 
@@ -96,7 +119,17 @@ public final class FSEventWatcher: @unchecked Sendable {
     public func stop() {
         lock.lock()
         defer { lock.unlock() }
+        stopLocked()
+    }
 
+    deinit {
+        lock.lock()
+        stopLocked()
+        lock.unlock()
+    }
+
+    /// Tears down the event stream. Caller must hold `lock`.
+    private func stopLocked() {
         guard isRunning, let stream = eventStream else { return }
 
         debounceTimer?.cancel()
@@ -107,10 +140,30 @@ public final class FSEventWatcher: @unchecked Sendable {
         FSEventStreamRelease(stream)
         self.eventStream = nil
         self.isRunning = false
+
+        // Balance the retain taken in `start()`. The box is released only after the stream has
+        // been invalidated, so no callback can be in flight while it is being freed.
+        if let context = callbackContext {
+            self.callbackContext = nil
+            Unmanaged<CallbackContext>.passUnretained(context).release()
+        }
     }
 
-    deinit {
-        stop()
+    /// Decodes the `eventPaths` payload of an FSEvent stream callback.
+    ///
+    /// With `kFSEventStreamCreateFlagUseCFTypes` the payload is a `CFArray` of `CFString`s, but
+    /// the bridge is not guaranteed for every event batch, so both representations are handled.
+    /// - Parameter eventPaths: Raw pointer supplied by the event stream.
+    /// - Returns: The decoded paths, or `nil` when the payload cannot be interpreted.
+    private static func decodeEventPaths(_ eventPaths: UnsafeMutableRawPointer) -> [String]? {
+        let array = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue()
+        if let paths = array as? [String] {
+            return paths
+        }
+        if let urls = array as? [NSURL] {
+            return urls.compactMap { $0.path }
+        }
+        return nil
     }
 
     // MARK: - Internal Event Processing
@@ -171,12 +224,7 @@ public final class FSEventWatcher: @unchecked Sendable {
             return true
         }
 
-        for pattern in excludePatterns {
-            if path.contains(pattern) {
-                return true
-            }
-        }
-
-        return false
+        // User-configured patterns, evaluated with the same glob semantics as the backup scanner.
+        return exclusionRules.contains { $0.matches(absolutePath: path) }
     }
 }

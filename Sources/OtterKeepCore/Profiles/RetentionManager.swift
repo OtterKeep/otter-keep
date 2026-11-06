@@ -1,7 +1,8 @@
 import Foundation
-import os
-import OtterKeepStorage
 import OtterKeepDatabase
+import OtterKeepDomain
+import OtterKeepStorage
+import os
 
 /// Actor-isolated manager executing Grandfather-Father-Son (GFS) snapshot retention pruning and atomic two-step deletion.
 public actor RetentionManager {
@@ -30,66 +31,14 @@ public actor RetentionManager {
         let snapshots = try await database.listSnapshots()
         guard !snapshots.isEmpty else { return [] }
 
-        let now = Date()
-        let oneDayAgo = now.addingTimeInterval(-86400) // 24 hours
-
-        let dayFormatter = DateFormatter()
-        dayFormatter.dateFormat = "yyyy-MM-dd"
-        dayFormatter.timeZone = .current
-
-        var snapshotsToKeep = Set<String>()
-        var seenDays = Set<String>()
-
-        let keepDailyDays = policy.keepDailyDays
-        let keepDailyLimit = keepDailyDays.map { now.addingTimeInterval(-Double($0) * 86400) }
-
-        // Safety net: Never allow deleting all backups; the latest snapshot is strictly protected.
-        if let newestSnapshot = snapshots.first {
-            snapshotsToKeep.insert(newestSnapshot.id)
-        }
-
-        // Immutability Protection: WORM locked snapshots must always be retained regardless of age or policy
-        for snap in snapshots {
-            if snap.isLocked {
-                snapshotsToKeep.insert(snap.id)
-            }
-        }
-
-        for snap in snapshots {
-            if snap.timestamp >= oneDayAgo {
-                // 1. Preserve all snapshots taken within the last 24 hours (hourly granularity)
-                snapshotsToKeep.insert(snap.id)
-            } else {
-                // 2. Snapshots older than 24 hours
-                if let limit = keepDailyLimit, snap.timestamp < limit {
-                    // Older than keepDailyDays -> prune
-                    continue
-                }
-                // Keep the most recent snapshot for each day within the keepDailyDays window
-                let dayString = dayFormatter.string(from: snap.timestamp)
-                if !seenDays.contains(dayString) {
-                    seenDays.insert(dayString)
-                    snapshotsToKeep.insert(snap.id)
-                }
-            }
-        }
-
-        // Apply max snapshot cap if configured
-        if let maxKeep = policy.maxSnapshotsToKeep, maxKeep > 0 {
-            let sortedCandidates = snapshots.filter { snapshotsToKeep.contains($0.id) }
-            if sortedCandidates.count > maxKeep {
-                var trimmed = Set(sortedCandidates.prefix(maxKeep).map { $0.id })
-                // Always preserve the newest backup even when capped
-                if let newest = snapshots.first {
-                    trimmed.insert(newest.id)
-                }
-                // Always preserve locked snapshots even when capped
-                for snap in snapshots where snap.isLocked {
-                    trimmed.insert(snap.id)
-                }
-                snapshotsToKeep = trimmed
-            }
-        }
+        let decision = RetentionPolicyCalculator.evaluate(
+            snapshots: snapshots,
+            keepDailyDays: policy.keepDailyDays,
+            keepWeeklyWeeks: nil,
+            keepMonthlyMonths: nil,
+            maxSnapshotsToKeep: policy.maxSnapshotsToKeep
+        )
+        let snapshotsToKeep = decision.keepSnapshotIds
 
         // Final guard: if snapshotsToKeep is empty for any reason, abort pruning to prevent total data loss
         guard !snapshotsToKeep.isEmpty else {

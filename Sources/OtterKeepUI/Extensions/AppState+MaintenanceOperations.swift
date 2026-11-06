@@ -3,8 +3,7 @@ import AppKit
 import Observation
 import Photos
 import UniformTypeIdentifiers
-import OtterKeepStorage
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 extension AppState {
@@ -87,11 +86,10 @@ extension AppState {
         self.isLoadingForecast = true
         Task {
             do {
-                let dbPath = profile.destinationURL.appendingPathComponent(".otterkeep/manifest.sqlite").path
-                try await self.database.open(at: dbPath)
+                let snapshots = try await SnapshotCatalogService.shared.listSnapshots(for: profile)
                 let forecast = try await StorageForecastEngine.shared.evaluateForecast(
                     profile: profile,
-                    database: self.database
+                    snapshots: snapshots
                 )
                 Task { @MainActor in
                     self.storageForecastReport = forecast
@@ -139,7 +137,7 @@ extension AppState {
 
         Task {
             do {
-                let dest = try await restoreEngine.restore(
+                let dest = try await engines.restore.restore(
                     snapshotPath: snapshot.snapshotPath,
                     backupRootURL: profile.destinationURL,
                     relativePath: file.relativePath,
@@ -185,7 +183,7 @@ extension AppState {
         Task { [weak self] in
             guard let self else { return }
             do {
-                let summary = try await restoreEngine.restoreSnapshot(
+                let summary = try await engines.restore.restoreSnapshot(
                     snapshotPath: snapshot.snapshotPath,
                     backupRootURL: profile.destinationURL,
                     targetDirectoryURL: targetDirectory,
@@ -268,12 +266,9 @@ extension AppState {
         self.selectedFileVersionHistoryRecord = nil
         self.showFileVersionHistoryModal = true
 
-        let dbPath = matchingProfile.destinationURL.appendingPathComponent(".otterkeep").appendingPathComponent("manifest.sqlite").path(percentEncoded: false)
-
         Task {
             do {
-                try await database.open(at: dbPath)
-                let versions = try await database.listVersions(ofRelativePath: relPath)
+                let versions = try await SnapshotCatalogService.shared.listFileVersions(relativePath: relPath, in: matchingProfile)
                 // Race condition safeguard: ensure active file hasn't changed while awaiting database
                 guard self.activeVersionHistoryFile == stdURL else { return }
                 self.activeVersionHistoryRecords = versions
@@ -302,7 +297,7 @@ extension AppState {
 
         Task {
             do {
-                let finalURL = try await restoreEngine.restoreToFile(
+                let finalURL = try await engines.restore.restoreToFile(
                     snapshotPath: version.snapshot.snapshotPath,
                     backupRootURL: profile.destinationURL,
                     relativePath: version.file.relativePath,
@@ -399,7 +394,7 @@ extension AppState {
         Task {
             do {
                 let policy = PruningPolicy(isAutoPruningEnabled: profile.pruningPolicy.isAutoPruningEnabled, maxSnapshotsToKeep: maxKeep, keepDailyDays: 30)
-                let deletedIds = try await retentionManager.applyRetentionPolicy(destinationURL: profile.destinationURL, policy: policy)
+                let deletedIds = try await engines.retention.applyRetentionPolicy(destinationURL: profile.destinationURL, policy: policy)
 
                 Task { @MainActor in
                     LogManager.shared.log("Retention pruning completed for profile '\(profile.name)': \(deletedIds.count) snapshots pruned. Pruned IDs: [\(deletedIds.joined(separator: ", "))]", level: .info, category: "Retention")
@@ -421,7 +416,7 @@ extension AppState {
 
         Task {
             do {
-                let count = try await restoreEngine.rebuildCatalog(at: profile.destinationURL)
+                let count = try await engines.restore.rebuildCatalog(at: profile.destinationURL)
                 Task { @MainActor in
                     LogManager.shared.log("Disaster recovery catalog rebuilt for profile '\(profile.name)': \(count) snapshots indexed from target disk", level: .info, category: "Rebuild")
                     self.refreshLogs()

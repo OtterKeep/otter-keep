@@ -1,11 +1,10 @@
-import SwiftUI
 import AppKit
 import Observation
-import Photos
-import UniformTypeIdentifiers
-import OtterKeepStorage
-import OtterKeepDatabase
 import OtterKeepCore
+import OtterKeepDomain
+import Photos
+import SwiftUI
+import UniformTypeIdentifiers
 
 /// Central `@Observable` view-model orchestrating application state, profile switching, background backup execution, and restore operations on the `@MainActor`.
 @MainActor
@@ -166,7 +165,8 @@ public final class AppState: Sendable {
         let isRunning = isBackupRunning(for: profile.id)
         let summary = profileLastSummaries[profile.id]
         let latestSnap = (selectedProfileId == profile.id ? snapshots.first : nil) ?? profileLatestSnapshots[profile.id]
-        let snapCount = (selectedProfileId == profile.id && !snapshots.isEmpty) ? snapshots.count : (profileSnapshotCounts[profile.id] ?? (latestSnap != nil ? 1 : 0))
+        let snapCount =
+            (selectedProfileId == profile.id && !snapshots.isEmpty) ? snapshots.count : (profileSnapshotCounts[profile.id] ?? (latestSnap != nil ? 1 : 0))
 
         if isRunning {
             let prog = progressState(for: profile.id)
@@ -290,22 +290,24 @@ public final class AppState: Sendable {
     }
 
     // MARK: - Testing State Helpers
-    /// Simulates or sets running state for testing profile lockout and multi-profile parallelism.
-    public func setBackupRunningForTesting(profileId: UUID, running: Bool) {
-        if running {
-            activeBackupTasks[profileId] = Task { try? await Task.sleep(nanoseconds: 10_000_000_000) }
-            profileProgressStates[profileId] = BackupProgressState(phase: .copying)
-        } else {
-            activeBackupTasks[profileId]?.cancel()
-            activeBackupTasks.removeValue(forKey: profileId)
-            profileProgressStates.removeValue(forKey: profileId)
+    #if DEBUG
+        /// Simulates or sets running state for testing profile lockout and multi-profile parallelism.
+        public func setBackupRunningForTesting(profileId: UUID, running: Bool) {
+            if running {
+                activeBackupTasks[profileId] = Task { try? await Task.sleep(nanoseconds: 10_000_000_000) }
+                profileProgressStates[profileId] = BackupProgressState(phase: .copying)
+            } else {
+                activeBackupTasks[profileId]?.cancel()
+                activeBackupTasks.removeValue(forKey: profileId)
+                profileProgressStates.removeValue(forKey: profileId)
+            }
         }
-    }
 
-    /// Sets simulated system dark mode state for theme switcher testing.
-    public func setSystemDarkModeForTesting(_ isDark: Bool) {
-        self.isSystemDarkMode = isDark
-    }
+        /// Sets simulated system dark mode state for theme switcher testing.
+        public func setSystemDarkModeForTesting(_ isDark: Bool) {
+            self.isSystemDarkMode = isDark
+        }
+    #endif
 
     // MARK: - New Profile Draft Helpers
     public func resetNewProfileDraft() {
@@ -360,29 +362,20 @@ public final class AppState: Sendable {
         self.finderPermissionStatus = FinderPermissionManager.shared.evaluateStatus(for: profiles)
     }
 
-    let storage: FileSystemProvider
-    let database: DatabaseEngine
-    let coordinator: BackupSessionCoordinator
-    let retentionManager: RetentionManager
-    let restoreEngine: RestoreEngine
-    let photosCoordinator: PhotosBackupCoordinator
+    /// Composition root owning the concrete storage and database engines.
+    let engines: EngineContainer
 
+    /// Creates an `AppState` with empty stores. Call ``bootstrap()`` once at application launch to
+    /// load persisted profiles, restore the Photos configuration and start background subsystems.
     public init() {
-        let storage = DefaultFileSystemProvider()
-        let database = DatabaseEngine()
-        let retentionManager = RetentionManager(storage: storage, database: database)
-        self.storage = storage
-        self.database = database
-        self.retentionManager = retentionManager
-        self.coordinator = BackupSessionCoordinator(
-            storage: storage,
-            database: database,
-            retentionManager: retentionManager,
-            volumeEjector: SystemVolumeEjector()
-        )
-        self.restoreEngine = RestoreEngine(storage: storage, database: database)
-        self.photosCoordinator = PhotosBackupCoordinator(storage: storage, dbEngine: database)
+        self.engines = EngineContainer()
+        self.photosStore = PhotosStore(config: PhotosProfileStore.shared.loadConfiguration())
+    }
 
+    /// Loads persisted state and starts the background subsystems (scheduler, volume monitor, theme observer).
+    ///
+    /// Kept separate from ``init()`` so that tests and previews can construct a side-effect-free `AppState`.
+    public func bootstrap() {
         // Load persistent profiles from ~/.otterkeep/profiles.json
         let loadedProfiles = ProfileStore.shared.loadProfiles()
         self.profiles = loadedProfiles
@@ -392,9 +385,6 @@ public final class AppState: Sendable {
         } else {
             self.activeNavigation = .photos
         }
-
-        // Load Photos backup configuration
-        self.photosStore = PhotosStore(config: PhotosProfileStore.shared.loadConfiguration())
 
         // Rename default profile if required by the effective language
         let currentEffective = LocalizationManager.shared.effectiveLanguage
@@ -427,7 +417,7 @@ public final class AppState: Sendable {
         }
 
         // Listen for unadopted profile metadata discovered on mounted drives
-        VolumeMonitor.shared.onUnadoptedDriveDetected = { [weak self] metadata, volumeURL in
+        VolumeMonitor.shared.setUnadoptedDriveHandler { [weak self] metadata, volumeURL in
             Task { @MainActor [weak self] in
                 self?.handleUnadoptedDriveDiscovered(metadata: metadata, volumeURL: volumeURL)
             }
@@ -449,7 +439,8 @@ public final class AppState: Sendable {
 
     public func adoptDiscoveredDrive() {
         guard let meta = discoveredUnadoptedMetadata, let volumeURL = discoveredUnadoptedVolumeURL else { return }
-        let defaultSource = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(meta.sourceRelativePath.isEmpty ? "Documents" : meta.sourceRelativePath)
+        let defaultSource = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(
+            meta.sourceRelativePath.isEmpty ? "Documents" : meta.sourceRelativePath)
         let destURL = volumeURL.appendingPathComponent(meta.profileName.replacingOccurrences(of: " ", with: "_"))
 
         let adoptedProfile = BackupProfile(
@@ -516,10 +507,25 @@ public final class AppState: Sendable {
         )
     }
 
+    /// Absolute filesystem path of the central catalog database.
+    public var centralDatabasePath: String {
+        engines.diagnostics.databasePath
+    }
+
+    /// Runs integrity checks and repairs recoverable inconsistencies in the central catalog database.
+    public func performCentralDatabaseSelfHealing() throws {
+        try engines.diagnostics.performSelfHealingMaintenance()
+    }
+
+    /// SSID of the currently joined Wi-Fi network, or `nil` when offline or on a wired connection.
+    public var currentWiFiSSID: String? {
+        engines.network.currentWiFiSSID
+    }
+
     /// Queries total, free, and available storage capacities on the currently selected destination volume.
     public func destinationStorageCapacity() -> StorageCapacity? {
         guard let destURL = selectedProfile?.destinationURL else { return nil }
-        return try? storage.storageCapacity(at: destURL)
+        return engines.storageCapacity(at: destURL)
     }
 
     /// Checks whether the destination volume/folder of a given profile is reachable and mounted.
@@ -555,7 +561,8 @@ public final class AppState: Sendable {
             let volName = destinationVolumeName(for: profile) ?? profile.name
             showSuccess(L10n.format(.destinationEjectedSuccessFormat, volName))
         } catch {
-            LogManager.shared.log("Failed to safely unmount destination volume for profile '\(profile.name)': \(error.localizedDescription)", level: .error, category: "Storage")
+            LogManager.shared.log(
+                "Failed to safely unmount destination volume for profile '\(profile.name)': \(error.localizedDescription)", level: .error, category: "Storage")
             refreshLogs()
             showError(error.localizedDescription)
         }

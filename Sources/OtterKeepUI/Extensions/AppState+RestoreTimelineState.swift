@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 import Photos
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 /// Forwarding accessors exposing the restore, timeline and diff state owned by

@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 import OtterKeepCore
-import OtterKeepDatabase
+import OtterKeepDomain
 
 /// Modal sheet displaying point-in-time snapshot versions of a specific file with Quick Look and in-place restore.
 public struct FileVersionHistoryModalView: View {

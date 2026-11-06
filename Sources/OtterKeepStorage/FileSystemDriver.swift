@@ -1,4 +1,5 @@
 import Foundation
+import OtterKeepDomain
 import Darwin
 
 /// Protocol for filesystem-specific drivers providing low-level operations.

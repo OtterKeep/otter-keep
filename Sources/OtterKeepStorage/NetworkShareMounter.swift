@@ -1,6 +1,7 @@
 import Foundation
 import os
 import Darwin
+import OtterKeepDomain
 
 /// Structured errors encountered during network share operations.
 public enum NetworkShareError: Error, Sendable, LocalizedError, Equatable {
@@ -48,30 +49,6 @@ public struct SMBMountResult: Sendable, Equatable {
         self.mountPoint = mountPoint
         self.resolvedSubpath = resolvedSubpath
         self.wasAlreadyMounted = wasAlreadyMounted
-    }
-}
-
-/// SMB / NFS Network Share Configuration.
-public struct NetworkShareConfiguration: Sendable, Codable, Equatable {
-    /// Remote share URL string (e.g. "smb://synology.local/Backups" or "nfs://192.168.1.50/volume1/backup").
-    public var shareURL: String
-    /// Username for SMB authentication.
-    public var username: String
-    /// Specific subfolder on the share.
-    public var subfolder: String
-    /// Whether to encapsulate backups inside an APFS Sparsebundle for full CoW and metadata preservation.
-    public var useSparsebundle: Bool
-
-    public init(
-        shareURL: String = "",
-        username: String = "",
-        subfolder: String = "",
-        useSparsebundle: Bool = true
-    ) {
-        self.shareURL = shareURL
-        self.username = username
-        self.subfolder = subfolder
-        self.useSparsebundle = useSparsebundle
     }
 }
 

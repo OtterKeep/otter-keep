@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 import Photos
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 /// Forwarding accessors exposing the maintenance, diagnostics and settings state owned by
