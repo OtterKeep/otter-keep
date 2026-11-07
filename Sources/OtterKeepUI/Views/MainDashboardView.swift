@@ -67,9 +67,6 @@ public struct MainDashboardView: View {
                     // MARK: - Zone 3: Guardianship & Resilience
                     rule321ComplianceCard(profile: profile)
 
-                    // Storage Capacity Depletion Forecast
-                    StorageForecastCardView(appState: appState)
-
                     // Quick Statistics
                     quickStatsSection(profile: profile)
 

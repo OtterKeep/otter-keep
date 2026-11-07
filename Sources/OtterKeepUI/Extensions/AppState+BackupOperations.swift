@@ -1,9 +1,9 @@
-import SwiftUI
 import AppKit
 import Observation
-import Photos
-import UniformTypeIdentifiers
 import OtterKeepCore
+import Photos
+import SwiftUI
+import UniformTypeIdentifiers
 
 extension AppState {
     // MARK: - Software Updates Management
@@ -73,10 +73,25 @@ extension AppState {
         }
     }
 
+    /// Triggers a backup initiated via deep link URL schemes (e.g. `otterkeep://backup` or `otterkeep://start-backup?profile=Name`).
+    public func triggerBackupFromURL(profileName: String?) {
+        if let name = profileName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty,
+            let match = profiles.first(where: {
+                $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame || $0.id.uuidString.lowercased() == name.lowercased()
+            })
+        {
+            startBackup(for: match)
+        } else {
+            startBackup(for: selectedProfile ?? profiles.first)
+        }
+    }
+
     public func startBackup(for profileToBackup: BackupProfile? = nil, mode: BackupMode = .incremental) {
         guard let profile = profileToBackup ?? selectedProfile else { return }
         guard !isBackupRunning(for: profile.id) else {
-            LogManager.shared.log("Backup already in progress for profile '\(profile.name)' [UUID: \(profile.id.uuidString)] - skipping duplicate launch.", level: .warning, category: "UI")
+            LogManager.shared.log(
+                "Backup already in progress for profile '\(profile.name)' [UUID: \(profile.id.uuidString)] - skipping duplicate launch.", level: .warning,
+                category: "UI")
             return
         }
 
@@ -113,7 +128,8 @@ extension AppState {
                     self.saveProfiles()
                 }
 
-                LogManager.shared.log("Backup completed successfully for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]\(modeTag)", level: .info, category: "UI")
+                LogManager.shared.log(
+                    "Backup completed successfully for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]\(modeTag)", level: .info, category: "UI")
                 self.refreshLogs()
                 self.loadSnapshots()
 
@@ -140,7 +156,9 @@ extension AppState {
                 self.activeBackupTasks.removeValue(forKey: profile.id)
                 self.profileProgressStates[profile.id] = BackupProgressState(phase: .failed)
                 NotificationDeliveryService.shared.notifyBackupFailed(profileName: profile.name, errorMessage: error.localizedDescription)
-                LogManager.shared.log("Backup failed for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]: \(error.localizedDescription)", level: .error, category: "UI")
+                LogManager.shared.log(
+                    "Backup failed for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]: \(error.localizedDescription)", level: .error, category: "UI"
+                )
                 self.refreshLogs()
 
                 let analyzed = Self.analyzeBackupError(error, destinationURL: profile.destinationURL, sourceURL: profile.sourceURL)
@@ -213,9 +231,7 @@ extension AppState {
         }
 
         // 3. Insufficient disk space
-        if errorDesc.localizedCaseInsensitiveContains("space") ||
-           errorDesc.localizedCaseInsensitiveContains("No space left") ||
-           (error as NSError).code == 28 {
+        if errorDesc.localizedCaseInsensitiveContains("space") || errorDesc.localizedCaseInsensitiveContains("No space left") || (error as NSError).code == 28 {
             return (
                 title: L10n.t(.feedbackDiskFullTitle),
                 message: L10n.t(.feedbackDiskFullMessage),
@@ -226,9 +242,9 @@ extension AppState {
         }
 
         // 4. macOS Full Disk Access or filesystem permission denied
-        if errorDesc.localizedCaseInsensitiveContains("permission") ||
-           errorDesc.localizedCaseInsensitiveContains("Permission denied") ||
-           (error as NSError).code == 13 {
+        if errorDesc.localizedCaseInsensitiveContains("permission") || errorDesc.localizedCaseInsensitiveContains("Permission denied")
+            || (error as NSError).code == 13
+        {
             return (
                 title: L10n.t(.feedbackPermissionDeniedTitle),
                 message: L10n.t(.feedbackPermissionDeniedMessage),
@@ -253,7 +269,8 @@ extension AppState {
 
         isDryRunRunning = true
         let modeTag = mode == .full ? " (FULL)" : " (Incremental)"
-        LogManager.shared.log("Pre-backup analysis (Dry-Run\(modeTag)) started for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]", level: .info, category: "UI")
+        LogManager.shared.log(
+            "Pre-backup analysis (Dry-Run\(modeTag)) started for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]", level: .info, category: "UI")
         refreshLogs()
 
         Task { [weak self] in
@@ -265,19 +282,22 @@ extension AppState {
                     self.isDryRunRunning = false
                     self.dryRunSummary = summary
                     self.showDryRunModal = true
-                    LogManager.shared.log("Dry-Run completed for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]: Added: \(summary.addedCount) files (\(summary.addedBytes) bytes), Modified: \(summary.modifiedCount) files (\(summary.modifiedBytes) bytes), Deleted: \(summary.deletedCount) files, Unmodified (CoW): \(summary.unmodifiedCount) files, Estimated new storage: \(summary.estimatedNewBytes) bytes.", level: .info, category: "UI")
+                    LogManager.shared.log(
+                        "Dry-Run completed for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]: Added: \(summary.addedCount) files (\(summary.addedBytes) bytes), Modified: \(summary.modifiedCount) files (\(summary.modifiedBytes) bytes), Deleted: \(summary.deletedCount) files, Unmodified (CoW): \(summary.unmodifiedCount) files, Estimated new storage: \(summary.estimatedNewBytes) bytes.",
+                        level: .info, category: "UI")
                     self.refreshLogs()
                 }
             } catch {
                 Task { @MainActor in
                     self.isDryRunRunning = false
-                    LogManager.shared.log("Dry-Run analysis failed for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]: \(error.localizedDescription)", level: .error, category: "UI")
+                    LogManager.shared.log(
+                        "Dry-Run analysis failed for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]: \(error.localizedDescription)", level: .error,
+                        category: "UI")
                     self.refreshLogs()
                     self.showError(error.localizedDescription)
                 }
             }
         }
     }
-
 
 }

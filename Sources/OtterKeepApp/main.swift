@@ -1,7 +1,15 @@
+import AppIntents
 import AppKit
 import OtterKeepCore
 import OtterKeepUI
 import SwiftUI
+
+/// Declares host application AppIntents package aggregation so macOS Shortcuts discovers library intents.
+struct OtterKeepAppPackage: AppIntentsPackage {
+    static var includedPackages: [any AppIntentsPackage.Type] {
+        [OtterKeepCorePackage.self]
+    }
+}
 
 #if canImport(Sparkle)
     import Sparkle
@@ -47,6 +55,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 SparkleUpdaterBridge.shared.checkForUpdates()
             }
         #endif
+
+        // Update and register macOS Shortcuts and Siri integration parameters
+        OtterKeepShortcutsProvider.updateAppShortcutParameters()
 
         // Register macOS Services provider for universal right-click context menu integration
         NSApp.servicesProvider = self
@@ -120,7 +131,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
-            if url.scheme == "otterkeep" && url.host == "restore-versions" {
+            guard url.scheme == "otterkeep" else { continue }
+            switch url.host {
+            case "restore-versions":
                 if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
                     let pathItem = components.queryItems?.first(where: { $0.name == "path" })?.value
                 {
@@ -130,6 +143,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         AppContext.shared.appState.openVersionHistory(for: fileURL)
                     }
                 }
+            case "backup", "start-backup":
+                let profileName = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                    .queryItems?.first(where: { $0.name == "profile" || $0.name == "name" })?.value
+                Task { @MainActor in
+                    AppContext.shared.appState.triggerBackupFromURL(profileName: profileName)
+                }
+            default:
+                break
             }
         }
     }

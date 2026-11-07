@@ -1,7 +1,7 @@
-import SwiftUI
 import AppKit
-import OtterKeepDomain
 import OtterKeepCore
+import OtterKeepDomain
+import SwiftUI
 
 /// Printable and renderable A4 document layout for the OtterKeep Emergency Recovery Kit.
 public struct EmergencyKitDocumentView: View {
@@ -176,50 +176,30 @@ public struct EmergencyKitDocumentView: View {
                 }
             }
 
-            // MARK: - Disaster Recovery Steps & QR Code
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("5. \(L10n.t(.emergencyKitRestoreSteps).uppercased())", systemImage: "arrow.clockwise.circle.fill")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(OtterTheme.otterAmber)
+            // MARK: - Disaster Recovery Steps
+            VStack(alignment: .leading, spacing: 10) {
+                Label("5. \(L10n.t(.emergencyKitRestoreSteps).uppercased())", systemImage: "arrow.clockwise.circle.fill")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(OtterTheme.otterAmber)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("1. Install OtterKeep on the recovery Mac (brew install otterkeep).")
-                        Text("2. Connect your backup drive or configure remote S3/B2 credentials.")
-                        Text("3. Execute the CLI recovery command below in Terminal:")
-                    }
-                    .font(.system(size: 9.5))
-                    .foregroundStyle(.secondary)
-
-                    Text(metadata.cliRestoreCommand)
-                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                        .padding(6)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 4))
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("1. Install OtterKeep on the recovery Mac (brew install otterkeep).")
+                    Text("2. Connect your backup drive or configure remote S3/B2 credentials.")
+                    Text("3. Execute the CLI recovery command below in Terminal:")
                 }
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
 
-                Spacer()
-
-                // Recovery QR Code
-                VStack(spacing: 4) {
-                    if let qrData = EmergencyKitBuilder.generateQRCodePNGData(for: metadata.qrPayload, targetDimension: 180),
-                       let qrImage = NSImage(data: qrData) {
-                        Image(nsImage: qrImage)
-                            .resizable()
-                            .interpolation(.none)
-                            .scaledToFit()
-                            .frame(width: 90, height: 90)
-                            .padding(4)
-                            .background(Color.white, in: RoundedRectangle(cornerRadius: 6))
-                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                    }
-
-                    Text("RECOVERY QR")
-                        .font(.system(size: 7.5, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                }
+                Text(metadata.cliRestoreCommand)
+                    .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.gray.opacity(0.3), lineWidth: 1))
             }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(nsColor: .controlBackgroundColor).opacity(0.6), in: RoundedRectangle(cornerRadius: 6))
 
             Spacer()
 
@@ -235,8 +215,8 @@ public struct EmergencyKitDocumentView: View {
             }
         }
         .padding(32)
-        .frame(width: 595, height: 842) // Strict A4 proportions (points)
+        .frame(width: 595, height: 842)  // Strict A4 proportions (points)
         .background(Color.white)
-        .environment(\.colorScheme, .light) // Emergency kit is always light-mode for clean printing
+        .environment(\.colorScheme, .light)  // Emergency kit is always light-mode for clean printing
     }
 }

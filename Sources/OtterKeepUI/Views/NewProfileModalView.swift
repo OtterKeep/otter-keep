@@ -1,6 +1,6 @@
-import SwiftUI
 import AppKit
 import OtterKeepCore
+import SwiftUI
 
 /// Modal sheet for creating a new backup profile with customizable source and destination directories, intelligent presets, and rule toggles.
 public struct NewProfileModalView: View {
@@ -63,7 +63,9 @@ public struct NewProfileModalView: View {
 
     private var canCreate: Bool {
         let nameValid = !appState.newProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let passValid = !appState.newProfileEnableEncryption || (!appState.newProfileEncryptionPassphrase.isEmpty && appState.newProfileEncryptionPassphrase == appState.newProfileConfirmPassphrase)
+        let passValid =
+            !appState.newProfileEnableEncryption
+            || (!appState.newProfileEncryptionPassphrase.isEmpty && appState.newProfileEncryptionPassphrase == appState.newProfileConfirmPassphrase)
         return nameValid && isFolderPairValid && passValid
     }
 
@@ -71,7 +73,7 @@ public struct NewProfileModalView: View {
         VStack(spacing: 0) {
             // Pinned Header
             headerView
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 22)
                 .padding(.top, 18)
                 .padding(.bottom, 14)
 
@@ -79,7 +81,7 @@ public struct NewProfileModalView: View {
 
             // Scrollable Form Body
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 18) {
                     presetsView
                     nameInputView
                     sourceFolderView
@@ -89,20 +91,20 @@ public struct NewProfileModalView: View {
                     encryptionAndEmergencyKitView
                     validationErrorView
                 }
-                .padding(20)
+                .padding(22)
             }
 
             Divider()
 
             // Pinned Action Buttons Footer
             footerActionsView
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 22)
                 .padding(.vertical, 14)
                 .background(.ultraThinMaterial)
         }
         .frame(
-            minWidth: 520, idealWidth: 580, maxWidth: 720,
-            minHeight: 460, idealHeight: 600, maxHeight: 820
+            minWidth: 700, idealWidth: 780, maxWidth: 880,
+            minHeight: 520, idealHeight: 660, maxHeight: 880
         )
         .onAppear {
             if appState.newProfileName.isEmpty && appState.selectedPresetTag == nil {
@@ -257,8 +259,8 @@ public struct NewProfileModalView: View {
 
             HStack(spacing: 10) {
                 Image(systemName: "internaldrive.fill")
-                .foregroundStyle(OtterTheme.otterAmber)
-                .font(.title3)
+                    .foregroundStyle(OtterTheme.otterAmber)
+                    .font(.title3)
 
                 Text(appState.newProfileDestinationURL.path)
                     .font(.callout.monospaced())
@@ -311,10 +313,13 @@ public struct NewProfileModalView: View {
                     .font(.caption.bold())
                     .foregroundStyle(OtterTheme.oceanicTeal)
                 Spacer()
-                Picker("", selection: Binding(
-                    get: { appState.newProfileIsContinuous },
-                    set: { appState.newProfileIsContinuous = $0 }
-                )) {
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { appState.newProfileIsContinuous },
+                        set: { appState.newProfileIsContinuous = $0 }
+                    )
+                ) {
                     Text(L10n.t(.executionModeScheduled)).tag(false)
                     Text(L10n.t(.executionModeContinuous)).tag(true)
                 }
@@ -354,19 +359,23 @@ public struct NewProfileModalView: View {
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
 
-                Toggle(isOn: Binding(
-                    get: { appState.newProfileEnableIgnoreFiles },
-                    set: { appState.newProfileEnableIgnoreFiles = $0 }
-                )) {
+                Toggle(
+                    isOn: Binding(
+                        get: { appState.newProfileEnableIgnoreFiles },
+                        set: { appState.newProfileEnableIgnoreFiles = $0 }
+                    )
+                ) {
                     Text(L10n.t(.enableIgnoreFilesToggle))
                         .font(.caption)
                 }
                 .toggleStyle(.checkbox)
 
-                Toggle(isOn: Binding(
-                    get: { appState.newProfileRespectGitIgnore },
-                    set: { appState.newProfileRespectGitIgnore = $0 }
-                )) {
+                Toggle(
+                    isOn: Binding(
+                        get: { appState.newProfileRespectGitIgnore },
+                        set: { appState.newProfileRespectGitIgnore = $0 }
+                    )
+                ) {
                     Text(L10n.t(.respectGitIgnoreToggle))
                         .font(.caption)
                 }
@@ -384,19 +393,23 @@ public struct NewProfileModalView: View {
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
 
-                Toggle(isOn: Binding(
-                    get: { appState.newProfileBackupOnVolumeMount },
-                    set: { appState.newProfileBackupOnVolumeMount = $0 }
-                )) {
+                Toggle(
+                    isOn: Binding(
+                        get: { appState.newProfileBackupOnVolumeMount },
+                        set: { appState.newProfileBackupOnVolumeMount = $0 }
+                    )
+                ) {
                     Text(L10n.t(.backupOnVolumeMountToggle))
                         .font(.caption)
                 }
                 .toggleStyle(.checkbox)
 
-                Toggle(isOn: Binding(
-                    get: { appState.newProfileAutoEjectOnCompletion },
-                    set: { appState.newProfileAutoEjectOnCompletion = $0 }
-                )) {
+                Toggle(
+                    isOn: Binding(
+                        get: { appState.newProfileAutoEjectOnCompletion },
+                        set: { appState.newProfileAutoEjectOnCompletion = $0 }
+                    )
+                ) {
                     Text(L10n.t(.autoEjectOnCompletionToggle))
                         .font(.caption)
                 }
@@ -428,13 +441,27 @@ public struct NewProfileModalView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
 
-                    SecureField("Titkosítási jelszó megadása...", text: encryptionPassphraseBinding)
-                        .textFieldStyle(.roundedBorder)
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Titkosítási jelszó")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.secondary)
+                            SecureField("Titkosítási jelszó megadása...", text: encryptionPassphraseBinding)
+                                .textFieldStyle(.roundedBorder)
+                        }
 
-                    SecureField("Jelszó megerősítése...", text: confirmPassphraseBinding)
-                        .textFieldStyle(.roundedBorder)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Jelszó megerősítése")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.secondary)
+                            SecureField("Jelszó megerősítése...", text: confirmPassphraseBinding)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                    }
 
-                    if !appState.newProfileEncryptionPassphrase.isEmpty && !appState.newProfileConfirmPassphrase.isEmpty && appState.newProfileEncryptionPassphrase != appState.newProfileConfirmPassphrase {
+                    if !appState.newProfileEncryptionPassphrase.isEmpty && !appState.newProfileConfirmPassphrase.isEmpty
+                        && appState.newProfileEncryptionPassphrase != appState.newProfileConfirmPassphrase
+                    {
                         Text("A megadott jelszavak nem egyeznek.")
                             .font(.caption2.bold())
                             .foregroundStyle(OtterTheme.statusError)
@@ -464,7 +491,8 @@ public struct NewProfileModalView: View {
                         }
                         .buttonStyle(.bordered)
                         .tint(appState.newProfileIsEmergencyKitExported ? OtterTheme.statusGreen : OtterTheme.otterAmber)
-                        .disabled(appState.newProfileEncryptionPassphrase.isEmpty || appState.newProfileEncryptionPassphrase != appState.newProfileConfirmPassphrase)
+                        .disabled(
+                            appState.newProfileEncryptionPassphrase.isEmpty || appState.newProfileEncryptionPassphrase != appState.newProfileConfirmPassphrase)
 
                         Spacer()
 
@@ -559,8 +587,8 @@ public struct NewProfileModalView: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
             }
-            .padding(10)
-            .frame(maxWidth: .infinity, minHeight: 64, alignment: .topLeading)
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 68, alignment: .topLeading)
             .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
