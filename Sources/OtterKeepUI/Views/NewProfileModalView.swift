@@ -95,21 +95,14 @@ public struct NewProfileModalView: View {
             }
 
             // Pinned Action Buttons Footer
-            ModalFooterActionsView(
-                cancelTitle: L10n.t(.cancel),
-                primaryTitle: L10n.t(.create),
-                isPrimaryDisabled: !canCreate,
-                onCancel: {
-                    appState.showNewProfileSheet = false
-                },
-                onPrimary: {
-                    performCreate()
-                }
-            )
+            footerActionsView
+                .padding(.horizontal, 22)
+                .padding(.vertical, 14)
+                .background(.ultraThinMaterial)
         }
         .frame(
-            minWidth: 700, idealWidth: 780, maxWidth: 880,
-            minHeight: 520, idealHeight: 660, maxHeight: 880
+            minWidth: 780, idealWidth: 820, maxWidth: 960,
+            minHeight: 580, idealHeight: 680, maxHeight: 900
         )
         .onAppear {
             if appState.newProfileName.isEmpty && appState.selectedPresetTag == nil {
@@ -202,12 +195,15 @@ public struct NewProfileModalView: View {
 
     private var sourceFolderView: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
+            HStack {
                 Label(L10n.t(.sourceFolderTitle), systemImage: "folder.fill")
                     .font(.caption.bold())
                     .foregroundStyle(OtterTheme.cyberTeal)
-                InfoTooltipView(L10n.t(.newProfileSourceDesc))
                 Spacer()
+                Text(L10n.t(.newProfileSourceDesc))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
 
             HStack(spacing: 10) {
@@ -249,12 +245,15 @@ public struct NewProfileModalView: View {
 
     private var destinationFolderView: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
+            HStack {
                 Label(L10n.t(.destinationFolderTitle), systemImage: "internaldrive.fill")
                     .font(.caption.bold())
                     .foregroundStyle(OtterTheme.otterAmber)
-                InfoTooltipView(L10n.t(.newProfileDestinationDesc))
                 Spacer()
+                Text(L10n.t(.newProfileDestinationDesc))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
 
             HStack(spacing: 10) {
@@ -434,11 +433,10 @@ public struct NewProfileModalView: View {
     // MARK: - Zero-Knowledge Client Encryption & Emergency Kit
     private var encryptionAndEmergencyKitView: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
+            HStack {
                 Label(L10n.t(.encryptionAndEmergencyKitTitle), systemImage: "lock.shield.fill")
                     .font(.caption.bold())
                     .foregroundStyle(OtterTheme.oceanicTeal)
-                InfoTooltipView(L10n.t(.clientEncryptionTooltipDesc))
                 Spacer()
                 Toggle("", isOn: enableEncryptionBinding)
                     .toggleStyle(.switch)
@@ -446,6 +444,10 @@ public struct NewProfileModalView: View {
 
             if appState.newProfileEnableEncryption {
                 VStack(alignment: .leading, spacing: 8) {
+                    Text(L10n.t(.encryptionKeychainStoredDesc))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(L10n.t(.encryptionPassphraseFieldLabel))
@@ -473,16 +475,18 @@ public struct NewProfileModalView: View {
                     }
 
                     Toggle(isOn: includePassphraseBinding) {
-                        HStack(spacing: 6) {
+                        VStack(alignment: .leading, spacing: 1) {
                             Text(L10n.t(.emergencyKitIncludePassword))
                                 .font(.caption.bold())
-                            InfoTooltipView(L10n.t(.emergencyKitIncludePasswordDesc))
+                            Text(L10n.t(.emergencyKitIncludePasswordDesc))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
                         }
                     }
                     .toggleStyle(.checkbox)
                     .padding(.top, 4)
 
-                    HStack(spacing: 8) {
+                    HStack {
                         Button {
                             downloadEmergencyKitNow()
                         } label: {
@@ -497,9 +501,12 @@ public struct NewProfileModalView: View {
                         .disabled(
                             appState.newProfileEncryptionPassphrase.isEmpty || appState.newProfileEncryptionPassphrase != appState.newProfileConfirmPassphrase)
 
-                        InfoTooltipView(L10n.t(.emergencyKitCreatedOnlyWarning))
-
                         Spacer()
+
+                        Text(L10n.t(.emergencyKitCreatedOnlyWarning))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.trailing)
                     }
                     .padding(.top, 4)
                 }
@@ -585,5 +592,23 @@ public struct NewProfileModalView: View {
         let pass = appState.newProfileEnableEncryption ? appState.newProfileEncryptionPassphrase : nil
         appState.createProfileFromDraft(encryptionPassphrase: pass)
         appState.showNewProfileSheet = false
+    }
+
+    private var footerActionsView: some View {
+        HStack {
+            Button(L10n.t(.cancel)) {
+                appState.showNewProfileSheet = false
+            }
+            .keyboardShortcut(.cancelAction)
+
+            Spacer()
+
+            Button(L10n.t(.create)) {
+                performCreate()
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(!canCreate)
+            .keyboardShortcut(.defaultAction)
+        }
     }
 }
