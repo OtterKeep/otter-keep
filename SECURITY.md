@@ -10,8 +10,8 @@ Security updates and patches are provided for the **latest minor release series*
 
 | Version | Supported          | Notes |
 | ------- | ------------------ | ----- |
-| `1.3.x` | :white_check_mark: | Latest stable minor release |
-| `< 1.3` | :x:                | End of Life (EOL) — please update |
+| `2.0.x` | :white_check_mark: | Active release series (Clean Architecture, Central DB, Resilient Engine) |
+| `< 2.0` | :x:                | End of Life (EOL) — minimum supported version is 2.0.0 |
 
 ---
 

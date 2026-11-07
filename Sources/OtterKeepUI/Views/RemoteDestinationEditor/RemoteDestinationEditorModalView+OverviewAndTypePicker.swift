@@ -90,14 +90,14 @@ extension RemoteDestinationEditorModalView {
             VStack(spacing: 6) {
                 HStack(spacing: 4) {
                     Image(systemName: icon)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.headline)
                         .foregroundStyle(isSelected ? accentColor : .secondary)
 
                     Spacer(minLength: 0)
 
                     if isSelected {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(accentColor)
                     }
                 }
@@ -109,7 +109,7 @@ extension RemoteDestinationEditorModalView {
                         .lineLimit(1)
 
                     Text(subtitle)
-                        .font(.system(size: 9))
+                        .font(.caption2)
                         .foregroundStyle(isSelected ? .secondary : .tertiary)
                         .lineLimit(1)
                 }

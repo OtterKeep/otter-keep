@@ -19,8 +19,21 @@ public final class DebugFileLogger: @unchecked Sendable {
     private var fileHandle: FileHandle?
     private var isLoggingActive: Bool = false
 
-    /// Standard logs directory located at `~/.otterkeep/logs/`.
+    /// Standard logs directory located at `~/Library/Logs/OtterKeep/` conforming to Apple's native logging location.
     public var logsDirectory: URL {
+        let baseDir: URL
+        if let pw = getpwuid(getuid()) {
+            let realHome = URL(fileURLWithPath: String(cString: pw.pointee.pw_dir))
+            baseDir = realHome.appendingPathComponent("Library/Logs", isDirectory: true)
+        } else {
+            baseDir = fileManager.urls(for: .libraryDirectory, in: .userDomainMask).first?.appendingPathComponent("Logs", isDirectory: true)
+                ?? fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs", isDirectory: true)
+        }
+        return baseDir.appendingPathComponent("OtterKeep", isDirectory: true)
+    }
+
+    /// Legacy logs directory located at `~/.otterkeep/logs/` (for backward-compatibility migration).
+    public var legacyLogsDirectory: URL {
         fileManager.homeDirectoryForCurrentUser
             .appendingPathComponent(".otterkeep", isDirectory: true)
             .appendingPathComponent("logs", isDirectory: true)
@@ -59,6 +72,20 @@ public final class DebugFileLogger: @unchecked Sendable {
         let dir = logsDirectory
         if !fileManager.fileExists(atPath: dir.path(percentEncoded: false)) {
             try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+
+        // Migrate any legacy logs from ~/.otterkeep/logs/
+        let legacyDir = legacyLogsDirectory
+        if fileManager.fileExists(atPath: legacyDir.path(percentEncoded: false)) {
+            if let files = try? fileManager.contentsOfDirectory(at: legacyDir, includingPropertiesForKeys: nil) {
+                for file in files where file.pathExtension.lowercased() == "log" {
+                    let dest = dir.appendingPathComponent(file.lastPathComponent)
+                    if !fileManager.fileExists(atPath: dest.path(percentEncoded: false)) {
+                        try? fileManager.moveItem(at: file, to: dest)
+                    }
+                }
+            }
+            try? fileManager.removeItem(at: legacyDir)
         }
     }
 

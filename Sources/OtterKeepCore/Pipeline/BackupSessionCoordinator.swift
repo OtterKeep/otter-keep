@@ -104,7 +104,14 @@ public actor BackupSessionCoordinator {
                 LogManager.shared.log("Pre-backup hook completed successfully.", level: .info, category: "Hook")
             }
 
-            // 0. Verify source directory accessibility
+            // 0. Check Power & Thermal Governor before beginning I/O
+            try checkPowerAndThermalGovernor(profile: profile)
+
+            // 0b. Arm Canary Trap Decoy if enabled
+            let canaryMonitor = try prepareCanaryTrap(profile: profile)
+            defer { canaryMonitor?.disarm() }
+
+            // 0c. Verify source directory accessibility
             let srcPath = profile.sourceURL.standardizedFileURL.path(percentEncoded: false)
             guard FileManager.default.fileExists(atPath: srcPath) else {
                 let errMsg = "Source directory is not accessible: '\(profile.sourceURL.path)'"
@@ -113,8 +120,14 @@ public actor BackupSessionCoordinator {
                 throw FileSystemError.itemNotFound(path: profile.sourceURL.path)
             }
 
-            // 1. Prepare destination directory, capabilities, and SQLite database
-            let destinationURL = profile.destinationURL.standardizedFileURL
+            // 1. Prepare destination directory, capabilities, and SQLite database (supporting encrypted Sparsebundle)
+            let (destinationURL, activeContainer, _) = try prepareEncryptedContainer(
+                profile: profile,
+                baseDestinationURL: profile.destinationURL.standardizedFileURL
+            )
+            defer {
+                cleanupEncryptedContainer(container: activeContainer, mountPoint: destinationURL)
+            }
             try storage.createDirectory(at: destinationURL)
 
         let eval = VolumeCapabilityEvaluator.evaluate(sourceURL: profile.sourceURL, destinationURL: destinationURL)
@@ -142,6 +155,9 @@ public actor BackupSessionCoordinator {
 
         // 2. Clean up dangling temporary/staging directories from any interrupted runs
         try cleanupDanglingStagingDirectories(at: destinationURL)
+
+        // 2b. Reconcile unindexed snapshots from disk with 100% certainty verification
+        try await reconcileUnindexedSnapshots(at: destinationURL, profile: profile)
 
         // 3. Find previous snapshot catalog if running in incremental mode
         var previousCatalog: [String: FileCatalogRecord] = [:]
@@ -477,7 +493,11 @@ public actor BackupSessionCoordinator {
         }
 
         let filesToCopy = itemsToCopy.filter { !$0.metadata.isDirectory }
-        let copyConcurrency = min(6, max(3, ProcessInfo.processInfo.activeProcessorCount))
+        let baseConcurrency = min(6, max(3, ProcessInfo.processInfo.activeProcessorCount))
+        let copyConcurrency = PowerAndThermalGovernor.shared.recommendedConcurrency(
+            baseConcurrency: baseConcurrency,
+            throttleOnThermal: profile.throttleOnThermalPressure
+        )
 
         try await withThrowingTaskGroup(of: CopyWorkerResult.self) { group in
             var activeTasks = 0
@@ -498,6 +518,14 @@ public actor BackupSessionCoordinator {
                             skippedItems: &skippedItems,
                             reportProgress: reportProgress
                         )
+                    }
+                }
+
+                // Thermal throttling cooperative relief (every 50 files)
+                if profile.throttleOnThermalPressure && (copiedCount % 50 == 0) && copiedCount > 0 {
+                    let thermal = ProcessInfo.processInfo.thermalState
+                    if thermal == .serious || thermal == .critical {
+                        try await Task.sleep(nanoseconds: 200_000_000)
                     }
                 }
 
@@ -563,6 +591,17 @@ public actor BackupSessionCoordinator {
                         throw CancellationError()
                     } catch {
                         try? localStorage.removeItem(at: targetURL)
+                        if Self.isOutOfSpaceError(error) {
+                            throw FileSystemError.notEnoughSpace(
+                                requiredBytes: currentItem.metadata.size,
+                                availableBytes: 0
+                            )
+                        }
+                        if Self.isFatalVolumeError(error) {
+                            throw FileSystemError.unknown(
+                                "Destination volume disconnected or fatal I/O error: \(error.localizedDescription)"
+                            )
+                        }
                         let isPerm = (error as NSError).domain == NSCocoaErrorDomain && (error as NSError).code == NSFileReadNoPermissionError
                         let errItem = BackupErrorItem(
                             url: currentItem.url,
@@ -643,7 +682,16 @@ public actor BackupSessionCoordinator {
             }
         }
 
-        // 9. Write snapshot metadata manifest
+        // 9. Determine final status and write snapshot metadata manifest
+        let snapshotStatus: String
+        if !errorItems.isEmpty {
+            snapshotStatus = "completed_with_errors"
+        } else if !skippedItems.isEmpty {
+            snapshotStatus = "completed_with_warnings"
+        } else {
+            snapshotStatus = "completed"
+        }
+
         progressTracker.withLock { state in
             state.phase = .committing
         }
@@ -656,7 +704,10 @@ public actor BackupSessionCoordinator {
             "totalBytes": scannedItems.reduce(0) { $0 + $1.metadata.size },
             "profileName": profile.name,
             "skippedCount": skippedItems.count,
-            "errorCount": errorItems.count
+            "errorCount": errorItems.count,
+            "status": snapshotStatus,
+            "isCommitted": true,
+            "backupType": mode.rawValue
         ]
         if let infoData = try? JSONSerialization.data(withJSONObject: snapshotInfo, options: [.prettyPrinted]) {
             try infoData.write(to: stagingDir.appendingPathComponent(".snapshot_info.json"))
@@ -699,17 +750,6 @@ public actor BackupSessionCoordinator {
             }
         }
 
-
-        // 13. Determine final status
-        let snapshotStatus: String
-        if !errorItems.isEmpty {
-            snapshotStatus = "completed_with_errors"
-        } else if !skippedItems.isEmpty {
-            snapshotStatus = "completed_with_warnings"
-        } else {
-            snapshotStatus = "completed"
-        }
-
         // 14. Persist database records
         let snapshotRecord = SnapshotRecord(
             id: snapshotId,
@@ -724,6 +764,16 @@ public actor BackupSessionCoordinator {
         try await database.insertSnapshot(snapshotRecord)
         try await database.insertFileRecordsBatch(catalogRecordsToSave)
 
+        // Mirror snapshot and file records to Central SQLite Database for offline inspection
+        try? CentralDatabase.shared.cacheSnapshotWithFiles(
+            snapshotRecord,
+            files: catalogRecordsToSave,
+            forProfileId: profile.id.uuidString
+        )
+
+        // Stamp zero-configuration adoption metadata file on destination volume
+        DriveProfileMetadata.write(for: profile, to: destinationURL)
+
         // 15. Automatic retention pruning (if enabled in profile)
         var autoPrunedCount = 0
         if profile.pruningPolicy.isAutoPruningEnabled {
@@ -732,6 +782,9 @@ public actor BackupSessionCoordinator {
                 logger.info("Running automatic retention pruning for profile '\(profile.name)' (Threshold: \(retainCount))...")
                 let deletedIds = try await retentionManager.applyRetentionPolicy(destinationURL: destinationURL, policy: profile.pruningPolicy)
                 autoPrunedCount = deletedIds.count
+                for prunedId in deletedIds {
+                    try? CentralDatabase.shared.deleteCachedSnapshot(id: prunedId, forProfileId: profile.id.uuidString)
+                }
                 if !deletedIds.isEmpty {
                     LogManager.shared.log("Auto-pruning completed for profile '\(profile.name)': \(deletedIds.count) older snapshots pruned (Pruned IDs: [\(deletedIds.joined(separator: ", "))]). Retained: \(retainCount) recent snapshots.", level: .info, category: "Retention")
                 } else {
@@ -766,6 +819,9 @@ public actor BackupSessionCoordinator {
             autoPrunedSnapshotsCount: autoPrunedCount
         )
         self.lastSessionSummary = sessionSummary
+
+        // Check automated database self-healing routine (every 20 cycles or 7 days)
+        CentralDatabase.shared.recordBackupCompletionAndCheckMaintenance()
 
         // Deliver macOS system notification
         NotificationDeliveryService.shared.notifyBackupCompleted(

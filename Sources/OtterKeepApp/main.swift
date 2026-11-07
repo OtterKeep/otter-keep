@@ -1,14 +1,44 @@
-import SwiftUI
+import AppIntents
 import AppKit
 import OtterKeepCore
 import OtterKeepUI
+import SwiftUI
+
+/// Declares host application AppIntents package aggregation so macOS Shortcuts discovers library intents.
+struct OtterKeepAppPackage: AppIntentsPackage {
+    static var includedPackages: [any AppIntentsPackage.Type] {
+        [OtterKeepCorePackage.self]
+    }
+}
+
+#if canImport(Sparkle)
+    import Sparkle
+
+    /// In-app software update controller bridging the official Sparkle 2.x framework.
+    final class SparkleUpdaterBridge: NSObject, SPUUpdaterDelegate {
+        static let shared = SparkleUpdaterBridge()
+        private var updaterController: SPUStandardUpdaterController?
+
+        func setup() {
+            updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: self, userDriverDelegate: nil)
+        }
+
+        func checkForUpdates() {
+            updaterController?.checkForUpdates(nil)
+        }
+    }
+#endif
 
 /// Shared application context holding the central `@Observable` AppState.
 @MainActor
 final class AppContext {
     static let shared = AppContext()
-    let appState = AppState()
-    private init() {}
+    let appState: AppState
+    private init() {
+        let state = AppState()
+        state.bootstrap()
+        self.appState = state
+    }
 }
 
 /// Application delegate handling single-instance lifecycle events, application dock icon, and cleanup.
@@ -18,6 +48,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let icon = OtterKeepLogoView.createApplicationDockIcon() {
             NSApp.applicationIconImage = icon
         }
+
+        #if canImport(Sparkle)
+            SparkleUpdaterBridge.shared.setup()
+            AppContext.shared.appState.onCheckForUpdatesNative = {
+                SparkleUpdaterBridge.shared.checkForUpdates()
+            }
+        #endif
+
+        // Update and register macOS Shortcuts and Siri integration parameters
+        OtterKeepShortcutsProvider.updateAppShortcutParameters()
 
         // Register macOS Services provider for universal right-click context menu integration
         NSApp.servicesProvider = self
@@ -54,8 +94,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func openVersionHistoryService(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         if let types = pboard.types, types.contains(.fileURL),
-           let urls = pboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
-           let firstURL = urls.first {
+            let urls = pboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
+            let firstURL = urls.first
+        {
             Task { @MainActor in
                 WindowManager.showAndFocusMainWindow()
                 AppContext.shared.appState.openVersionHistory(for: firstURL)
@@ -90,15 +131,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
-            if url.scheme == "otterkeep" && url.host == "restore-versions" {
+            guard url.scheme == "otterkeep" else { continue }
+            switch url.host {
+            case "restore-versions":
                 if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-                   let pathItem = components.queryItems?.first(where: { $0.name == "path" })?.value {
+                    let pathItem = components.queryItems?.first(where: { $0.name == "path" })?.value
+                {
                     let fileURL = URL(fileURLWithPath: pathItem)
                     Task { @MainActor in
                         WindowManager.showAndFocusMainWindow()
                         AppContext.shared.appState.openVersionHistory(for: fileURL)
                     }
                 }
+            case "backup", "start-backup":
+                let profileName = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                    .queryItems?.first(where: { $0.name == "profile" || $0.name == "name" })?.value
+                Task { @MainActor in
+                    AppContext.shared.appState.triggerBackupFromURL(profileName: profileName)
+                }
+            default:
+                break
             }
         }
     }
@@ -158,4 +210,3 @@ SingleInstanceManager.shared.startServer { message in
 
 // 3. Launch the native SwiftUI application
 OtterKeepApplication.main()
-

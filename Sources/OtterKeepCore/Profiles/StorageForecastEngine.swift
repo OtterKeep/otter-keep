@@ -1,6 +1,5 @@
 import Foundation
-import OtterKeepStorage
-import OtterKeepDatabase
+import OtterKeepDomain
 
 /// Health and capacity risk status for storage volumes.
 public enum ForecastHealthStatus: String, Codable, Sendable {
@@ -97,7 +96,7 @@ public actor StorageForecastEngine {
     /// Evaluates current disk capacity and historical growth rates to project volume depletion.
     public func evaluateForecast(
         profile: BackupProfile,
-        database: DatabaseEngine
+        snapshots: [SnapshotRecord]
     ) async throws -> StorageForecastReport {
         let destURL = profile.destinationURL.standardizedFileURL
 
@@ -117,9 +116,8 @@ public actor StorageForecastEngine {
         }
 
 
-        // 2. Fetch historical snapshots from SQLite database
-        let snapshots = try await database.listSnapshots()
-            .sorted { $0.timestamp < $1.timestamp }
+        // 2. Historical snapshots supplied by the caller (already sorted ascending by timestamp)
+        let snapshots = snapshots.sorted { $0.timestamp < $1.timestamp }
 
 
         var dailyGrowth: Int64 = 0

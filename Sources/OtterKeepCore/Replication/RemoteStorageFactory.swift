@@ -1,4 +1,5 @@
 import Foundation
+import OtterKeepDomain
 import OtterKeepStorage
 
 /// Isolated factory and credential resolution boundary for remote storage providers.

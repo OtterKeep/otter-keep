@@ -8,9 +8,9 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-VERSION="${1:-1.3.0}"
+VERSION="${1:-2.0.0}"
 CONFIGURATION="${2:-release}"
-BUILD_NUMBER="${3:-1300}"
+BUILD_NUMBER="${3:-2000}"
 
 OUTPUT_DIR="$PROJECT_ROOT/.build/dist/"
 DMG_NAME="OtterKeep-${VERSION}.dmg"
@@ -101,10 +101,10 @@ pub_date = sys.argv[6]
 new_item = f"""        <item>
             <title>Version {version}</title>
             <pubDate>{pub_date}</pubDate>
-            <sparkle:releaseNotesLink>https://github.com/richardeszeshu/otter-keep/releases/tag/v{version}</sparkle:releaseNotesLink>
+            <sparkle:releaseNotesLink>https://github.com/OtterKeep/otter-keep/releases/tag/v{version}</sparkle:releaseNotesLink>
             <description><![CDATA[OtterKeep {version} release.]]></description>
             <enclosure
-                url="https://github.com/richardeszeshu/otter-keep/releases/download/v{version}/{zip_name}"
+                url="https://github.com/OtterKeep/otter-keep/releases/download/v{version}/{zip_name}"
                 sparkle:version="{build_number}"
                 sparkle:shortVersionString="{version}"
                 length="{zip_size}"
@@ -116,7 +116,7 @@ if not os.path.exists(appcast_path):
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/sparrow/rss" xmlns:dc="http://purl.org/dc/elements/1.1/">
     <channel>
         <title>OtterKeep Changelog</title>
-        <link>https://github.com/richardeszeshu/otter-keep</link>
+        <link>https://github.com/OtterKeep/otter-keep</link>
         <description>Most recent updates and releases for OtterKeep on macOS.</description>
         <language>en</language>
 {new_item}

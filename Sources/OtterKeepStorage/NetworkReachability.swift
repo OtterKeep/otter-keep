@@ -1,8 +1,9 @@
 import Foundation
 import Network
+import OtterKeepApplication
 
 /// Network reachability and constraint status analyzer.
-public final class NetworkReachability: @unchecked Sendable {
+public final class NetworkReachability: NetworkStatusProviding, @unchecked Sendable {
     public static let shared = NetworkReachability()
 
     private let monitor: NWPathMonitor

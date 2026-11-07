@@ -1,6 +1,6 @@
 import SwiftUI
 import QuickLook
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 extension RestoreExplorerView {
@@ -40,6 +40,7 @@ extension RestoreExplorerView {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(L10n.t(.clearSearchButton))
                 }
             }
             .padding(.horizontal, 14)

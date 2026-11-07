@@ -13,7 +13,13 @@ public enum L10n {
             return translation
         }
         // Fallback: English -> Raw key
-        return translations[.english]?[key] ?? key.rawValue
+        if let english = translations[.english]?[key] {
+            return english
+        }
+        #if DEBUG
+            assertionFailure("Missing localization entry for key '\(key.rawValue)'")
+        #endif
+        return key.rawValue
     }
 
     /// Checks whether an explicit translation entry exists for the given key in the specified language.
@@ -60,6 +66,8 @@ public enum L10n {
         case delete
         case confirm
         case details
+        case modalPayloadUnavailableTitle
+        case modalPayloadUnavailableMessage
         case searchPlaceholder
         case okDone
         case unitCountFormat
@@ -144,9 +152,6 @@ public enum L10n {
         case cowDescNTFSReadOnly
         case errNTFSTargetReadOnly
         case errDestinationReadOnly
-
-
-
 
         // MARK: - Scheduling
         case scheduleCardTitle
@@ -358,6 +363,7 @@ public enum L10n {
         case logEmptyDesc
         case logExportSuccess
         case logExportError
+        case supportBundleButton
 
         // MARK: - iCloud Strategies
         case icloudStrategyDownloadAndEvict
@@ -631,7 +637,6 @@ public enum L10n {
         // MARK: - Modern UI & Unified Workspace Tabs
         case tabOverview
         case tabTimeMachine
-        case tabRulesAndMaintenance
         case tabPhotosSync
         case tabPhotosSnapshots
         case pipelineSourceLabel
@@ -854,6 +859,9 @@ public enum L10n {
         case remoteDestEditorSFTPPathPlaceholder
         case testConnectionSuccessWebDAVFormat
         case testConnectionSuccessSFTPFormat
+        case testConnectionSMBPortUnreachableFormat
+        case testConnectionInvalidWebDAVURL
+        case testConnectionInvalidSFTPHost
         case testConnectionFailedFormat
         case remoteDestEditorSFTPAuthMethodLabel
         case remoteDestEditorSFTPAuthPassword
@@ -934,6 +942,7 @@ public enum L10n {
         case menuRefreshData
         case menuMainWindow
         case menuDocumentation
+        case menuWelcomeGuide
         case menuReleaseNotes
         case menuRevealLogs
         case menuReportIssue
@@ -1061,8 +1070,197 @@ public enum L10n {
         case menuBarExternalVolumeDisconnected
         case menuBarTargetVolumeLabel
         case errBackupInProgress
-    }
 
+        // MARK: - 2.0.0 UI/UX Modernization
+        case profileSettingsTitle
+        case profileSettingsButton
+        case lastBackupResultTitle
+        case lastBackupResultSubtitle
+        case tabGeneral
+        case tabFinderIntegration
+        case tabStorageAndDb
+        case tabDiagnosticsAndUpdates
+        case tabAbout
+        case menuSystemLogs
+        case welcomeSanctuaryTitle
+        case welcomeSanctuarySubtitle
+        case createFirstProfileButton
+
+        // MARK: - 2.0.0 Core Engine & Resilience
+        case executionModeScheduled
+        case executionModeContinuous
+        case continuousDebounceLabel
+        case continuousDebounceDesc
+        case powerGovernorHeader
+        case pauseOnBatteryLabel
+        case pauseOnBatteryDesc
+        case throttleOnThermalLabel
+        case throttleOnThermalDesc
+        case canaryTrapHeader
+        case enableCanaryTrapsLabel
+        case enableCanaryTrapsDesc
+        case localEncryptionHeader
+        case enableLocalEncryptionLabel
+        case enableLocalEncryptionDesc
+        case canaryTrapTriggeredAlertTitle
+        case canaryTrapTriggeredAlertMessage
+
+        // MARK: - 2.0.0 Multi-Drive & Storage
+        case multiDriveRotationTitle
+        case multiDriveRotationDesc
+        case dedupCdcTitle
+        case dedupCdcDesc
+
+        // MARK: - 2.0.0 Sanctuary Onboarding & Scrubber
+        case onboardingWelcomeTitle
+        case onboardingWelcomeDesc
+        case onboardingStepFDA
+        case onboardingStepProfile
+        case onboardingStepSchedule
+        case onboardingStepFinish
+        case onboardingContinue
+        case onboardingSkip
+        case onboardingFinish
+        case timelineScrubberTitle
+        case smartHeroTitle
+        case smartHeroHealthy
+        case smartHeroWarning
+        case presetExclusionsTitle
+        case presetExclusionNodeModules
+        case presetExclusionXcode
+        case presetExclusionPython
+        case presetExclusionMediaCaches
+        case sparsebundlePasswordLabel
+        case sparsebundlePasswordPlaceholder
+        case sparsebundlePasswordHint
+        case menuSaveSupportBundle
+        case daemonStatusHeader
+        case daemonStatusActive
+        case daemonStatusRequiresApproval
+        case daemonStatusNotFound
+        case daemonOpenSystemSettings
+        case addVolumeToRotation
+        case noRotationVolumes
+        case onboardingFeatureApfsTitle
+        case onboardingFeatureApfsDesc
+        case onboardingFeatureLocalTitle
+        case onboardingFeatureLocalDesc
+        case onboardingFeatureGentleTitle
+        case onboardingFeatureGentleDesc
+        case onboardingFDADesc
+        case onboardingRecheckFDA
+        case onboardingProfileFoldersSubtitle
+        case onboardingProfileNameLabel
+        case onboardingProtectionSubtitle
+        case back
+        case daysCountFormat
+
+        // MARK: - Hardcoded String Migration
+        case forecastRefreshHelp
+        case photosMaxBufferFormat
+        case replicationEncryptionBadge
+        case replicationArchiveBadgeFormat
+        case encryptionSparsebundleLabel
+        case debounceSecondsFormat
+        case snapshotPathLabelFormat
+        case aboutSubsystemComponentsTitle
+        case aboutCraftedBy
+        case aboutCopyrightNotice
+        case aboutSubsystemsSummaryFormat
+        case aboutVersionBuildFormat
+        case aboutBuildFormat
+        case aboutAppVersionFormat
+        case aboutTaglineEnglish
+        case aboutTaglineHungarian
+        case aboutBadgeApfsTitle
+        case aboutBadgeApfsSubtitle
+        case aboutBadgeSwiftTitle
+        case aboutBadgeSwiftSubtitle
+        case aboutBadgeLocalTitle
+        case aboutBadgeLocalSubtitle
+        case aboutBadgeTelemetryTitle
+        case aboutBadgeTelemetrySubtitle
+        case aboutLinkWebsite
+        case aboutLinkGitHub
+        case aboutLinkReleases
+        case aboutLinkLicense
+
+        // MARK: - Accessibility Labels for Icon-Only Controls
+        case closeButton
+        case clearSearchButton
+        case removeExclusionButton
+        case compareVersionsButton
+        case openInFinderButton
+        case previousSnapshotButton
+        case nextSnapshotButton
+        case refreshLogsButton
+        case stopBackupAccessibility
+        case startBackupAccessibility
+
+        // MARK: - Three-Part Error Architecture (Guarantee & Recovery)
+        case feedbackGuaranteeTitle
+        case feedbackGuaranteeSnapshotsSafe
+        case feedbackGuaranteeNothingModified
+        case recoveryOpenFullDiskAccess
+        case recoveryViewLogs
+
+        // MARK: - Emergency Kit, Biometrics & Automation (v2.1)
+        case encryptionAndEmergencyKitTitle
+        case emergencyKitTitle
+        case emergencyKitSubtitle
+        case emergencyKitExportButton
+        case emergencyKitExportedNotice
+        case emergencyKitDownloadPrompt
+        case emergencyKitCreatedOnlyWarning
+        case emergencyKitIncludePassword
+        case emergencyKitIncludePasswordDesc
+        case emergencyKitHandwriteNotice
+        case emergencyKitSecuritySummary
+        case emergencyKitRestoreSteps
+        case emergencyKitTerminalCommand
+        case emergencyKitQRCodeLabel
+        case biometricsTabTitle
+        case biometricsEnableMasterToggle
+        case biometricsTouchIDAvailable
+        case biometricsTouchIDUnavailable
+        case biometricsRequireForRestore
+        case biometricsRequireForRestoreDesc
+        case biometricsRequireForDelete
+        case biometricsRequireForDeleteDesc
+        case biometricsRequireForKeyReveal
+        case biometricsRequireForKeyRevealDesc
+        case biometricsHardwareSecureEnclave
+        case biometricsHardwareSecureEnclaveDesc
+        case biometricsAuthPromptRestore
+        case biometricsAuthPromptDelete
+        case biometricsAuthPromptKeyReveal
+        case biometricsAuthPromptEmergencyKit
+        case biometricsAuthFailed
+        case encryptionLockedNotice
+        case intentStartBackupTitle
+        case intentStartBackupDesc
+        case intentGetStatusTitle
+        case intentGetStatusDesc
+        case ignoreFilesTooltipDesc
+        case driveAutomationTooltipDesc
+        case clientEncryptionTooltipDesc
+        case encryptionPassphraseFieldLabel
+        case encryptionPassphraseFieldPlaceholder
+        case confirmPassphraseFieldLabel
+        case confirmPassphraseFieldPlaceholder
+        case passphraseMismatchError
+        case biometricsActionGatesSection
+        case biometricsSecureEnclaveToggle
+        case encryptionPermanentTag
+        case encryptionKeychainStoredDesc
+        case unencryptedProfileNotice
+        case centralDatabaseTitle
+        case centralDatabaseVacuumButton
+        case unadoptedDriveDiscoveredTitle
+        case unadoptedDriveDiscoveredMessageFormat
+        case unadoptedDriveAdoptAction
+        case unadoptedDriveDismissAction
+    }
 
     // MARK: - Translation Dictionaries
 

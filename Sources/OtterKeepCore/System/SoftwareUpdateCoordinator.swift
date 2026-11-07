@@ -66,13 +66,13 @@ public actor SoftwareUpdateCoordinator {
     private static let lastCheckKey = "OtterKeep.LastUpdateCheckDate"
 
     /// Default public appcast feed URL pointing to the raw GitHub distribution XML.
-    public static let defaultAppcastURL = URL(string: "https://raw.githubusercontent.com/richardeszeshu/otter-keep/main/Distribution/appcast.xml")!
+    public static let defaultAppcastURL = URL(string: "https://raw.githubusercontent.com/OtterKeep/otter-keep/main/Distribution/appcast.xml")!
 
     /// Default fallback web releases page.
-    public static let defaultReleasesURL = URL(string: "https://github.com/richardeszeshu/otter-keep/releases")!
+    public static let defaultReleasesURL = URL(string: "https://github.com/OtterKeep/otter-keep/releases")!
 
     /// Official GitHub REST API endpoint for the latest release.
-    public static let defaultGitHubReleasesAPIURL = URL(string: "https://api.github.com/repos/richardeszeshu/otter-keep/releases/latest")!
+    public static let defaultGitHubReleasesAPIURL = URL(string: "https://api.github.com/repos/OtterKeep/otter-keep/releases/latest")!
 
     public private(set) var latestStatus: UpdateCheckStatus = .idle
     public private(set) var lastCheckDate: Date?

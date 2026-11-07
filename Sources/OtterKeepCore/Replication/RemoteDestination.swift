@@ -1,5 +1,5 @@
 import Foundation
-import OtterKeepStorage
+import OtterKeepDomain
 
 /// Target remote backend type (S3 cloud storage, NAS network share, WebDAV, or SFTP).
 public enum RemoteDestinationType: Codable, Sendable, Equatable {

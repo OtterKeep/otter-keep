@@ -1,4 +1,5 @@
 import Foundation
+import OtterKeepDomain
 import Darwin
 
 /// Legacy MS-DOS / FAT32 filesystem driver.

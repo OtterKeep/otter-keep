@@ -1,7 +1,6 @@
 import SwiftUI
 import AppKit
 import OtterKeepCore
-import OtterKeepStorage
 
 extension MenuBarContentView {
     // MARK: - Footer Controls
@@ -24,8 +23,7 @@ extension MenuBarContentView {
                 Image(systemName: "arrow.triangle.2.circlepath")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .rotationEffect(appState.isCheckingForSoftwareUpdates ? .degrees(360) : .zero)
-                    .animation(appState.isCheckingForSoftwareUpdates ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: appState.isCheckingForSoftwareUpdates)
+                    .symbolEffect(.rotate, isActive: appState.isCheckingForSoftwareUpdates)
             }
             .buttonStyle(.plain)
             .help(L10n.t(.menuBarCheckUpdates))

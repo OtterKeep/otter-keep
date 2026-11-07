@@ -17,3 +17,9 @@ func createTempDirectory(prefix: String = "OtterKeepTest") throws -> URL {
 func removeTempDirectory(_ url: URL) {
     try? FileManager.default.removeItem(at: url)
 }
+
+public enum TemporaryDirectoryFixtures {
+    public static func createUniqueDirectory(prefix: String = "OtterKeepTest") throws -> URL {
+        try createTempDirectory(prefix: prefix)
+    }
+}

@@ -1,12 +1,13 @@
 import Foundation
 import os
+import OtterKeepDomain
+import OtterKeepApplication
 import OtterKeepStorage
 import OtterKeepDatabase
 
 /// Central domain service managing snapshot catalog operations, version histories, and immutability locks.
 ///
-/// Encapsulates SQLite database connection lifecycles, guaranteeing that every query, lock mutation,
-/// and diff evaluation strictly closes the database and truncates WAL logs via transactional closures.
+/// Encapsulates SQLite database connection lifecycles and provides clean repository port access.
 public final class SnapshotCatalogService: Sendable {
     /// Shared singleton instance.
     public static let shared = SnapshotCatalogService()
@@ -14,6 +15,16 @@ public final class SnapshotCatalogService: Sendable {
     private let logger = Logger(subsystem: "com.otterkeep", category: "SnapshotCatalogService")
 
     public init() {}
+
+    /// Factory creating a `SnapshotRepositoryProtocol` port instance for the given backup profile.
+    public func snapshotRepository(for profile: BackupProfile) -> SnapshotRepositoryProtocol {
+        SQLiteSnapshotRepository(databasePath: profile.manifestDatabasePath)
+    }
+
+    /// Factory creating a `FileCatalogRepositoryProtocol` port instance for the given backup profile.
+    public func fileCatalogRepository(for profile: BackupProfile) -> FileCatalogRepositoryProtocol {
+        SQLiteFileCatalogRepository(databasePath: profile.manifestDatabasePath)
+    }
 
     /// Executes an async block against an open `DatabaseEngine` connection, guaranteeing that
     /// `await db.close()` is always executed upon completion or error.
@@ -28,24 +39,19 @@ public final class SnapshotCatalogService: Sendable {
                 return def
             }
         }
-        let db = DatabaseEngine()
-        try await db.open(at: profile.manifestDatabasePath)
-        do {
-            let result = try await action(db)
-            await db.close()
-            return result
-        } catch {
-            await db.close()
-            throw error
-        }
+        return try await withDatabase(atPath: profile.manifestDatabasePath, action: action)
     }
 
-    /// Lists all snapshots recorded in the profile's SQLite manifest catalog.
+    /// Lists all snapshots recorded in the profile's SQLite manifest catalog, falling back to the central database offline cache if the destination volume is detached.
     /// - Parameter profile: The target backup profile.
     /// - Returns: Array of snapshot records sorted by timestamp descending.
     public func listSnapshots(for profile: BackupProfile) async throws -> [SnapshotRecord] {
-        try await withDatabase(for: profile, allowMissing: true, defaultValue: []) { db in
-            try await db.listSnapshots()
+        if FileManager.default.fileExists(atPath: profile.manifestDatabasePath) {
+            let snaps = try await snapshotRepository(for: profile).listSnapshots()
+            try? CentralDatabase.shared.cacheSnapshots(snaps, forProfileId: profile.id.uuidString)
+            return snaps
+        } else {
+            return try CentralDatabase.shared.listCachedSnapshots(forProfileId: profile.id.uuidString)
         }
     }
 
@@ -55,9 +61,10 @@ public final class SnapshotCatalogService: Sendable {
     ///   - profile: The target backup profile.
     /// - Returns: The matching `SnapshotRecord`, or `nil` if not found.
     public func getSnapshot(id: String, in profile: BackupProfile) async throws -> SnapshotRecord? {
-        try await withDatabase(for: profile, allowMissing: true, defaultValue: nil) { db in
-            let snapshots = try await db.listSnapshots()
-            return snapshots.first(where: { $0.id == id })
+        if FileManager.default.fileExists(atPath: profile.manifestDatabasePath) {
+            return try await snapshotRepository(for: profile).getSnapshot(id: id)
+        } else {
+            return try CentralDatabase.shared.getCachedSnapshot(id: id, forProfileId: profile.id.uuidString)
         }
     }
 
@@ -67,8 +74,10 @@ public final class SnapshotCatalogService: Sendable {
     ///   - profile: The target backup profile.
     /// - Returns: Array of indexed `FileCatalogRecord` entries.
     public func listFiles(forSnapshotId snapshotId: String, in profile: BackupProfile) async throws -> [FileCatalogRecord] {
-        try await withDatabase(for: profile, allowMissing: true, defaultValue: []) { db in
-            try await db.listFiles(forSnapshotId: snapshotId)
+        if FileManager.default.fileExists(atPath: profile.manifestDatabasePath) {
+            return try await fileCatalogRepository(for: profile).listFiles(forSnapshotId: snapshotId)
+        } else {
+            return try CentralDatabase.shared.listCachedFiles(forSnapshotId: snapshotId, profileId: profile.id.uuidString)
         }
     }
 
@@ -81,8 +90,10 @@ public final class SnapshotCatalogService: Sendable {
         relativePath: String,
         in profile: BackupProfile
     ) async throws -> [(snapshot: SnapshotRecord, file: FileCatalogRecord)] {
-        try await withDatabase(for: profile, allowMissing: true, defaultValue: []) { db in
-            try await db.listVersions(ofRelativePath: relativePath)
+        if FileManager.default.fileExists(atPath: profile.manifestDatabasePath) {
+            return try await fileCatalogRepository(for: profile).listVersions(ofRelativePath: relativePath)
+        } else {
+            return try CentralDatabase.shared.listCachedVersions(ofRelativePath: relativePath, profileId: profile.id.uuidString)
         }
     }
 
@@ -98,11 +109,10 @@ public final class SnapshotCatalogService: Sendable {
         in profile: BackupProfile,
         storage: FileSystemProvider = DefaultFileSystemProvider()
     ) async throws {
-        try await withDatabase(for: profile) { db in
-            try await db.updateSnapshotLockedUntil(id: id, lockedUntil: lockedUntil)
-        }
+        let repo = snapshotRepository(for: profile)
+        try await repo.updateSnapshotLockedUntil(id: id, lockedUntil: lockedUntil)
 
-        let snapshots = try await listSnapshots(for: profile)
+        let snapshots = try await repo.listSnapshots()
         if let snap = snapshots.first(where: { $0.id == id }) {
             let snapURL = profile.destinationURL.appendingPathComponent(snap.snapshotPath)
             let isLockActive = (lockedUntil != nil && lockedUntil! > Date())
@@ -137,10 +147,101 @@ public final class SnapshotCatalogService: Sendable {
     ///   - relativePath: Display relative path.
     /// - Returns: A `FileComparisonResult`.
     public func diffFiles(
-        leftURL: URL,
-        rightURL: URL,
+        leftURL: URL?,
+        rightURL: URL?,
         relativePath: String
     ) throws -> FileComparisonResult {
         try TextDiffEngine().diffFiles(leftURL: leftURL, rightURL: rightURL, relativePath: relativePath)
+    }
+
+    // MARK: - Cross-Snapshot Search & Photos Catalog
+
+    /// Searches distinct relative paths across all snapshots of the profile's catalog.
+    /// - Parameters:
+    ///   - query: Substring filter pattern (empty string matches all).
+    ///   - profile: The target backup profile.
+    ///   - limit: Maximum number of paths to return.
+    /// - Returns: Array of distinct relative file paths.
+    public func searchDistinctRelativePaths(
+        matching query: String,
+        in profile: BackupProfile,
+        limit: Int = 100
+    ) async throws -> [String] {
+        if FileManager.default.fileExists(atPath: profile.manifestDatabasePath) {
+            return try await withDatabase(for: profile) { db in
+                try await db.searchDistinctRelativePaths(matching: query, limit: limit)
+            }
+        } else {
+            return try CentralDatabase.shared.searchCachedRelativePaths(
+                matching: query,
+                profileId: profile.id.uuidString
+            )
+        }
+    }
+
+    /// Performs a cross-snapshot search across all indexed catalog records of the profile.
+    /// - Parameters:
+    ///   - query: Substring or filename pattern to search for.
+    ///   - profile: The target backup profile.
+    ///   - limit: Maximum number of results.
+    /// - Returns: Array of `GlobalSearchResult` records.
+    public func searchFilesAcrossSnapshots(
+        query: String,
+        in profile: BackupProfile,
+        limit: Int = 100
+    ) async throws -> [GlobalSearchResult] {
+        try await withDatabase(for: profile) { db in
+            try await db.searchFilesAcrossSnapshots(query: query, limit: limit)
+        }
+    }
+
+    /// Lists all snapshots recorded in the manifest catalog at the given destination URL.
+    /// - Parameter destinationURL: Root destination URL of the backup volume.
+    /// - Returns: Array of snapshot records sorted by timestamp descending.
+    public func listSnapshots(atDestination destinationURL: URL) async throws -> [SnapshotRecord] {
+        let dbPath = BackupProfile.manifestDatabasePath(forDestination: destinationURL)
+        guard FileManager.default.fileExists(atPath: dbPath) else { return [] }
+        return try await SQLiteSnapshotRepository(databasePath: dbPath).listSnapshots()
+    }
+
+    /// Lists all Photos asset records recorded for a snapshot in the manifest catalog at the given destination.
+    /// - Parameters:
+    ///   - snapshotId: Unique snapshot identifier.
+    ///   - destinationURL: Root destination URL of the backup volume.
+    /// - Returns: Array of `PhotosAssetRecord` entries.
+    public func listPhotosAssets(forSnapshotId snapshotId: String, atDestination destinationURL: URL) async throws -> [PhotosAssetRecord] {
+        let dbPath = BackupProfile.manifestDatabasePath(forDestination: destinationURL)
+        guard FileManager.default.fileExists(atPath: dbPath) else { return [] }
+        return try await withDatabase(atPath: dbPath) { db in
+            try await db.fetchPhotosAssetRecords(for: snapshotId)
+        }
+    }
+
+    /// Executes an async block against an open `DatabaseEngine` connection at an explicit path.
+    private func withDatabase<T: Sendable>(
+        atPath path: String,
+        action: (DatabaseEngine) async throws -> T
+    ) async throws -> T {
+        let db = DatabaseEngine()
+        try await db.open(at: path)
+        do {
+            let result = try await action(db)
+            await db.close()
+            return result
+        } catch {
+            await db.close()
+            throw error
+        }
+    }
+
+    /// Lists all Photos asset records recorded for a snapshot in the profile's catalog.
+    /// - Parameters:
+    ///   - snapshotId: Unique snapshot identifier.
+    ///   - profile: The target backup profile.
+    /// - Returns: Array of `PhotosAssetRecord` entries.
+    public func listPhotosAssets(forSnapshotId snapshotId: String, in profile: BackupProfile) async throws -> [PhotosAssetRecord] {
+        try await withDatabase(for: profile) { db in
+            try await db.fetchPhotosAssetRecords(for: snapshotId)
+        }
     }
 }

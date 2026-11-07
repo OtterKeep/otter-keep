@@ -1,6 +1,6 @@
 import SwiftUI
 import QuickLook
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 extension RestoreExplorerView {
@@ -30,6 +30,7 @@ extension RestoreExplorerView {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundStyle(.secondary)
                         }
+                        .accessibilityLabel(L10n.t(.clearSearchButton))
                         .buttonStyle(.plain)
                     }
                 }
@@ -213,7 +214,7 @@ extension RestoreExplorerView {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(Self.dateFormatter.string(from: item.snapshot.timestamp))
                             .font(.headline)
-                        Text("Snapshot: \(item.snapshot.snapshotPath)")
+                        Text(L10n.format(.snapshotPathLabelFormat, item.snapshot.snapshotPath))
                             .font(.caption2.monospaced())
                             .foregroundStyle(.tertiary)
                     }

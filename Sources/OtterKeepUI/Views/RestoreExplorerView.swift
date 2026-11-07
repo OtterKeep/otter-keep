@@ -1,6 +1,5 @@
 import SwiftUI
 import QuickLook
-import OtterKeepDatabase
 import OtterKeepCore
 
 public struct RestoreExplorerView: View {
@@ -48,6 +47,11 @@ public struct RestoreExplorerView: View {
             // Top Bar: Mode Selector (Snapshot vs. Timeline)
             headerModeSelector
 
+            // Visual Timeline Scrubber
+            if appState.restoreBrowseMode == .snapshot || appState.restoreBrowseMode == .timeline {
+                VisualTimelineScrubberView(appState: appState)
+            }
+
             Divider()
 
             // View content based on selected mode
@@ -67,10 +71,6 @@ public struct RestoreExplorerView: View {
         }
         .onDisappear {
             QuickLookCoordinator.shared.stopKeyboardMonitoring()
-        }
-        .onKeyPress(.space) {
-            appState.toggleQuickLook()
-            return .handled
         }
         .sheet(isPresented: showRestoreDialogBinding) {
             restoreSheetView

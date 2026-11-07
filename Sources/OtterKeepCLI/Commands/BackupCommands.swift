@@ -7,9 +7,14 @@ extension OtterKeepCLI {
     static func handleBackup(_ args: [String]) async {
         let isDryRun = args.contains("--dry-run")
         let isFull = args.contains("--full")
-        let backupMode: BackupMode = isFull ? .full : .incremental
+        let isContinuous = args.contains("--continuous")
         let profileName = getOption("--profile", from: args)
-        let profile = resolveProfile(target: profileName)
+        await runBackup(profileTarget: profileName, isDryRun: isDryRun, isFull: isFull, isContinuous: isContinuous)
+    }
+
+    static func runBackup(profileTarget: String?, isDryRun: Bool, isFull: Bool, isContinuous: Bool) async {
+        let backupMode: BackupMode = isFull ? .full : .incremental
+        let profile = resolveProfile(target: profileTarget)
 
         let storage = DefaultFileSystemProvider()
         let database = DatabaseEngine()
@@ -22,7 +27,46 @@ extension OtterKeepCLI {
         )
 
         let modeLabel = isFull ? " [\(L10n.t(.backupTypeFull).uppercased())]" : ""
-        LogManager.shared.log("CLI backup initiated for profile '\(profile.name)' [UUID: \(profile.id.uuidString)] (DryRun: \(isDryRun), Full: \(isFull))", level: .info, category: "CLI")
+        LogManager.shared.log("CLI backup initiated for profile '\(profile.name)' [UUID: \(profile.id.uuidString)] (DryRun: \(isDryRun), Full: \(isFull), Continuous: \(isContinuous))", level: .info, category: "CLI")
+
+        if isContinuous {
+            let debounce = profile.executionMode.debouncingSeconds
+            print("⚡️ Starting continuous real-time backup watcher for '\(profile.name)' (quiet window: \(debounce)s)...")
+            print("📁 \(L10n.t(.activeProfileLabel)): \(profile.name)")
+            print("📂 \(L10n.t(.sourceFolderTitle)): \(profile.sourceURL.path)")
+            print("🎯 \(L10n.t(.destinationFolderTitle)): \(profile.destinationURL.path)")
+            print("   Press Ctrl+C to terminate.\n")
+
+            let watcher = FSEventWatcher(
+                watchedPath: profile.sourceURL.standardizedFileURL.path(percentEncoded: false),
+                excludePatterns: profile.excludePatterns,
+                debouncingSeconds: debounce
+            ) { _ in
+                print("\n🔔 [FSEvents] Change detected! Triggering incremental backup...")
+                Task {
+                    do {
+                        _ = try await coordinator.performBackup(profile: profile, mode: .incremental) { progress in
+                            if progress.totalFiles > 0 {
+                                let pct = Int((Double(progress.processedFiles) / Double(progress.totalFiles)) * 100)
+                                let file = progress.currentItem.isEmpty ? "" : " - \(progress.currentItem)"
+                                print("\r[\(progress.phase.localizedDescription)] \(pct)% (\(progress.processedFiles)/\(progress.totalFiles))\(file)", terminator: "")
+                                fflush(stdout)
+                            }
+                        }
+                        if let sum = await coordinator.lastSessionSummary {
+                            print("\n✅ Real-time backup completed: Snapshot \(sum.snapshotId), Copied: \(sum.copiedCount), Cloned: \(sum.clonedCount)")
+                        }
+                    } catch {
+                        print("\n❌ Backup failed: \(error.localizedDescription)")
+                    }
+                }
+            }
+            watcher.start()
+
+            while true {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+            }
+        }
 
         if isDryRun {
             print(L10n.t(.cliDryRunStarting) + modeLabel)

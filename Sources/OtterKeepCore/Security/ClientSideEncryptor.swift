@@ -1,6 +1,6 @@
-import Foundation
-import CryptoKit
 import CommonCrypto
+import CryptoKit
+import Foundation
 
 /// Structured errors encountered during zero-knowledge client-side encryption.
 public enum ClientEncryptionError: Error, Sendable, LocalizedError, Equatable {
@@ -22,10 +22,10 @@ public enum ClientEncryptionError: Error, Sendable, LocalizedError, Equatable {
 /// Zero-Knowledge Client-Side Authenticated Encryption Engine (AES-256-GCM with PBKDF2-HMAC-SHA256 key derivation).
 public enum ClientSideEncryptor: Sendable {
     /// Modern PBKDF2-HMAC-SHA256 header magic identifier (OtterKeep standard envelope format).
-    public static let headerMagicOKENC2 = Data([0x4F, 0x4B, 0x45, 0x4E, 0x43, 0x32, 0x00]) // "OKENC2\0"
+    public static let headerMagicOKENC2 = Data([0x4F, 0x4B, 0x45, 0x4E, 0x43, 0x32, 0x00])  // "OKENC2\0"
     /// Legacy HKDF-SHA256 header magic identifier retained for backwards-compatible reading of existing archives.
-    public static let headerMagicV1 = Data([0x44, 0x53, 0x45, 0x4E, 0x43, 0x31, 0x00]) // "DSENC1\0"
-    
+    public static let headerMagicV1 = Data([0x44, 0x53, 0x45, 0x4E, 0x43, 0x31, 0x00])  // "DSENC1\0"
+
     private static let saltLengthV2 = 32
     private static let saltLengthV1 = 16
     private static let pbkdf2Rounds: UInt32 = 600_000
@@ -57,6 +57,37 @@ public enum ClientSideEncryptor: Sendable {
             throw ClientEncryptionError.encryptionFailed("PBKDF2 key derivation failed with status: \(status)")
         }
         return SymmetricKey(data: derivedKeyData)
+    }
+
+    /// Derives a deterministic hexadecimal key fingerprint from a passphrase and salt using PBKDF2-HMAC-SHA256.
+    /// Uses computationally hard PBKDF2 key derivation (100,000 rounds) rather than fast hashing algorithms,
+    /// adhering to CWE-328 standards against offline brute-forcing.
+    public static func deriveFingerprintPBKDF2(from passphrase: String, salt: Data, rounds: UInt32 = 100_000) -> String {
+        var fingerprintBytes = Data(count: 8)
+        let passwordData = Data(passphrase.utf8)
+
+        let status = fingerprintBytes.withUnsafeMutableBytes { outBytes in
+            salt.withUnsafeBytes { saltBytes in
+                passwordData.withUnsafeBytes { passwordBytes in
+                    CCKeyDerivationPBKDF(
+                        CCPBKDFAlgorithm(kCCPBKDF2),
+                        passwordBytes.baseAddress?.assumingMemoryBound(to: Int8.self),
+                        passwordData.count,
+                        saltBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                        salt.count,
+                        CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256),
+                        rounds,
+                        outBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                        8
+                    )
+                }
+            }
+        }
+
+        guard status == kCCSuccess else {
+            return "PBKDF2:UNAVAILABLE"
+        }
+        return "PBKDF2:" + fingerprintBytes.map { String(format: "%02x", $0) }.joined().uppercased()
     }
 
     /// Legacy key derivation using HKDF-SHA256 for backward compatibility with existing DSENC1 blobs.

@@ -55,35 +55,28 @@ public struct SystemNotificationPresenter: NotificationPresenting {
         return nil
     }
 
-    /// Displays a notification through `osascript` so the banner adopts the OtterKeep application icon.
+    /// Displays a notification through `osascript`.
     /// - Parameters:
     ///   - title: Notification title.
     ///   - body: Notification body.
     public func deliverFallbackNotification(title: String, body: String) {
         #if canImport(AppKit)
-        let safeBody = body.replacingOccurrences(of: "\"", with: "\\\"")
-        let safeTitle = title.replacingOccurrences(of: "\"", with: "\\\"")
-        // Try displaying via application id so the notification gets the OtterKeep application icon
-        let scriptWithId = "tell application id \"com.otterkeep.OtterKeepApp\" to display notification \"\(safeBody)\" with title \"\(safeTitle)\""
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        proc.arguments = ["-e", scriptWithId]
-        do {
-            try proc.run()
-            proc.waitUntilExit()
-            if proc.terminationStatus != 0 {
-                let fallbackScript = "display notification \"\(safeBody)\" with title \"\(safeTitle)\""
-                let procFallback = Process()
-                procFallback.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-                procFallback.arguments = ["-e", fallbackScript]
-                try? procFallback.run()
-            }
-        } catch {
+        let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || ProcessInfo.processInfo.processName.lowercased().contains("test")
+            || ProcessInfo.processInfo.arguments.contains(where: { $0.lowercased().contains("test") })
+            || NSClassFromString("XCTest") != nil
+        if isTesting {
+            return
+        }
+
+        DispatchQueue.global(qos: .utility).async {
+            let safeBody = body.replacingOccurrences(of: "\"", with: "\\\"")
+            let safeTitle = title.replacingOccurrences(of: "\"", with: "\\\"")
             let fallbackScript = "display notification \"\(safeBody)\" with title \"\(safeTitle)\""
-            let procFallback = Process()
-            procFallback.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            procFallback.arguments = ["-e", fallbackScript]
-            try? procFallback.run()
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            proc.arguments = ["-e", fallbackScript]
+            try? proc.run()
         }
         #endif
     }

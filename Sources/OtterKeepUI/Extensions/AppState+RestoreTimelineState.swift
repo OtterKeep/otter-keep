@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 import Photos
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 /// Forwarding accessors exposing the restore, timeline and diff state owned by
@@ -24,6 +24,8 @@ extension AppState {
     public var selectedTreeNode: FileTreeNode? { get { restoreTimeline.selectedTreeNode } set { restoreTimeline.selectedTreeNode = newValue } }
     /// Currently selected file catalog record.
     public var selectedFile: FileCatalogRecord? { get { restoreTimeline.selectedFile } set { restoreTimeline.selectedFile = newValue } }
+    /// Differential status for files in the selected snapshot relative to previous snapshot.
+    public var snapshotFileDiffStatuses: [String: DiffChangeType] { get { restoreTimeline.snapshotFileDiffStatuses } set { restoreTimeline.snapshotFileDiffStatuses = newValue } }
 
     // MARK: - File Timeline & Tree Structure
     /// Active browsing mode (snapshot catalog or timeline).
@@ -93,8 +95,8 @@ extension AppState {
     // MARK: - Direct File Version History & Finder In-Place Restore
     /// Controls presentation of the file version history modal.
     public var showFileVersionHistoryModal: Bool {
-        get { restoreTimeline.showFileVersionHistoryModal }
-        set { restoreTimeline.showFileVersionHistoryModal = newValue }
+        get { activeModal == .fileVersionHistory }
+        set { setModalRoute(.fileVersionHistory, presented: newValue) }
     }
     /// On-disk URL of the file whose version history is displayed.
     public var activeVersionHistoryFile: URL? { get { restoreTimeline.activeVersionHistoryFile } set { restoreTimeline.activeVersionHistoryFile = newValue } }

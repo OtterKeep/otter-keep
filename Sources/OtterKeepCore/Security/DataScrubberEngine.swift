@@ -63,6 +63,9 @@ public actor DataScrubberEngine {
         let internalDir = backupRootURL.standardizedFileURL.appendingPathComponent(".otterkeep")
         let dbPath = internalDir.appendingPathComponent("manifest.sqlite").standardizedFileURL.path(percentEncoded: false)
         try await database.open(at: dbPath)
+        defer {
+            Task { await database.close() }
+        }
 
         var snapshots = try await database.listSnapshots()
         if let limit = limitSnapshots, limit > 0 {
@@ -168,6 +171,7 @@ public actor DataScrubberEngine {
             )
         }
 
+        await database.close()
         return auditRecord
     }
 

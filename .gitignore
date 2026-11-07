@@ -21,6 +21,7 @@ Package.pins
 Package.resolved
 
 # Xcode & workspace files
+.vscode/
 DerivedData/
 build/
 *.xcodeproj/*

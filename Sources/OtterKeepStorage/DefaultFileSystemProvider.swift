@@ -1,4 +1,5 @@
 import Foundation
+import OtterKeepDomain
 import Darwin
 
 /// Default macOS storage engine providing unified filesystem abstraction across APFS, exFAT, NTFS, and FAT
@@ -6,11 +7,13 @@ import Darwin
 public final class DefaultFileSystemProvider: FileSystemProvider, Sendable {
 
     private let registry: FileSystemDriverRegistry
+    public let fastCDCEngine: FastCDCEngine
 
     /// Initializes a new `DefaultFileSystemProvider` instance.
     /// - Parameter registry: Driver registry to use for driver resolution (defaults to `FileSystemDriverRegistry.shared`).
-    public init(registry: FileSystemDriverRegistry = .shared) {
+    public init(registry: FileSystemDriverRegistry = .shared, fastCDCEngine: FastCDCEngine = FastCDCEngine()) {
         self.registry = registry
+        self.fastCDCEngine = fastCDCEngine
     }
 
     // MARK: - Capabilities & Metrics
@@ -121,5 +124,62 @@ public final class DefaultFileSystemProvider: FileSystemProvider, Sendable {
     /// - Returns: True if immutable.
     public func isFileImmutable(at url: URL) throws -> Bool {
         try registry.driver(for: url).isFileImmutable(at: url)
+    }
+}
+
+import OtterKeepApplication
+
+// MARK: - Clean Architecture FileSystemPort Conformance
+extension DefaultFileSystemProvider: FileSystemPort {
+    public func fileExists(at url: URL) -> Bool {
+        FileManager.default.fileExists(atPath: url.path)
+    }
+
+    public func isDirectory(at url: URL) -> Bool {
+        var isDir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue
+    }
+
+    public func cloneFile(source: URL, destination: URL) throws {
+        if clonefile(source.path, destination.path, 0) != 0 {
+            let err = errno
+            if err == EXDEV || err == ENOTSUP {
+                try hardlink(source: source, destination: destination)
+            } else {
+                throw FileSystemError.cloneFailed(path: destination.path, errno: err, message: String(cString: strerror(err)))
+            }
+        }
+    }
+
+    public func hardlink(source: URL, destination: URL) throws {
+        if link(source.path, destination.path) != 0 {
+            let err = errno
+            throw FileSystemError.hardLinkFailed(path: destination.path, errno: err, message: String(cString: strerror(err)))
+        }
+    }
+
+    public func move(from source: URL, to destination: URL) throws {
+        if rename(source.path, destination.path) != 0 {
+            let err = errno
+            throw FileSystemError.atomicMoveFailed(source: source.path, destination: destination.path, errno: err, message: String(cString: strerror(err)))
+        }
+    }
+
+    public func remove(at url: URL) throws {
+        try removeItem(at: url)
+    }
+
+    // MARK: - FastCDC Variable-Block Deduplication
+
+    /// Deduplicates and stores content using FastCDC variable block chunking into a CAS repository.
+    public func deduplicateAndStore(sourceURL: URL, casRootURL: URL) throws -> [String] {
+        let chunks = try fastCDCEngine.chunk(fileURL: sourceURL)
+        try fastCDCEngine.store(chunks: chunks, in: casRootURL)
+        return chunks.map { $0.sha256 }
+    }
+
+    /// Reconstructs a file from chunk hashes stored in CAS repository.
+    public func reconstructFromChunks(chunkHashes: [String], casRootURL: URL, destinationURL: URL) throws {
+        try fastCDCEngine.reconstruct(chunkHashes: chunkHashes, from: casRootURL, to: destinationURL)
     }
 }

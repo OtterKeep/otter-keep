@@ -1,11 +1,9 @@
-import SwiftUI
 import AppKit
 import Observation
-import Photos
-import UniformTypeIdentifiers
-import OtterKeepStorage
-import OtterKeepDatabase
 import OtterKeepCore
+import Photos
+import SwiftUI
+import UniformTypeIdentifiers
 
 extension AppState {
     // MARK: - Software Updates Management
@@ -23,6 +21,11 @@ extension AppState {
     }
 
     public func checkForSoftwareUpdates(silent: Bool = false) {
+        if !silent, let native = onCheckForUpdatesNative {
+            native()
+            return
+        }
+
         guard !isCheckingForSoftwareUpdates else { return }
         isCheckingForSoftwareUpdates = true
         if !silent {
@@ -70,10 +73,25 @@ extension AppState {
         }
     }
 
+    /// Triggers a backup initiated via deep link URL schemes (e.g. `otterkeep://backup` or `otterkeep://start-backup?profile=Name`).
+    public func triggerBackupFromURL(profileName: String?) {
+        if let name = profileName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty,
+            let match = profiles.first(where: {
+                $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame || $0.id.uuidString.lowercased() == name.lowercased()
+            })
+        {
+            startBackup(for: match)
+        } else {
+            startBackup(for: selectedProfile ?? profiles.first)
+        }
+    }
+
     public func startBackup(for profileToBackup: BackupProfile? = nil, mode: BackupMode = .incremental) {
         guard let profile = profileToBackup ?? selectedProfile else { return }
         guard !isBackupRunning(for: profile.id) else {
-            LogManager.shared.log("Backup already in progress for profile '\(profile.name)' [UUID: \(profile.id.uuidString)] - skipping duplicate launch.", level: .warning, category: "UI")
+            LogManager.shared.log(
+                "Backup already in progress for profile '\(profile.name)' [UUID: \(profile.id.uuidString)] - skipping duplicate launch.", level: .warning,
+                category: "UI")
             return
         }
 
@@ -83,14 +101,7 @@ extension AppState {
         refreshLogs()
 
         // Create dedicated, isolated session coordinator and SQLite database to support zero-contention parallel backups
-        let sessionDb = DatabaseEngine()
-        let sessionRetention = RetentionManager(storage: self.storage, database: sessionDb)
-        let sessionCoordinator = BackupSessionCoordinator(
-            storage: self.storage,
-            database: sessionDb,
-            retentionManager: sessionRetention,
-            volumeEjector: SystemVolumeEjector()
-        )
+        let sessionCoordinator = self.engines.makeBackupSessionCoordinator()
 
         let task = Task { [weak self] in
             guard let self = self else { return }
@@ -117,7 +128,8 @@ extension AppState {
                     self.saveProfiles()
                 }
 
-                LogManager.shared.log("Backup completed successfully for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]\(modeTag)", level: .info, category: "UI")
+                LogManager.shared.log(
+                    "Backup completed successfully for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]\(modeTag)", level: .info, category: "UI")
                 self.refreshLogs()
                 self.loadSnapshots()
 
@@ -144,7 +156,9 @@ extension AppState {
                 self.activeBackupTasks.removeValue(forKey: profile.id)
                 self.profileProgressStates[profile.id] = BackupProgressState(phase: .failed)
                 NotificationDeliveryService.shared.notifyBackupFailed(profileName: profile.name, errorMessage: error.localizedDescription)
-                LogManager.shared.log("Backup failed for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]: \(error.localizedDescription)", level: .error, category: "UI")
+                LogManager.shared.log(
+                    "Backup failed for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]: \(error.localizedDescription)", level: .error, category: "UI"
+                )
                 self.refreshLogs()
 
                 let analyzed = Self.analyzeBackupError(error, destinationURL: profile.destinationURL, sourceURL: profile.sourceURL)
@@ -153,6 +167,8 @@ extension AppState {
                     title: analyzed.title,
                     message: analyzed.message,
                     detailedReason: analyzed.detailedReason,
+                    guaranteeText: analyzed.guaranteeText,
+                    recoveryAction: analyzed.recoveryAction,
                     profileName: profile.name
                 )
                 self.showFeedbackModal = true
@@ -184,7 +200,12 @@ extension AppState {
     }
 
     /// Analyzes backup failure errors to produce precise, non-misleading user guidance.
-    public static func analyzeBackupError(_ error: Error, destinationURL: URL?, sourceURL: URL?) -> (title: String, message: String, detailedReason: String) {
+    ///
+    /// Every branch fills all three parts of the error architecture: what happened (`title`/`message`),
+    /// the sanctuary guarantee (`guaranteeText`), and the restorative pathway (`recoveryAction`).
+    public static func analyzeBackupError(_ error: Error, destinationURL: URL?, sourceURL: URL?) -> (
+        title: String, message: String, detailedReason: String, guaranteeText: String, recoveryAction: RecoveryAction
+    ) {
         let errorDesc = error.localizedDescription
 
         // 1. External drive disconnected or destination directory vanished
@@ -192,7 +213,9 @@ extension AppState {
             return (
                 title: L10n.t(.feedbackExternalDriveMissingTitle),
                 message: L10n.format(.feedbackExternalDriveMissingMessage, dest.lastPathComponent),
-                detailedReason: L10n.t(.feedbackExternalDriveMissingAdvice)
+                detailedReason: L10n.t(.feedbackExternalDriveMissingAdvice),
+                guaranteeText: L10n.t(.feedbackGuaranteeSnapshotsSafe),
+                recoveryAction: RecoveryAction(kind: .viewLogs, label: L10n.t(.recoveryViewLogs))
             )
         }
 
@@ -201,29 +224,33 @@ extension AppState {
             return (
                 title: L10n.t(.feedbackSourceFolderMissingTitle),
                 message: L10n.format(.feedbackSourceFolderMissingMessage, src.lastPathComponent),
-                detailedReason: L10n.t(.feedbackSourceFolderMissingAdvice)
+                detailedReason: L10n.t(.feedbackSourceFolderMissingAdvice),
+                guaranteeText: L10n.t(.feedbackGuaranteeNothingModified),
+                recoveryAction: RecoveryAction(kind: .viewLogs, label: L10n.t(.recoveryViewLogs))
             )
         }
 
         // 3. Insufficient disk space
-        if errorDesc.localizedCaseInsensitiveContains("space") ||
-           errorDesc.localizedCaseInsensitiveContains("No space left") ||
-           (error as NSError).code == 28 {
+        if errorDesc.localizedCaseInsensitiveContains("space") || errorDesc.localizedCaseInsensitiveContains("No space left") || (error as NSError).code == 28 {
             return (
                 title: L10n.t(.feedbackDiskFullTitle),
                 message: L10n.t(.feedbackDiskFullMessage),
-                detailedReason: L10n.t(.feedbackDiskFullAdvice)
+                detailedReason: L10n.t(.feedbackDiskFullAdvice),
+                guaranteeText: L10n.t(.feedbackGuaranteeSnapshotsSafe),
+                recoveryAction: RecoveryAction(kind: .viewLogs, label: L10n.t(.recoveryViewLogs))
             )
         }
 
         // 4. macOS Full Disk Access or filesystem permission denied
-        if errorDesc.localizedCaseInsensitiveContains("permission") ||
-           errorDesc.localizedCaseInsensitiveContains("Permission denied") ||
-           (error as NSError).code == 13 {
+        if errorDesc.localizedCaseInsensitiveContains("permission") || errorDesc.localizedCaseInsensitiveContains("Permission denied")
+            || (error as NSError).code == 13
+        {
             return (
                 title: L10n.t(.feedbackPermissionDeniedTitle),
                 message: L10n.t(.feedbackPermissionDeniedMessage),
-                detailedReason: L10n.t(.feedbackPermissionDeniedAdvice)
+                detailedReason: L10n.t(.feedbackPermissionDeniedAdvice),
+                guaranteeText: L10n.t(.feedbackGuaranteeNothingModified),
+                recoveryAction: RecoveryAction(kind: .openFullDiskAccess, label: L10n.t(.recoveryOpenFullDiskAccess))
             )
         }
 
@@ -231,7 +258,9 @@ extension AppState {
         return (
             title: L10n.t(.feedbackGeneralErrorTitle),
             message: errorDesc,
-            detailedReason: L10n.t(.feedbackGeneralErrorAdvice)
+            detailedReason: L10n.t(.feedbackGeneralErrorAdvice),
+            guaranteeText: L10n.t(.feedbackGuaranteeSnapshotsSafe),
+            recoveryAction: RecoveryAction(kind: .viewLogs, label: L10n.t(.recoveryViewLogs))
         )
     }
 
@@ -240,30 +269,35 @@ extension AppState {
 
         isDryRunRunning = true
         let modeTag = mode == .full ? " (FULL)" : " (Incremental)"
-        LogManager.shared.log("Pre-backup analysis (Dry-Run\(modeTag)) started for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]", level: .info, category: "UI")
+        LogManager.shared.log(
+            "Pre-backup analysis (Dry-Run\(modeTag)) started for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]", level: .info, category: "UI")
         refreshLogs()
 
         Task { [weak self] in
             guard let self = self else { return }
             do {
-                let summary = try await self.coordinator.performDryRun(profile: profile, mode: mode)
+                let dryRunCoordinator = self.engines.makeBackupSessionCoordinator()
+                let summary = try await dryRunCoordinator.performDryRun(profile: profile, mode: mode)
                 Task { @MainActor in
                     self.isDryRunRunning = false
                     self.dryRunSummary = summary
                     self.showDryRunModal = true
-                    LogManager.shared.log("Dry-Run completed for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]: Added: \(summary.addedCount) files (\(summary.addedBytes) bytes), Modified: \(summary.modifiedCount) files (\(summary.modifiedBytes) bytes), Deleted: \(summary.deletedCount) files, Unmodified (CoW): \(summary.unmodifiedCount) files, Estimated new storage: \(summary.estimatedNewBytes) bytes.", level: .info, category: "UI")
+                    LogManager.shared.log(
+                        "Dry-Run completed for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]: Added: \(summary.addedCount) files (\(summary.addedBytes) bytes), Modified: \(summary.modifiedCount) files (\(summary.modifiedBytes) bytes), Deleted: \(summary.deletedCount) files, Unmodified (CoW): \(summary.unmodifiedCount) files, Estimated new storage: \(summary.estimatedNewBytes) bytes.",
+                        level: .info, category: "UI")
                     self.refreshLogs()
                 }
             } catch {
                 Task { @MainActor in
                     self.isDryRunRunning = false
-                    LogManager.shared.log("Dry-Run analysis failed for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]: \(error.localizedDescription)", level: .error, category: "UI")
+                    LogManager.shared.log(
+                        "Dry-Run analysis failed for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]: \(error.localizedDescription)", level: .error,
+                        category: "UI")
                     self.refreshLogs()
                     self.showError(error.localizedDescription)
                 }
             }
         }
     }
-
 
 }

@@ -39,6 +39,45 @@ public struct StorageGaugeBar: View {
         CGFloat(freeBytes) / CGFloat(totalBytes)
     }
 
+    /// Gap between gauge segments, in points.
+    private static let segmentSpacing: CGFloat = 2
+
+    /// Minimum visible width of a segment, in points.
+    private static let minimumSegmentWidth: CGFloat = 3
+
+    struct GaugeSegment: Equatable {
+        let width: CGFloat
+        let color: Color
+    }
+
+    /// Distributes the available track width across the visible segments.
+    ///
+    /// Segment widths are derived from the track width minus the inter-segment gaps, so the row can
+    /// never overflow the track. Segments below the visibility threshold are dropped and their
+    /// share is redistributed, which keeps the bar flush with the track at every width.
+    func segmentWidths(for trackWidth: CGFloat) -> [GaugeSegment] {
+        let candidates: [(ratio: CGFloat, color: Color)] = [
+            (backupRatio, OtterTheme.storageBackups),
+            (otherRatio, OtterTheme.storageOther),
+            (freeRatio, Color.primary.opacity(0.08)),
+        ]
+        let visible = candidates.filter { $0.ratio > 0.005 }
+        guard !visible.isEmpty, trackWidth > 0 else { return [] }
+
+        let totalGap = Self.segmentSpacing * CGFloat(visible.count - 1)
+        let usableWidth = max(trackWidth - totalGap, 0)
+        let totalRatio = visible.reduce(CGFloat.zero) { $0 + $1.ratio }
+        guard totalRatio > 0 else { return [] }
+
+        var widths = visible.map { max(usableWidth * ($0.ratio / totalRatio), Self.minimumSegmentWidth) }
+        let overflow = widths.reduce(CGFloat.zero, +) - usableWidth
+        if overflow > 0, let widest = widths.indices.max(by: { widths[$0] < widths[$1] }) {
+            widths[widest] = max(widths[widest] - overflow, Self.minimumSegmentWidth)
+        }
+
+        return zip(visible, widths).map { GaugeSegment(width: $1, color: $0.color) }
+    }
+
     public var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             // Header: Title & Total Capacity
@@ -64,56 +103,59 @@ public struct StorageGaugeBar: View {
 
             // Segmented Storage Bar
             GeometryReader { geo in
-                let width = geo.size.width
-                HStack(spacing: 2) {
-                    // Backup Bytes Segment
-                    if backupRatio > 0.005 {
+                let segments = segmentWidths(for: geo.size.width)
+                HStack(spacing: Self.segmentSpacing) {
+                    ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
                         RoundedRectangle(cornerRadius: 3, style: .continuous)
-                            .fill(OtterTheme.storageBackups)
-                            .frame(width: max(width * backupRatio - 2, 4))
-                    }
-
-                    // Other System Files Segment
-                    if otherRatio > 0.005 {
-                        RoundedRectangle(cornerRadius: 3, style: .continuous)
-                            .fill(OtterTheme.storageOther)
-                            .frame(width: max(width * otherRatio - 2, 4))
-                    }
-
-                    // Free Disk Space Segment
-                    if freeRatio > 0.005 {
-                        RoundedRectangle(cornerRadius: 3, style: .continuous)
-                            .fill(Color.primary.opacity(0.08))
-                            .frame(width: max(width * freeRatio - 2, 4))
+                            .fill(segment.color)
+                            .frame(width: segment.width)
                     }
                 }
+                .frame(width: geo.size.width, alignment: .leading)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             }
             .frame(height: 8)
             .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
 
             // Legend Row
-            HStack(spacing: 16) {
-                legendItem(
-                    color: OtterTheme.storageBackups,
-                    label: L10n.t(.storageBackupsLabel),
-                    bytes: backupBytes
-                )
-
-                legendItem(
-                    color: OtterTheme.storageOther,
-                    label: L10n.t(.storageOtherLabel),
-                    bytes: otherBytes
-                )
-
-                legendItem(
-                    color: Color.secondary.opacity(0.5),
-                    label: L10n.t(.storageFreeLabel),
-                    bytes: freeBytes
-                )
-
-                Spacer(minLength: 0)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 16) {
+                    legendContent
+                    Spacer(minLength: 0)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 12) {
+                        legendItem(color: OtterTheme.storageBackups, label: L10n.t(.storageBackupsLabel), bytes: backupBytes)
+                        legendItem(color: OtterTheme.storageOther, label: L10n.t(.storageOtherLabel), bytes: otherBytes)
+                    }
+                    legendItem(color: Color.secondary.opacity(0.5), label: L10n.t(.storageFreeLabel), bytes: freeBytes)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    legendContent
+                }
             }
         }
+    }
+
+    @ViewBuilder
+    private var legendContent: some View {
+        legendItem(
+            color: OtterTheme.storageBackups,
+            label: L10n.t(.storageBackupsLabel),
+            bytes: backupBytes
+        )
+
+        legendItem(
+            color: OtterTheme.storageOther,
+            label: L10n.t(.storageOtherLabel),
+            bytes: otherBytes
+        )
+
+        legendItem(
+            color: Color.secondary.opacity(0.5),
+            label: L10n.t(.storageFreeLabel),
+            bytes: freeBytes
+        )
     }
 
     private func legendItem(color: Color, label: String, bytes: Int64) -> some View {
@@ -125,10 +167,12 @@ public struct StorageGaugeBar: View {
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
 
             Text(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
                 .font(.caption2.monospacedDigit().bold())
                 .foregroundStyle(.primary)
+                .lineLimit(1)
         }
     }
 }

@@ -1,7 +1,6 @@
-import SwiftUI
 import AppKit
-import OtterKeepStorage
 import OtterKeepCore
+import SwiftUI
 
 extension ProfileRulesView {
     // MARK: - 1. Folder Overview Header
@@ -28,15 +27,6 @@ extension ProfileRulesView {
             }
 
             Spacer()
-
-            Button {
-                appState.activeProfileTab = .overview
-            } label: {
-                Label(L10n.t(.tabOverview), systemImage: "gauge.with.needle")
-                    .font(.caption.weight(.medium))
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
         .padding(14)
         .background(.background.secondary, in: RoundedRectangle(cornerRadius: 12))
@@ -55,23 +45,26 @@ extension ProfileRulesView {
                     .frame(width: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(profile.icloudStrategy.localizedTitle)
-                        .font(.body.weight(.medium))
-                    Text(profile.icloudStrategy.localizedDescription)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Text(profile.icloudStrategy.localizedTitle)
+                            .font(.body.weight(.medium))
+                        InfoTooltipView(profile.icloudStrategy.localizedDescription)
+                    }
                 }
 
                 Spacer()
 
-                Picker("", selection: Binding(
-                    get: { profile.icloudStrategy },
-                    set: { strat in
-                        var updated = profile
-                        updated.icloudStrategy = strat
-                        appState.selectedProfile = updated
-                    }
-                )) {
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { profile.icloudStrategy },
+                        set: { strat in
+                            var updated = profile
+                            updated.icloudStrategy = strat
+                            appState.selectedProfile = updated
+                        }
+                    )
+                ) {
                     ForEach(ICloudBackupStrategy.allCases, id: \.self) { strat in
                         Text(strat.localizedTitle).tag(strat)
                     }
@@ -141,6 +134,23 @@ extension ProfileRulesView {
                     }
                 }
 
+                // Technology Stack Presets
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L10n.t(.presetExclusionsTitle))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    FlowLayout(spacing: OtterTheme.spacing6) {
+                        ForEach(ExclusionPreset.allCases) { preset in
+                            stackPresetChip(
+                                title: preset.localizedTitle,
+                                patterns: preset.patterns,
+                                profile: profile
+                            )
+                        }
+                    }
+                }
+
                 Divider()
 
                 // Active exclusion tags
@@ -166,6 +176,7 @@ extension ProfileRulesView {
                                 }
                                 .buttonStyle(.plain)
                                 .foregroundStyle(.secondary)
+                                .accessibilityLabel(L10n.t(.removeExclusionButton))
                             }
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -178,39 +189,39 @@ extension ProfileRulesView {
 
                 // Ignore files and markers engine toggles
                 VStack(alignment: .leading, spacing: 8) {
-                    Toggle(isOn: Binding(
-                        get: { profile.enableIgnoreFiles },
-                        set: { val in
-                            var updated = profile
-                            updated.enableIgnoreFiles = val
-                            appState.selectedProfile = updated
-                        }
-                    )) {
-                        VStack(alignment: .leading, spacing: 2) {
+                    Toggle(
+                        isOn: Binding(
+                            get: { profile.enableIgnoreFiles },
+                            set: { val in
+                                var updated = profile
+                                updated.enableIgnoreFiles = val
+                                appState.selectedProfile = updated
+                            }
+                        )
+                    ) {
+                        HStack(spacing: 6) {
                             Text(L10n.t(.enableIgnoreFilesToggle))
                                 .font(.body.weight(.medium))
-                            Text(L10n.t(.enableIgnoreFilesDesc))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            InfoTooltipView(L10n.t(.enableIgnoreFilesDesc))
                         }
                     }
                     .toggleStyle(.checkbox)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Toggle(isOn: Binding(
-                        get: { profile.respectGitIgnore },
-                        set: { val in
-                            var updated = profile
-                            updated.respectGitIgnore = val
-                            appState.selectedProfile = updated
-                        }
-                    )) {
-                        VStack(alignment: .leading, spacing: 2) {
+                    Toggle(
+                        isOn: Binding(
+                            get: { profile.respectGitIgnore },
+                            set: { val in
+                                var updated = profile
+                                updated.respectGitIgnore = val
+                                appState.selectedProfile = updated
+                            }
+                        )
+                    ) {
+                        HStack(spacing: 6) {
                             Text(L10n.t(.respectGitIgnoreToggle))
                                 .font(.body)
-                            Text(L10n.t(.respectGitIgnoreDesc))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            InfoTooltipView(L10n.t(.respectGitIgnoreDesc))
                         }
                     }
                     .toggleStyle(.checkbox)
@@ -224,5 +235,25 @@ extension ProfileRulesView {
         }
     }
 
+    private func stackPresetChip(title: String, patterns: [String], profile: BackupProfile) -> some View {
+        let allAdded = patterns.allSatisfy { profile.excludePatterns.contains($0) }
+        return Button {
+            for p in patterns where !profile.excludePatterns.contains(p) {
+                appState.addExcludePattern(p)
+            }
+        } label: {
+            HStack(spacing: 4) {
+                if allAdded {
+                    Image(systemName: "checkmark")
+                        .font(.caption2)
+                }
+                Text(title)
+            }
+            .font(.caption)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .disabled(allAdded)
+    }
 
 }

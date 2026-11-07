@@ -1,6 +1,6 @@
 import SwiftUI
 import QuickLook
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 /// Visual diff and change log browser comparing files between two backup snapshots.
@@ -277,6 +277,7 @@ public struct SnapshotDiffView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    .accessibilityLabel(L10n.t(.clearSearchButton))
                     .buttonStyle(.plain)
                 }
             }

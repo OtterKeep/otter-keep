@@ -3,8 +3,6 @@ import AppKit
 import Observation
 import Photos
 import UniformTypeIdentifiers
-import OtterKeepStorage
-import OtterKeepDatabase
 import OtterKeepCore
 
 extension AppState {
@@ -224,6 +222,7 @@ extension AppState {
 
     // MARK: - Profile Operations
 
+    @discardableResult
     public func createProfile(
         name: String,
         sourceURL: URL? = nil,
@@ -232,10 +231,12 @@ extension AppState {
         enableIgnoreFiles: Bool = true,
         respectGitIgnore: Bool = false,
         backupOnVolumeMount: Bool = false,
-        autoEjectOnCompletion: Bool = false
-    ) {
+        autoEjectOnCompletion: Bool = false,
+        executionMode: BackupExecutionMode? = nil,
+        encryptionPassphrase: String? = nil
+    ) -> BackupProfile? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty else { return nil }
         let defaultSource = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents")
         let defaultDest = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("OtterKeep_Backups_\(trimmed.replacingOccurrences(of: " ", with: "_"))")
 
@@ -244,10 +245,25 @@ extension AppState {
 
         guard validateFolderPair(sourceURL: effectiveSource, destinationURL: effectiveDest) else {
             showError(L10n.t(.invalidFolderSelectionMessage))
-            return
+            return nil
+        }
+
+        var encConfig: LocalEncryptionConfiguration? = nil
+        let cleanPassphrase = encryptionPassphrase?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasEncryption = cleanPassphrase != nil && !(cleanPassphrase!.isEmpty)
+
+        let newProfileId = UUID()
+        if hasEncryption, let secret = cleanPassphrase {
+            encConfig = LocalEncryptionConfiguration(
+                isEnabled: true,
+                keychainKeyIdentifier: newProfileId.uuidString,
+                containerName: "OtterKeepSanctuary"
+            )
+            try? KeychainManager.savePassphrase(secret, for: newProfileId, requireSecureEnclave: self.useSecureEnclaveForKeychain)
         }
 
         let newProfile = BackupProfile(
+            id: newProfileId,
             name: trimmed,
             sourceURL: effectiveSource,
             destinationURL: effectiveDest,
@@ -255,21 +271,28 @@ extension AppState {
             enableIgnoreFiles: enableIgnoreFiles,
             respectGitIgnore: respectGitIgnore,
             backupOnVolumeMount: backupOnVolumeMount,
-            autoEjectOnCompletion: autoEjectOnCompletion
+            autoEjectOnCompletion: autoEjectOnCompletion,
+            executionMode: executionMode ?? .scheduled(BackupSchedule()),
+            encryptionConfig: encConfig
         )
         profiles.append(newProfile)
         selectedProfileId = newProfile.id
         saveProfiles()
         refreshVolumeEvaluation()
         loadSnapshots()
-        LogManager.shared.log("New profile created: '\(trimmed)' [UUID: \(newProfile.id.uuidString)] (Source: '\(newProfile.sourceURL.path)', Dest: '\(newProfile.destinationURL.path)')", level: .info, category: "Profile")
+        LogManager.shared.log("New profile created: '\(trimmed)' [UUID: \(newProfile.id.uuidString)] (Encrypted: \(hasEncryption))", level: .info, category: "Profile")
         refreshLogs()
+        return newProfile
     }
 
-    public func createProfileFromDraft() {
+    @discardableResult
+    public func createProfileFromDraft(encryptionPassphrase: String? = nil) -> BackupProfile? {
         let trimmed = newProfileName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        createProfile(
+        guard !trimmed.isEmpty else { return nil }
+        let execMode: BackupExecutionMode = newProfileIsContinuous
+            ? .continuous(debouncingSeconds: newProfileDebouncingSeconds)
+            : .scheduled(BackupSchedule())
+        return createProfile(
             name: trimmed,
             sourceURL: newProfileSourceURL,
             destinationURL: newProfileDestinationURL,
@@ -277,7 +300,9 @@ extension AppState {
             enableIgnoreFiles: newProfileEnableIgnoreFiles,
             respectGitIgnore: newProfileRespectGitIgnore,
             backupOnVolumeMount: newProfileBackupOnVolumeMount,
-            autoEjectOnCompletion: newProfileAutoEjectOnCompletion
+            autoEjectOnCompletion: newProfileAutoEjectOnCompletion,
+            executionMode: execMode,
+            encryptionPassphrase: encryptionPassphrase
         )
     }
 

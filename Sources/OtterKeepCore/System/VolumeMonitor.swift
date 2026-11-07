@@ -161,6 +161,79 @@ public enum VolumeCapabilityEvaluator {
     }
 }
 
+/// Zero-configuration adoption and drive rotation metadata stamped on external backup storage targets.
+public struct DriveProfileMetadata: Codable, Sendable, Equatable {
+    public static let fileName = ".otterkeep_profile_meta.json"
+
+    public let profileId: UUID
+    public let profileName: String
+    public let sourceRelativePath: String
+    public let excludePatterns: [String]
+    public let isContinuous: Bool
+    public let createdAt: Date
+    public let sanctuaryVersion: String
+
+    public init(
+        profileId: UUID,
+        profileName: String,
+        sourceRelativePath: String = "Documents",
+        excludePatterns: [String] = [],
+        isContinuous: Bool = false,
+        createdAt: Date = Date(),
+        sanctuaryVersion: String = CoreEngine.version
+    ) {
+        self.profileId = profileId
+        self.profileName = profileName
+        self.sourceRelativePath = sourceRelativePath
+        self.excludePatterns = excludePatterns
+        self.isContinuous = isContinuous
+        self.createdAt = createdAt
+        self.sanctuaryVersion = sanctuaryVersion
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case profileId, profileName, sourceRelativePath, excludePatterns, isContinuous, createdAt, sanctuaryVersion
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.profileId = try container.decode(UUID.self, forKey: .profileId)
+        self.profileName = try container.decode(String.self, forKey: .profileName)
+        self.sourceRelativePath = try container.decodeIfPresent(String.self, forKey: .sourceRelativePath) ?? "Documents"
+        self.excludePatterns = try container.decodeIfPresent([String].self, forKey: .excludePatterns) ?? []
+        self.isContinuous = try container.decodeIfPresent(Bool.self, forKey: .isContinuous) ?? false
+        self.createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        self.sanctuaryVersion = try container.decodeIfPresent(String.self, forKey: .sanctuaryVersion) ?? CoreEngine.version
+    }
+
+    /// Writes profile metadata to the target destination folder.
+    public static func write(for profile: BackupProfile, to destinationURL: URL) {
+        let relSource = profile.sourceURL.lastPathComponent
+        let meta = DriveProfileMetadata(
+            profileId: profile.id,
+            profileName: profile.name,
+            sourceRelativePath: relSource,
+            excludePatterns: profile.excludePatterns,
+            isContinuous: profile.executionMode.isContinuous
+        )
+        let fileURL = destinationURL.appendingPathComponent(fileName)
+        if let data = try? JSONEncoder().encode(meta) {
+            try? data.write(to: fileURL, options: .atomic)
+        }
+    }
+
+    /// Reads profile metadata from a given root or folder URL.
+    public static func read(from folderURL: URL) -> DriveProfileMetadata? {
+        let fileURL = folderURL.appendingPathComponent(fileName)
+        guard FileManager.default.fileExists(atPath: fileURL.path(percentEncoded: false)),
+              let data = try? Data(contentsOf: fileURL),
+              let meta = try? JSONDecoder().decode(DriveProfileMetadata.self, from: data) else {
+            return nil
+        }
+        return meta
+    }
+}
+
 /// Thread-safe monitor listening to macOS volume mount and unmount notifications.
 public final class VolumeMonitor: @unchecked Sendable {
     /// Shared singleton instance.
@@ -172,10 +245,14 @@ public final class VolumeMonitor: @unchecked Sendable {
     /// Handler closure invoked when an automated backup trigger is requested for a profile.
     public typealias AutoBackupTriggerHandler = @Sendable (_ profile: BackupProfile) -> Void
 
+    /// Handler closure invoked when an external volume with an unadopted profile is discovered.
+    public typealias UnadoptedDriveHandler = @Sendable (_ metadata: DriveProfileMetadata, _ volumeURL: URL) -> Void
+
     private let lock = NSLock()
     private let observer: VolumeObserving
     private var handlers: [VolumeChangeHandler] = []
     private var autoBackupHandler: AutoBackupTriggerHandler?
+    private var unadoptedDriveHandler: UnadoptedDriveHandler?
     private var lastTriggeredPerVolume: [String: Date] = [:]
 
     /// Creates a monitor driven by the given platform observer.
@@ -204,24 +281,57 @@ public final class VolumeMonitor: @unchecked Sendable {
         autoBackupHandler = handler
     }
 
+    /// Sets the handler invoked when a mounted volume carries an unadopted profile metadata tag.
+    public func setUnadoptedDriveHandler(_ handler: @escaping UnadoptedDriveHandler) {
+        lock.lock()
+        defer { lock.unlock() }
+        unadoptedDriveHandler = handler
+    }
+
+    private func currentAutoBackupHandler() -> AutoBackupTriggerHandler? {
+        lock.lock()
+        defer { lock.unlock() }
+        return autoBackupHandler
+    }
+
+    private func currentUnadoptedDriveHandler() -> UnadoptedDriveHandler? {
+        lock.lock()
+        defer { lock.unlock() }
+        return unadoptedDriveHandler
+    }
+
     /// Evaluates whether a mounted volume corresponds to any profile's destination with mount trigger enabled.
+    /// Supports direct path matches, registered multi-drive rotation volume UUIDs, and zero-config adoption tags.
     /// Enforces a cooldown (default: 15 minutes / 900 seconds) to prevent redundant runs.
     public func evaluateMountForAutoBackup(
         mountedURL: URL,
         profiles: [BackupProfile],
         cooldownSeconds: TimeInterval = 900
     ) -> [BackupProfile] {
-        lock.lock()
-        defer { lock.unlock() }
-
         let mountedPath = BackupProfile.canonicalizePath(mountedURL.standardizedFileURL.path(percentEncoded: false))
+
+        // Filesystem and metadata reads happen outside the lock: they can block for a long time on
+        // a slow or unresponsive external volume and must not stall other monitor callers.
+        let volumeUUID = (try? mountedURL.resourceValues(forKeys: [.volumeUUIDStringKey]))?.volumeUUIDString
+        let rootMeta = DriveProfileMetadata.read(from: mountedURL)
+
         var triggeredProfiles: [BackupProfile] = []
         let now = Date()
 
+        lock.lock()
+        defer { lock.unlock() }
+
         for profile in profiles where profile.backupOnVolumeMount {
             let destPath = BackupProfile.canonicalizePath(profile.destinationURL.standardizedFileURL.path(percentEncoded: false))
-            let matches = destPath == mountedPath || destPath.hasPrefix(mountedPath + "/")
-            if matches {
+            let pathMatches = destPath == mountedPath || destPath.hasPrefix(mountedPath + "/")
+
+            // Check multi-drive rotation UUID match
+            let uuidMatches = volumeUUID.map { profile.destinationVolumeUUIDs.contains($0) } ?? false
+
+            // Check zero-config adoption tag match
+            let metaMatches = rootMeta?.profileId == profile.id
+
+            if pathMatches || uuidMatches || metaMatches {
                 let cacheKey = "\(profile.id.uuidString)_\(mountedPath)"
                 if let lastDate = lastTriggeredPerVolume[cacheKey], now.timeIntervalSince(lastDate) < cooldownSeconds {
                     LogManager.shared.log("Skipping mount backup trigger for '\(profile.name)': Cooldown active (\(Int(now.timeIntervalSince(lastDate)))s elapsed).", level: .debug, category: "Storage")
@@ -241,10 +351,20 @@ public final class VolumeMonitor: @unchecked Sendable {
         cooldownSeconds: TimeInterval = 900
     ) {
         let matching = evaluateMountForAutoBackup(mountedURL: mountedURL, profiles: profiles, cooldownSeconds: cooldownSeconds)
+        let autoBackupHandler = currentAutoBackupHandler()
         for profile in matching {
             LogManager.shared.log("Mounted volume '\(mountedURL.lastPathComponent)' matched profile '\(profile.name)'. Initiating automatic backup...", level: .info, category: "Storage")
             NotificationDeliveryService.shared.notifyVolumeMountTrigger(profileName: profile.name, volumeName: mountedURL.lastPathComponent)
             autoBackupHandler?(profile)
+        }
+
+        // Check for unadopted profile metadata tag
+        if let rootMeta = DriveProfileMetadata.read(from: mountedURL) {
+            let alreadyKnown = profiles.contains(where: { $0.id == rootMeta.profileId })
+            if !alreadyKnown {
+                LogManager.shared.log("Unadopted profile metadata found on '\(mountedURL.lastPathComponent)': '\(rootMeta.profileName)' [UUID: \(rootMeta.profileId.uuidString)].", level: .info, category: "Storage")
+                currentUnadoptedDriveHandler()?(rootMeta, mountedURL)
+            }
         }
     }
 
@@ -264,6 +384,10 @@ public final class VolumeMonitor: @unchecked Sendable {
                 guard let self = self else { return }
                 LogManager.shared.log("Volume mounted: \(mountedURL?.path ?? "unknown")", level: .info, category: "Storage")
                 self.notifyHandlers(with: mountedURL)
+                if let url = mountedURL {
+                    let profiles = ProfileStore.shared.loadProfiles()
+                    self.handleMountedVolume(url, profiles: profiles)
+                }
             },
             onUnmount: { [weak self] unmountedURL in
                 guard let self = self else { return }

@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 import OtterKeepCore
-import OtterKeepDatabase
+import OtterKeepDomain
 
 /// Modal dialog providing side-by-side visual file comparison between two backup snapshots.
 public struct SideBySideDiffModalView: View {

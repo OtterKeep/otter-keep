@@ -140,7 +140,7 @@ public actor WebhookDispatcher {
 
         let shouldSend: Bool
         switch payload.status {
-        case "success":
+        case "success", "completed":
             shouldSend = config.notifyOnSuccess
         case "completed_with_warnings":
             shouldSend = config.notifyOnWarning
@@ -199,7 +199,7 @@ public actor WebhookDispatcher {
         let statusEmoji: String
         let statusTitle: String
         switch payload.status {
-        case "success":
+        case "success", "completed":
             statusEmoji = "✅"
             statusTitle = "Backup Completed"
         case "completed_with_warnings":

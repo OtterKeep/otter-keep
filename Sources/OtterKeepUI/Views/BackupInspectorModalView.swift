@@ -98,6 +98,7 @@ public struct BackupInspectorModalView: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(L10n.t(.closeButton))
         }
         .padding()
         .background(.ultraThinMaterial)
@@ -288,6 +289,7 @@ public struct BackupInspectorModalView: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(L10n.t(.clearSearchButton))
                 }
             }
             .padding(8)

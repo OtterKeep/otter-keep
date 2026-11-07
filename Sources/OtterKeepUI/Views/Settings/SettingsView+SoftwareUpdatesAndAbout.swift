@@ -63,10 +63,10 @@ extension SettingsView {
             if let update = appState.softwareUpdateAvailableInfo {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("OtterKeep v\(update.version)")
+                        Text(L10n.format(.aboutAppVersionFormat, update.version))
                             .font(.headline)
                         Spacer()
-                        Text("Build \(update.buildNumber)")
+                        Text(L10n.format(.aboutBuildFormat, update.buildNumber))
                             .font(.subheadline.bold().monospacedDigit())
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -101,20 +101,24 @@ extension SettingsView {
                     Text("OtterKeep")
                         .font(.headline.bold())
 
-                    Text("v\(CoreEngine.version) (Build \(CoreEngine.buildNumber))")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    Text(L10n.format(.aboutVersionBuildFormat, CoreEngine.version, CoreEngine.buildNumber))
+                        .font(.caption2.bold().monospaced())
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1.5)
                         .background(OtterTheme.oceanicTeal.opacity(0.15), in: Capsule())
                         .foregroundStyle(OtterTheme.oceanicTeal)
                 }
 
-                Text("„Keep what you love close to your chest.”")
+                Text(L10n.t(.aboutTaglineEnglish))
                     .font(.caption.italic())
                     .foregroundStyle(OtterTheme.otterAmber)
 
-                Text("Subsystems: Storage v\(CoreEngine.storageVersion) • DB v\(CoreEngine.databaseVersion) • Core v\(CoreEngine.coreVersion) • UI v\(CoreEngine.uiVersion) • CLI v\(CoreEngine.cliVersion)")
-                    .font(.system(size: 9.5, design: .monospaced))
+                Text(
+                    L10n.format(
+                        .aboutSubsystemsSummaryFormat, CoreEngine.storageVersion, CoreEngine.databaseVersion, CoreEngine.coreVersion,
+                        CoreEngine.uiVersion, CoreEngine.cliVersion)
+                )
+                    .font(.caption2.monospaced())
                     .foregroundStyle(.secondary)
 
             }

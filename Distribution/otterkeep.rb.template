@@ -1,14 +1,14 @@
 cask "otterkeep" do
-  version "1.5.0"
+  version "2.0.0"
   sha256 "REPLACE_WITH_SHA256"
 
-  url "https://github.com/richardeszeshu/otter-keep/releases/download/v#{version}/OtterKeep-#{version}.dmg"
+  url "https://github.com/OtterKeep/otter-keep/releases/download/v#{version}/OtterKeep-#{version}.dmg"
   name "OtterKeep"
   desc "Autonomous, APFS-native incremental backup & replication engine"
-  homepage "https://github.com/richardeszeshu/otter-keep"
+  homepage "https://github.com/OtterKeep/otter-keep"
 
   livecheck do
-    url "https://raw.githubusercontent.com/richardeszeshu/otter-keep/main/Distribution/appcast.xml"
+    url "https://raw.githubusercontent.com/OtterKeep/otter-keep/main/Distribution/appcast.xml"
     strategy :sparkle
   end
 

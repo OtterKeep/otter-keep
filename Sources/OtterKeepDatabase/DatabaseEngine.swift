@@ -242,4 +242,40 @@ public actor DatabaseEngine {
         return String(cString: ptr)
     }
 
+    // MARK: - Database Self-Healing & Optimization
+
+    /// Runs SQLite integrity checks, returning true if database is healthy.
+    public func performIntegrityCheck() throws -> Bool {
+        guard let db = db else { throw DatabaseError.openFailed("Database is not open") }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "PRAGMA quick_check;", -1, &stmt, nil) == SQLITE_OK else {
+            return false
+        }
+        defer { sqlite3_finalize(stmt) }
+        if sqlite3_step(stmt) == SQLITE_ROW {
+            if let result = sqlite3_column_text(stmt, 0) {
+                let status = String(cString: result)
+                return status.lowercased() == "ok"
+            }
+        }
+        return false
+    }
+
+    /// Performs self-healing database optimization, vacuuming free pages, and rebuilding query planner statistics.
+    public func performSelfHealingMaintenance() throws {
+        guard db != nil else { throw DatabaseError.openFailed("Database is not open") }
+        // 1. Check integrity
+        let isHealthy = (try? performIntegrityCheck()) ?? false
+        if !isHealthy {
+            logger.error("Database integrity check failed! Attempting index re-indexing repair...")
+            try? execute(query: "REINDEX;")
+        }
+
+        // 2. Query planner optimizer
+        try? execute(query: "PRAGMA optimize;")
+
+        // 3. Compact free pages
+        try? execute(query: "VACUUM;")
+        logger.info("Database self-healing and vacuum maintenance successfully completed.")
+    }
 }

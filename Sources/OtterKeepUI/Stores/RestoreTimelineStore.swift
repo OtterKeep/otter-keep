@@ -1,6 +1,6 @@
 import Foundation
 import Observation
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 /// Snapshot browsing, file timeline and diff-comparison state for the Restore workspace.
@@ -37,6 +37,9 @@ public final class RestoreTimelineStore: Sendable {
 
     /// Currently selected file catalog record.
     public var selectedFile: FileCatalogRecord?
+
+    /// Differential status for files in the selected snapshot relative to previous snapshot.
+    public var snapshotFileDiffStatuses: [String: DiffChangeType] = [:]
 
     // MARK: - File Timeline & Tree Structure
 
@@ -102,9 +105,6 @@ public final class RestoreTimelineStore: Sendable {
     public var isLoadingSideBySideDiff: Bool = false
 
     // MARK: - Direct File Version History & Finder In-Place Restore
-
-    /// Controls presentation of the file version history modal.
-    public var showFileVersionHistoryModal: Bool = false
 
     /// On-disk URL of the file whose version history is displayed.
     public var activeVersionHistoryFile: URL? = nil

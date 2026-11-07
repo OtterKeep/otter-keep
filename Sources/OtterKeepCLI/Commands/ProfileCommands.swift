@@ -49,10 +49,12 @@ extension OtterKeepCLI {
             print("       • \(L10n.format(.rule321OffsiteFormat, offsiteTag))")
 
             if p.copyJobConfig.isEnabled && !p.copyJobConfig.destinations.isEmpty {
-                print("    🌐 Távoli célok (Backup Copy Job) [\(p.copyJobConfig.trigger.localizedTitle)]:")
+                let isHu = LocalizationManager.shared.effectiveLanguage == .hungarian
+                let header = isHu ? "Távoli célok (Backup Copy Job)" : "Remote Targets (Backup Copy Job)"
+                print("    🌐 \(header) [\(p.copyJobConfig.trigger.localizedTitle)]:")
                 for dest in p.copyJobConfig.destinations {
-                    let encTag = dest.isClientEncryptionEnabled ? " [🔒 Titkosított (AES-GCM)]" : ""
-                    let statusTag = dest.isEnabled ? "Aktív" : "Kikapcsolva"
+                    let encTag = dest.isClientEncryptionEnabled ? (isHu ? " [🔒 Titkosított (AES-GCM)]" : " [🔒 Encrypted (AES-GCM)]") : ""
+                    let statusTag = dest.isEnabled ? (isHu ? "Aktív" : "Active") : (isHu ? "Kikapcsolva" : "Disabled")
                     print("       • [\(dest.type.typeDisplayName)] \(dest.name) (\(statusTag))\(encTag)")
                 }
             }

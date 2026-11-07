@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 import Photos
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 /// Apple Photos backup and browsing state.

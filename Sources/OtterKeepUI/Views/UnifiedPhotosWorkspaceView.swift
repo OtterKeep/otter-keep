@@ -53,7 +53,7 @@ public struct UnifiedPhotosWorkspaceView: View {
                             .fill(appState.isPhotosBackupRunning ? OtterTheme.otterAmber : OtterTheme.statusGreen)
                             .frame(width: 6, height: 6)
                         Text(appState.isPhotosBackupRunning ? L10n.t(.statusRunning) : L10n.t(.statusReady))
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.caption2.weight(.semibold))
                             .foregroundStyle(.secondary)
                     }
                 }

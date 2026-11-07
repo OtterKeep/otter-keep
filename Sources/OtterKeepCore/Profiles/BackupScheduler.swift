@@ -15,8 +15,9 @@ public final class BackupScheduler: @unchecked Sendable {
     private var timerTask: Task<Void, Never>?
     private var activeProfileIdsRunning = Set<UUID>()
     private var isPhotosBackupRunning = false
-    public var onTriggerBackup: BackupTriggerHandler?
-    public var onTriggerPhotosBackup: PhotosBackupTriggerHandler?
+    private var activeFSEventWatchers: [UUID: FSEventWatcher] = [:]
+    private var triggerBackupHandler: BackupTriggerHandler?
+    private var triggerPhotosBackupHandler: PhotosBackupTriggerHandler?
 
     private init() {
         // Monitor external disk volume mount events
@@ -41,20 +42,25 @@ public final class BackupScheduler: @unchecked Sendable {
         photosTriggerHandler: PhotosBackupTriggerHandler? = nil
     ) {
         lock.lock()
-        defer { lock.unlock() }
-
-        self.onTriggerBackup = triggerHandler
+        self.triggerBackupHandler = triggerHandler
         if let pHandler = photosTriggerHandler {
-            self.onTriggerPhotosBackup = pHandler
+            self.triggerPhotosBackupHandler = pHandler
         }
-        guard !isRunning else { return }
+        guard !isRunning else {
+            lock.unlock()
+            return
+        }
         isRunning = true
+        lock.unlock()
+
+        syncContinuousWatchers()
 
         timerTask = Task.detached { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 30_000_000_000) // 30-second interval
                 guard let self = self else { break }
                 await self.evaluateSchedules()
+                self.syncContinuousWatchers()
             }
         }
     }
@@ -66,39 +72,64 @@ public final class BackupScheduler: @unchecked Sendable {
         isRunning = false
         timerTask?.cancel()
         timerTask = nil
+
+        for (_, watcher) in activeFSEventWatchers {
+            watcher.stop()
+        }
+        activeFSEventWatchers.removeAll()
     }
 
     /// Handles external volume mount events, checking for missed backups for profiles stored on that volume.
     /// - Parameter mountedURL: URL of the newly mounted volume.
     public func handleVolumeMounted(_ mountedURL: URL?) async {
+        guard let mountedURL else { return }
         let profiles = ProfileStore.shared.loadProfiles()
         let now = Date()
 
+        // Filesystem and metadata reads happen outside the lock and only once per mount event.
+        let mountedPath = BackupProfile.canonicalizePath(mountedURL.standardizedFileURL.path(percentEncoded: false))
+        let mountedVolumeUUID = (try? mountedURL.resourceValues(forKeys: [.volumeUUIDStringKey]))?.volumeUUIDString
+
         for profile in profiles where profile.schedule.isEnabled {
-            let destPath = profile.destinationURL.standardizedFileURL.path(percentEncoded: false)
-            if FileManager.default.fileExists(atPath: destPath) {
-                if isRunMissed(schedule: profile.schedule, now: now) {
-                    LogManager.shared.log(
-                        "Backup destination disk became available for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]. Triggering catch-up backup...",
-                        level: .info,
-                        category: "Scheduler"
-                    )
-                    await triggerBackupSafely(for: profile, isCatchUp: true)
-                }
+            guard Self.destination(profile.destinationURL, residesOn: mountedPath, volumeUUID: mountedVolumeUUID, knownVolumeUUIDs: profile.destinationVolumeUUIDs) else {
+                continue
             }
+            guard isRunMissed(schedule: profile.schedule, now: now) else { continue }
+            LogManager.shared.log(
+                "Backup destination disk became available for profile '\(profile.name)' [UUID: \(profile.id.uuidString)]. Triggering catch-up backup...",
+                level: .info,
+                category: "Scheduler"
+            )
+            await triggerBackupSafely(for: profile, isCatchUp: true)
         }
 
         // Photos backup volume check
         let photosConfig = PhotosProfileStore.shared.loadConfiguration()
         if photosConfig.isEnabled && photosConfig.schedule.isEnabled {
-            let destPath = photosConfig.destinationURL.standardizedFileURL.path(percentEncoded: false)
-            if FileManager.default.fileExists(atPath: destPath) {
+            let photosDestination = photosConfig.destinationURL
+            if Self.destination(photosDestination, residesOn: mountedPath, volumeUUID: mountedVolumeUUID, knownVolumeUUIDs: []) {
                 if isRunMissed(schedule: photosConfig.schedule, now: now) {
                     LogManager.shared.log("Photos backup destination disk became available. Triggering catch-up Photos backup...", level: .info, category: "Scheduler")
                     await triggerPhotosBackupSafely(for: photosConfig, isCatchUp: true)
                 }
             }
         }
+    }
+
+    /// Determines whether a backup destination actually lives on the volume that was just mounted.
+    /// A destination matches when its canonical path is the mount point or nested below it, or when the
+    /// mounted volume's UUID is one of the profile's registered rotation drives.
+    public static func destination(
+        _ destinationURL: URL,
+        residesOn mountedPath: String,
+        volumeUUID: String?,
+        knownVolumeUUIDs: [String]
+    ) -> Bool {
+        if let volumeUUID, knownVolumeUUIDs.contains(volumeUUID) {
+            return true
+        }
+        let destPath = BackupProfile.canonicalizePath(destinationURL.standardizedFileURL.path(percentEncoded: false))
+        return destPath == mountedPath || destPath.hasPrefix(mountedPath + "/")
     }
 
     /// Checks all enabled profiles on app startup and triggers catch-up backups if missed.
@@ -198,13 +229,13 @@ public final class BackupScheduler: @unchecked Sendable {
     private func getTriggerHandler() -> BackupTriggerHandler? {
         lock.lock()
         defer { lock.unlock() }
-        return onTriggerBackup
+        return triggerBackupHandler
     }
 
     private func getPhotosTriggerHandler() -> PhotosBackupTriggerHandler? {
         lock.lock()
         defer { lock.unlock() }
-        return onTriggerPhotosBackup
+        return triggerPhotosBackupHandler
     }
 
     private func triggerBackupSafely(for profile: BackupProfile, isCatchUp: Bool) async {
@@ -304,6 +335,52 @@ public final class BackupScheduler: @unchecked Sendable {
             } else {
                 return calendar.date(byAdding: .weekOfYear, value: 1, to: candidate) ?? candidate.addingTimeInterval(7 * 86400)
             }
+        }
+    }
+
+    /// Synchronizes active real-time continuous FSEventWatchers with configured backup profiles.
+    public func syncContinuousWatchers() {
+        // Profile loading and filesystem probes happen outside the lock: both can block on slow
+        // storage and must not stall the scheduler's timer loop.
+        let profiles = ProfileStore.shared.loadProfiles()
+        let continuousProfiles = profiles.filter { $0.executionMode.isContinuous }
+        let existingSourcePaths = continuousProfiles.reduce(into: [UUID: String]()) { result, profile in
+            let sourcePath = profile.sourceURL.standardizedFileURL.path(percentEncoded: false)
+            guard FileManager.default.fileExists(atPath: sourcePath) else { return }
+            result[profile.id] = sourcePath
+        }
+
+        lock.lock()
+        defer { lock.unlock() }
+
+        let currentIds = Set(activeFSEventWatchers.keys)
+        let wantedIds = Set(continuousProfiles.map(\.id))
+
+        // Stop watchers for profiles no longer set to continuous or deleted
+        for id in currentIds.subtracting(wantedIds) {
+            activeFSEventWatchers[id]?.stop()
+            activeFSEventWatchers.removeValue(forKey: id)
+            LogManager.shared.log("Stopped real-time FSEventWatcher for profile UUID \(id)", level: .debug, category: "Scheduler")
+        }
+
+        // Start watchers for newly continuous profiles
+        for profile in continuousProfiles where activeFSEventWatchers[profile.id] == nil {
+            guard let sourcePath = existingSourcePaths[profile.id] else { continue }
+
+            let watcher = FSEventWatcher(
+                watchedPath: sourcePath,
+                excludePatterns: profile.excludePatterns,
+                debouncingSeconds: profile.executionMode.debouncingSeconds
+            ) { [weak self] _ in
+                guard let self = self else { return }
+                Task {
+                    LogManager.shared.log("Real-time filesystem change triggered backup for profile '\(profile.name)'", level: .info, category: "Scheduler")
+                    await self.triggerBackupSafely(for: profile, isCatchUp: false)
+                }
+            }
+            watcher.start()
+            activeFSEventWatchers[profile.id] = watcher
+            LogManager.shared.log("Started real-time FSEventWatcher for profile '\(profile.name)' [\(sourcePath)]", level: .info, category: "Scheduler")
         }
     }
 }

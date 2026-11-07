@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import OtterKeepCore
 
 public struct DiagnosticLogView: View {
@@ -46,6 +47,7 @@ public struct DiagnosticLogView: View {
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(L10n.t(.clearSearchButton))
                     }
                 }
                 .padding(8)
@@ -97,6 +99,14 @@ public struct DiagnosticLogView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
+
+                Button {
+                    exportSupportBundle()
+                } label: {
+                    Label(L10n.t(.supportBundleButton), systemImage: "archivebox")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
             }
             .padding()
             .background(.background.secondary)
@@ -117,7 +127,7 @@ public struct DiagnosticLogView: View {
                         Text(Self.dateFormatter.string(from: entry.timestamp))
                             .font(.system(.body, design: .monospaced))
                             .foregroundStyle(.tertiary)
-                            .frame(width: 105, alignment: .leading)
+                            .fixedSize(horizontal: true, vertical: false)
 
                         Text(entry.level.rawValue)
                             .font(.system(.body, design: .monospaced).bold())
@@ -125,16 +135,19 @@ public struct DiagnosticLogView: View {
                             .padding(.vertical, 2)
                             .background(levelColor(entry.level).opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
                             .foregroundStyle(levelColor(entry.level))
-                            .frame(width: 75)
+                            .fixedSize(horizontal: true, vertical: false)
 
                         Text("[\(entry.category)]")
                             .font(.system(.body, design: .monospaced))
                             .foregroundStyle(.secondary)
-                            .frame(width: 120, alignment: .leading)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .frame(minWidth: 60, maxWidth: 140, alignment: .leading)
 
                         Text(entry.message)
                             .font(.system(.body, design: .monospaced))
                             .textSelection(.enabled)
+                            .layoutPriority(1)
                     }
                     .padding(.vertical, 3)
                 }
@@ -171,6 +184,24 @@ public struct DiagnosticLogView: View {
         panel.nameFieldStringValue = "OtterKeep_Logs_\(ISO8601DateFormatter().string(from: Date())).txt"
         if panel.runModal() == .OK, let url = panel.url {
             appState.exportLogs(to: url)
+        }
+    }
+
+    private func exportSupportBundle() {
+        let panel = NSSavePanel()
+        if let zipType = UTType(filenameExtension: "zip") {
+            panel.allowedContentTypes = [zipType]
+        }
+        panel.nameFieldStringValue = "OtterKeep-Diagnostics-\(Int(Date().timeIntervalSince1970)).zip"
+        if panel.runModal() == .OK, let url = panel.url {
+            Task {
+                do {
+                    _ = try await SanctuarySupportBundleExporter.shared.exportSupportBundle(to: url)
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                } catch {
+                    LogManager.shared.log("Failed to export support bundle: \(error.localizedDescription)", level: .error, category: "SupportBundle")
+                }
+            }
         }
     }
 }

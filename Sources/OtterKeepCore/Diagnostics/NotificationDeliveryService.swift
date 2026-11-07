@@ -164,6 +164,19 @@ public final class NotificationDeliveryService: NSObject, @unchecked Sendable, U
         dispatchNotification(identifier: "com.otterkeep.ransomware.\(profileName).\(UUID().uuidString)", content: content)
     }
 
+    /// Delivers a friendly notification when a backup is paused to preserve battery or mitigate thermal load.
+    public func notifyGovernorPaused(profileName: String, reason: String) {
+        let content = UNMutableNotificationContent()
+        let isHu = LocalizationManager.shared.effectiveLanguage == .hungarian
+        content.title = isHu ? "Mentés szüneteltetve" : "Backup Paused"
+        content.body = isHu
+            ? "Mentés szüneteltetve az akkumulátor kímélése érdekében (\(profileName)). Csatlakoztasd a töltőt a folytatáshoz."
+            : "Backup paused to preserve battery (\(profileName)). Connect power charger to resume."
+        content.sound = .default
+
+        dispatchNotification(identifier: "com.otterkeep.governor.paused.\(profileName)", content: content)
+    }
+
     /// Delivers a notification when a scheduled backup was missed and automatic catch-up backup has begun.
     /// - Parameter profileName: Target backup profile name.
     public func notifyMissedBackup(profileName: String) {

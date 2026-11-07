@@ -5,18 +5,18 @@ public struct CoreEngine: Sendable {
     // MARK: - Version Manifest (generated from version.json by scripts/sync_version.sh)
     // <version-manifest:begin>
     /// Semantic version identifier of the OtterKeep application (main product version).
-    public static let version = "1.7.1"
+    public static let version = "2.0.0"
 
     /// Internal build sequence number.
-    public static let buildNumber = "1701"
+    public static let buildNumber = "2000"
 
     /// Subsystem versions:
-    public static let storageVersion = "1.3.0"
-    public static let databaseVersion = "1.3.1"
-    public static let coreVersion = "1.7.1"
-    public static let uiVersion = "1.7.1"
-    public static let cliVersion = "1.3.1"
-    public static let finderSyncVersion = "1.0.1"
+    public static let storageVersion = "2.0.0"
+    public static let databaseVersion = "2.0.0"
+    public static let coreVersion = "2.0.0"
+    public static let uiVersion = "2.0.0"
+    public static let cliVersion = "2.0.0"
+    public static let finderSyncVersion = "2.0.0"
     // <version-manifest:end>
 
     /// Structured dictionary of all subsystem components and their respective SemVer versions.

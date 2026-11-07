@@ -23,41 +23,52 @@ public struct OperationFeedbackModalView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Hero Character Presentation
-            VStack(spacing: OtterTheme.spacing12) {
-                OttieFeedbackMascotView(
-                    state: feedback.type == .success ? .success : .failure,
-                    size: 150
-                )
-                .padding(.top, OtterTheme.spacing16)
+            // Scrollable body: a long diagnostic reason can never push the footer off screen.
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Hero Character Presentation
+                    VStack(spacing: OtterTheme.spacing12) {
+                        OttieFeedbackMascotView(
+                            state: feedback.type == .success ? .success : .failure,
+                            size: 150
+                        )
+                        .padding(.top, OtterTheme.spacing16)
 
-                Text(feedback.title)
-                    .font(OtterTheme.heroTitleFont)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(feedback.type == .success ? OtterTheme.statusGreen : OtterTheme.statusError)
-                    .padding(.horizontal, OtterTheme.spacing16)
+                        Text(feedback.title)
+                            .font(OtterTheme.heroTitleFont)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(feedback.type == .success ? OtterTheme.statusGreen : OtterTheme.statusError)
+                            .padding(.horizontal, OtterTheme.spacing16)
 
-                Text(feedback.message)
-                    .font(.body)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.primary)
+                        Text(feedback.message)
+                            .font(.body)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, OtterTheme.spacing24)
+                    }
+
+                    // Detailed Telemetry or Diagnostic Advice Card
+                    VStack(spacing: OtterTheme.spacing12) {
+                        if feedback.type == .success, let summary = feedback.summary {
+                            successSummaryCard(summary: summary)
+                        } else if feedback.type == .success, let restoreSummary = feedback.restoreSummary {
+                            restoreSummaryCard(summary: restoreSummary)
+                        } else {
+                            if let guarantee = feedback.guaranteeText, !guarantee.isEmpty {
+                                guaranteeCard(text: guarantee)
+                            }
+                            if let reason = feedback.detailedReason, !reason.isEmpty {
+                                failureAdviceCard(reason: reason)
+                            }
+                        }
+                    }
                     .padding(.horizontal, OtterTheme.spacing24)
-            }
-
-            // Detailed Telemetry or Diagnostic Advice Card
-            VStack(spacing: OtterTheme.spacing12) {
-                if feedback.type == .success, let summary = feedback.summary {
-                    successSummaryCard(summary: summary)
-                } else if feedback.type == .success, let restoreSummary = feedback.restoreSummary {
-                    restoreSummaryCard(summary: restoreSummary)
-                } else if let reason = feedback.detailedReason, !reason.isEmpty {
-                    failureAdviceCard(reason: reason)
+                    .padding(.top, OtterTheme.spacing16)
+                    .padding(.bottom, OtterTheme.spacing16)
                 }
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, OtterTheme.spacing24)
-            .padding(.top, OtterTheme.spacing16)
-
-            Spacer(minLength: OtterTheme.spacing16)
+            .scrollBounceBehavior(.basedOnSize)
 
             Divider()
 
@@ -91,6 +102,16 @@ public struct OperationFeedbackModalView: View {
 
                 Spacer()
 
+                if let recovery = feedback.recoveryAction {
+                    Button {
+                        perform(recovery)
+                    } label: {
+                        Text(recovery.label)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                }
+
                 Button {
                     onDismiss()
                 } label: {
@@ -106,7 +127,10 @@ public struct OperationFeedbackModalView: View {
             .padding(.vertical, OtterTheme.spacing12)
             .background(OtterTheme.sectionHeaderBackground)
         }
-        .frame(width: 480, height: 460)
+        .frame(
+            minWidth: 440, idealWidth: 480, maxWidth: 620,
+            minHeight: 380, idealHeight: 460, maxHeight: 720
+        )
         .background(OtterTheme.windowBackground)
     }
 
@@ -185,6 +209,40 @@ public struct OperationFeedbackModalView: View {
                 .foregroundStyle(.primary)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Sanctuary Guarantee Card
+    private func guaranteeCard(text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "checkmark.shield.fill")
+                .font(.title3)
+                .foregroundStyle(OtterTheme.statusGreen)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L10n.t(.feedbackGuaranteeTitle))
+                    .font(.callout.weight(.semibold))
+                Text(text)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .otterCard(padding: OtterTheme.spacing12)
+    }
+
+    /// Runs the restorative pathway attached to a failure, then closes the modal.
+    private func perform(_ recovery: RecoveryAction) {
+        switch recovery.kind {
+        case .openFullDiskAccess:
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
+                NSWorkspace.shared.open(url)
+            }
+            onDismiss()
+        case .viewLogs:
+            onDismiss()
+            onViewLogs?()
+        }
     }
 
     // MARK: - Failure Advice & Reassurance Card

@@ -25,10 +25,14 @@ public struct OtterKeepMenuCommands: Commands {
 
         CommandGroup(replacing: .appSettings) {
             Button(L10n.t(.menuPreferences)) {
-                appState.activeNavigation = .settings
+                appState.showPreferencesModal = true
                 WindowManager.showAndFocusMainWindow()
             }
             .keyboardShortcut(",", modifiers: .command)
+
+            Button(L10n.t(.aboutWindowTitle)) {
+                AboutWindowController.shared.show()
+            }
         }
 
         // MARK: - File (Fájl)
@@ -140,13 +144,9 @@ public struct OtterKeepMenuCommands: Commands {
             }
             .keyboardShortcut("2", modifiers: .command)
 
-            Button(L10n.t(.menuViewRulesMaintenance)) {
-                if let id = appState.selectedProfileId ?? appState.profiles.first?.id {
-                    appState.selectProfile(id: id)
-                    appState.activeProfileTab = .rulesAndMaintenance
-                    appState.activeNavigation = .profile(id)
-                    WindowManager.showAndFocusMainWindow()
-                }
+            Button(L10n.t(.profileSettingsTitle)) {
+                appState.showProfileSettingsModal = true
+                WindowManager.showAndFocusMainWindow()
             }
             .keyboardShortcut("3", modifiers: .command)
 
@@ -156,11 +156,11 @@ public struct OtterKeepMenuCommands: Commands {
             }
             .keyboardShortcut("4", modifiers: .command)
 
-            Button(L10n.t(.menuViewLogs)) {
-                appState.activeNavigation = .logs
+            Button(L10n.t(.menuSystemLogs)) {
+                appState.showSystemLogsModal = true
                 WindowManager.showAndFocusMainWindow()
             }
-            .keyboardShortcut("5", modifiers: .command)
+            .keyboardShortcut("l", modifiers: .command)
 
             Divider()
 
@@ -192,14 +192,19 @@ public struct OtterKeepMenuCommands: Commands {
         // MARK: - Help (Súgó)
         CommandGroup(replacing: .help) {
             Button(L10n.t(.menuDocumentation)) {
-                if let url = URL(string: "https://github.com/richardeszeshu/otter-keep#readme") {
+                if let url = URL(string: "https://github.com/OtterKeep/otter-keep#readme") {
                     NSWorkspace.shared.open(url)
                 }
             }
             .keyboardShortcut("?", modifiers: .command)
 
+            Button(L10n.t(.menuWelcomeGuide)) {
+                appState.maintenanceSettings.onboardingCurrentStep = 0
+                appState.showOnboardingModal = true
+            }
+
             Button(L10n.t(.menuReleaseNotes)) {
-                if let url = URL(string: "https://github.com/richardeszeshu/otter-keep/releases") {
+                if let url = URL(string: "https://github.com/OtterKeep/otter-keep/releases") {
                     NSWorkspace.shared.open(url)
                 }
             }
@@ -214,14 +219,25 @@ public struct OtterKeepMenuCommands: Commands {
             }
             .keyboardShortcut("l", modifiers: [.shift, .command])
 
+            Button(L10n.t(.menuSaveSupportBundle)) {
+                Task {
+                    if let zipURL = try? await SanctuarySupportBundleExporter.shared.exportSupportBundle() {
+                        NSWorkspace.shared.activateFileViewerSelecting([zipURL])
+                    }
+                }
+            }
+
             Divider()
 
             Button(L10n.t(.menuReportIssue)) {
-                if let url = URL(string: "https://github.com/richardeszeshu/otter-keep/issues") {
+                if let url = URL(string: "https://github.com/OtterKeep/otter-keep/issues") {
                     NSWorkspace.shared.open(url)
                 }
             }
         }
+
+        // MARK: - Native macOS Sidebar Toggle Commands
+        SidebarCommands()
 
         // MARK: - Standard Text Editing Commands
         TextEditingCommands()

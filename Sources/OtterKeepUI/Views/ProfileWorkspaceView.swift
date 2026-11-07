@@ -3,7 +3,10 @@ import AppKit
 import OtterKeepCore
 
 /// Unified workspace for an individual backup profile, featuring a top segmented navigation bar
-/// between Overview (live telemetry & pipeline), Time Machine (restore explorer), and Rules & Maintenance.
+/// between Overview (live telemetry & pipeline) and Time Machine (restore explorer).
+///
+/// Rules, automation and maintenance are intentionally *not* a tab here — they open from the
+/// Profile Settings button, so configuration never competes with the daily monitoring surface.
 public struct ProfileWorkspaceView: View {
     public let profile: BackupProfile
     public let appState: AppState
@@ -28,17 +31,19 @@ public struct ProfileWorkspaceView: View {
             Divider()
 
             // Tab Content
-            switch appState.activeProfileTab {
-            case .overview:
-                MainDashboardView(appState: appState)
-            case .timeMachine:
-                RestoreExplorerView(appState: appState)
-            case .rulesAndMaintenance:
-                ProfileRulesAndMaintenanceView(appState: appState, profile: profile)
+            Group {
+                switch appState.activeProfileTab {
+                case .overview:
+                    MainDashboardView(appState: appState)
+                case .timeMachine:
+                    RestoreExplorerView(appState: appState)
+                }
             }
+            .transition(.opacity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
+        .animation(OtterTheme.smoothEase, value: appState.activeProfileTab)
     }
 
     // MARK: - Modern Workspace Header Bar
@@ -46,9 +51,11 @@ public struct ProfileWorkspaceView: View {
         HStack(spacing: 16) {
             // Profile Title, APFS Badge, and Last Backup Status
             HStack(spacing: 8) {
-                Image(systemName: "folder.fill")
+                let health = appState.profileHealthStatus(for: profile)
+                Image(systemName: health.systemImage)
                     .font(.title3)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(health.color)
+                    .symbolEffect(.rotate, isActive: health == .running)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(profile.name)
@@ -61,11 +68,11 @@ public struct ProfileWorkspaceView: View {
                             Image(systemName: cowMode == .nonAPFS ? "exclamationmark.shield.fill" : "checkmark.shield.fill")
                             Text(L10n.t(cowMode.badgeKey))
                         }
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.caption2.bold())
                         .foregroundStyle(cowMode == .nonAPFS ? OtterTheme.statusWarning : OtterTheme.statusGreen)
 
                         Text("•")
-                            .font(.system(size: 9))
+                            .font(.caption2)
                             .foregroundStyle(.tertiary)
 
                         HStack(spacing: 4) {
@@ -74,13 +81,13 @@ public struct ProfileWorkspaceView: View {
                                 .frame(width: 5, height: 5)
                             Text(statusInfo.displayDetailText)
                         }
-                        .font(.system(size: 9, weight: .medium))
+                        .font(.caption2.weight(.medium))
                         .foregroundStyle(.secondary)
                     }
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 12)
 
             // Centered Segmented Workspace Tabs
             Picker("", selection: activeTabBinding) {
@@ -90,72 +97,53 @@ public struct ProfileWorkspaceView: View {
             }
             .pickerStyle(.segmented)
             .controlSize(.regular)
-            .frame(maxWidth: 420)
+            .labelsHidden()
+            .frame(minWidth: 240, idealWidth: 340, maxWidth: 420)
+            .layoutPriority(1)
 
-            Spacer()
+            Spacer(minLength: 12)
 
-            // Quick Action Buttons
+            // Profile Configuration & Quick Action Buttons
             HStack(spacing: 8) {
-                // Dry-Run Button
+                // Delete Profile Button (only if multiple profiles exist)
+                if appState.profiles.count > 1 {
+                    Button(role: .destructive) {
+                        appState.profilePendingDeletion = profile
+                        appState.showDeleteProfileConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .foregroundStyle(OtterTheme.statusError)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .help(L10n.t(.deleteProfileButton))
+                    .disabled(appState.isBackupRunning(for: profile.id))
+                }
+
+                // Profile Settings Button
                 Button {
-                    appState.performDryRun()
+                    appState.showProfileSettingsModal = true
                 } label: {
                     HStack(spacing: 5) {
-                        Image(systemName: appState.isDryRunRunning ? "arrow.triangle.2.circlepath" : "magnifyingglass")
-                            .symbolEffect(.rotate, isActive: appState.isDryRunRunning)
-                        Text(appState.isDryRunRunning ? L10n.t(.analyzingProgress) : L10n.t(.quickDryRunAction))
+                        Image(systemName: "slider.horizontal.3")
+                        Text(L10n.t(.profileSettingsButton))
                     }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
-                .keyboardShortcut("d", modifiers: .command)
-                .disabled(appState.isBackupRunning(for: profile.id) || appState.isDryRunRunning)
-
-                // Backup Now / Stop Button
-                if appState.isBackupRunning(for: profile.id) {
-                    Button(role: .destructive) {
-                        appState.cancelBackup(for: profile.id)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "stop.circle.fill")
-                            Text(L10n.t(.stopBackupButton))
-                        }
-                        .font(.body.bold())
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(OtterTheme.statusError)
-                    .controlSize(.regular)
-                    .keyboardShortcut(".", modifiers: .command)
-                } else {
-                    Button {
-                        appState.startBackup(for: profile)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.clockwise.circle.fill")
-                            Text(L10n.t(.quickBackupAction))
-                        }
-                        .font(.body.bold())
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(OtterTheme.otterAmber)
-                    .controlSize(.regular)
-                    .keyboardShortcut("b", modifiers: .command)
-                    .disabled(appState.isDryRunRunning)
-                }
+                .help(L10n.t(.profileSettingsTitle))
             }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .background(.ultraThinMaterial)
         .background {
-            // Invisible keyboard shortcut targets for ⌘1, ⌘2, ⌘3 tab switching
+            // Invisible keyboard shortcut targets for ⌘1 / ⌘2 tab switching
             Group {
                 Button("") { appState.activeProfileTab = .overview }
                     .keyboardShortcut("1", modifiers: .command)
                 Button("") { appState.activeProfileTab = .timeMachine }
                     .keyboardShortcut("2", modifiers: .command)
-                Button("") { appState.activeProfileTab = .rulesAndMaintenance }
-                    .keyboardShortcut("3", modifiers: .command)
             }
             .opacity(0)
             .allowsHitTesting(false)

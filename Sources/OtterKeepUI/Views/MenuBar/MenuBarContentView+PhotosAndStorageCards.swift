@@ -1,7 +1,6 @@
 import SwiftUI
 import AppKit
 import OtterKeepCore
-import OtterKeepStorage
 
 extension MenuBarContentView {
     // MARK: - Apple Photos Backup Card
@@ -112,7 +111,7 @@ extension MenuBarContentView {
                                 appState.ejectDestinationVolume(for: profile)
                             } label: {
                                 Image(systemName: "eject.fill")
-                                    .font(.system(size: 9))
+                                    .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
                             .buttonStyle(.plain)

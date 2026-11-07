@@ -1,7 +1,7 @@
-import SwiftUI
 import AppKit
-import OtterKeepStorage
 import OtterKeepCore
+import OtterKeepDomain
+import SwiftUI
 
 extension ProfileRulesView {
     // MARK: - 6. 3-2-1 Backup Copy Job & Remote Targets
@@ -19,29 +19,32 @@ extension ProfileRulesView {
 
             VStack(alignment: .leading, spacing: 14) {
                 // Master Copy Job Toggle
-                Toggle(isOn: Binding(
-                    get: { profile.copyJobConfig.isEnabled },
-                    set: { enabled in
-                        var updated = profile
-                        updated.copyJobConfig.isEnabled = enabled
-                        if enabled && updated.copyJobConfig.destinations.isEmpty {
-                            // Provide default Cloud and NAS destinations
-                            let defaultS3 = RemoteDestination(
-                                name: "AWS S3 / Backblaze Cloud",
-                                type: .s3(S3Configuration(endpoint: "https://s3.eu-central-1.amazonaws.com", bucket: "otterkeep-offsite", region: "eu-central-1", pathPrefix: "backups")),
-                                isClientEncryptionEnabled: true
-                            )
-                            updated.copyJobConfig.destinations.append(defaultS3)
+                Toggle(
+                    isOn: Binding(
+                        get: { profile.copyJobConfig.isEnabled },
+                        set: { enabled in
+                            var updated = profile
+                            updated.copyJobConfig.isEnabled = enabled
+                            if enabled && updated.copyJobConfig.destinations.isEmpty {
+                                // Provide default Cloud and NAS destinations
+                                let defaultS3 = RemoteDestination(
+                                    name: "AWS S3 / Backblaze Cloud",
+                                    type: .s3(
+                                        S3Configuration(
+                                            endpoint: "https://s3.eu-central-1.amazonaws.com", bucket: "otterkeep-offsite", region: "eu-central-1",
+                                            pathPrefix: "backups")),
+                                    isClientEncryptionEnabled: true
+                                )
+                                updated.copyJobConfig.destinations.append(defaultS3)
+                            }
+                            appState.selectedProfile = updated
                         }
-                        appState.selectedProfile = updated
-                    }
-                )) {
-                    VStack(alignment: .leading, spacing: 2) {
+                    )
+                ) {
+                    HStack(spacing: 6) {
                         Text(L10n.t(.copyJobMasterToggleTitle))
                             .font(.body.weight(.medium))
-                        Text(L10n.t(.copyJobMasterToggleDesc))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        InfoTooltipView(L10n.t(.copyJobMasterToggleDesc))
                     }
                 }
                 .toggleStyle(.checkbox)
@@ -55,14 +58,17 @@ extension ProfileRulesView {
                         Text(L10n.t(.copyJobTriggerLabel))
                             .font(.body)
                         Spacer()
-                        Picker("", selection: Binding(
-                            get: { profile.copyJobConfig.trigger },
-                            set: { val in
-                                var updated = profile
-                                updated.copyJobConfig.trigger = val
-                                appState.selectedProfile = updated
-                            }
-                        )) {
+                        Picker(
+                            "",
+                            selection: Binding(
+                                get: { profile.copyJobConfig.trigger },
+                                set: { val in
+                                    var updated = profile
+                                    updated.copyJobConfig.trigger = val
+                                    appState.selectedProfile = updated
+                                }
+                            )
+                        ) {
                             ForEach(CopyJobTrigger.allCases, id: \.self) { trg in
                                 Text(trg.localizedTitle).tag(trg)
                             }
@@ -75,14 +81,17 @@ extension ProfileRulesView {
                         Text(L10n.t(.copyJobNetworkPolicyLabel))
                             .font(.body)
                         Spacer()
-                        Picker("", selection: Binding(
-                            get: { profile.copyJobConfig.networkPolicy },
-                            set: { val in
-                                var updated = profile
-                                updated.copyJobConfig.networkPolicy = val
-                                appState.selectedProfile = updated
-                            }
-                        )) {
+                        Picker(
+                            "",
+                            selection: Binding(
+                                get: { profile.copyJobConfig.networkPolicy },
+                                set: { val in
+                                    var updated = profile
+                                    updated.copyJobConfig.networkPolicy = val
+                                    appState.selectedProfile = updated
+                                }
+                            )
+                        ) {
                             ForEach(CopyJobNetworkPolicy.allCases, id: \.self) { pol in
                                 Text(pol.localizedTitle).tag(pol)
                             }
@@ -92,22 +101,23 @@ extension ProfileRulesView {
 
                     // Smart Bandwidth Throttling
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
                             Text(L10n.t(.smartThrottlingTitle))
                                 .font(.body)
-                            Text(L10n.t(.smartThrottlingDesc))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            InfoTooltipView(L10n.t(.smartThrottlingDesc))
                         }
                         Spacer()
-                        Picker("", selection: Binding(
-                            get: { profile.copyJobConfig.maxBandwidthBytesPerSec },
-                            set: { val in
-                                var updated = profile
-                                updated.copyJobConfig.maxBandwidthBytesPerSec = val
-                                appState.selectedProfile = updated
-                            }
-                        )) {
+                        Picker(
+                            "",
+                            selection: Binding(
+                                get: { profile.copyJobConfig.maxBandwidthBytesPerSec },
+                                set: { val in
+                                    var updated = profile
+                                    updated.copyJobConfig.maxBandwidthBytesPerSec = val
+                                    appState.selectedProfile = updated
+                                }
+                            )
+                        ) {
                             Text(L10n.t(.copyJobThrottlingUnlimited)).tag(Int64(0))
                             Text(L10n.t(.copyJobThrottlingGentle)).tag(Int64(2 * 1024 * 1024))
                             Text(L10n.t(.copyJobThrottlingRecommended)).tag(Int64(5 * 1024 * 1024))
@@ -118,24 +128,22 @@ extension ProfileRulesView {
                     }
 
                     // Parallel Multi-Destination Replication Toggle
-                    Toggle(isOn: Binding(
-                        get: { profile.isParallelMultiDestinationEnabled },
-                        set: { val in
-                            var updated = profile
-                            updated.isParallelMultiDestinationEnabled = val
-                            appState.selectedProfile = updated
-                        }
-                    )) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "arrow.triangle.branch")
-                                    .foregroundStyle(OtterTheme.oceanicTeal)
-                                Text(L10n.t(.parallelMultiDestTitle))
-                                    .font(.body.weight(.medium))
+                    Toggle(
+                        isOn: Binding(
+                            get: { profile.isParallelMultiDestinationEnabled },
+                            set: { val in
+                                var updated = profile
+                                updated.isParallelMultiDestinationEnabled = val
+                                appState.selectedProfile = updated
                             }
-                            Text(L10n.t(.parallelMultiDestDescription))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        )
+                    ) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.triangle.branch")
+                                .foregroundStyle(OtterTheme.oceanicTeal)
+                            Text(L10n.t(.parallelMultiDestTitle))
+                                .font(.body.weight(.medium))
+                            InfoTooltipView(L10n.t(.parallelMultiDestDescription))
                         }
                     }
                     .toggleStyle(.checkbox)
@@ -181,15 +189,17 @@ extension ProfileRulesView {
                     } else {
                         ForEach(profile.copyJobConfig.destinations) { dest in
                             HStack(spacing: 12) {
-                                Image(systemName: {
-                                    switch dest.type {
-                                    case .s3: return "icloud.fill"
-                                    case .backblazeB2: return "flame.fill"
-                                    case .smb: return "server.rack"
-                                    case .webdav: return "network"
-                                    case .sftp: return "terminal.fill"
-                                    }
-                                }())
+                                Image(
+                                    systemName: {
+                                        switch dest.type {
+                                        case .s3: return "icloud.fill"
+                                        case .backblazeB2: return "flame.fill"
+                                        case .smb: return "server.rack"
+                                        case .webdav: return "network"
+                                        case .sftp: return "terminal.fill"
+                                        }
+                                    }()
+                                )
                                 .foregroundStyle(OtterTheme.oceanicTeal)
                                 .font(.title3)
 
@@ -201,7 +211,7 @@ extension ProfileRulesView {
                                         if dest.isClientEncryptionEnabled {
                                             HStack(spacing: 3) {
                                                 Image(systemName: "lock.fill")
-                                                Text("AES-256")
+                                                Text(L10n.t(.replicationEncryptionBadge))
                                             }
                                             .font(.caption2.bold())
                                             .padding(.horizontal, 6)
@@ -212,7 +222,7 @@ extension ProfileRulesView {
                                         if dest.archivePackagingEnabled {
                                             HStack(spacing: 3) {
                                                 Image(systemName: "archivebox.fill")
-                                                Text("TAR.ZST (L\(dest.archiveCompressionLevel))")
+                                                Text(L10n.format(.replicationArchiveBadgeFormat, dest.archiveCompressionLevel))
                                             }
                                             .font(.caption2.bold().monospacedDigit())
                                             .padding(.horizontal, 6)
@@ -222,15 +232,17 @@ extension ProfileRulesView {
                                         }
                                     }
 
-                                    Text({ () -> String in
-                                        switch dest.type {
-                                        case .s3(let cfg): return "S3: \(cfg.endpoint) [\(cfg.bucket)]"
-                                        case .backblazeB2(let cfg): return "B2: \(cfg.bucketName) (\(cfg.region))"
-                                        case .smb(let cfg): return "SMB: \(cfg.shareURL)"
-                                        case .webdav(let cfg): return "WebDAV: \(cfg.serverURL)\(cfg.destinationPath)"
-                                        case .sftp(let cfg): return "SFTP: \(cfg.host):\(cfg.port)\(cfg.remotePath)"
-                                        }
-                                    }())
+                                    Text(
+                                        { () -> String in
+                                            switch dest.type {
+                                            case .s3(let cfg): return "S3: \(cfg.endpoint) [\(cfg.bucket)]"
+                                            case .backblazeB2(let cfg): return "B2: \(cfg.bucketName) (\(cfg.region))"
+                                            case .smb(let cfg): return "SMB: \(cfg.shareURL)"
+                                            case .webdav(let cfg): return "WebDAV: \(cfg.serverURL)\(cfg.destinationPath)"
+                                            case .sftp(let cfg): return "SFTP: \(cfg.host):\(cfg.port)\(cfg.remotePath)"
+                                            }
+                                        }()
+                                    )
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
@@ -260,16 +272,19 @@ extension ProfileRulesView {
                                     .controlSize(.small)
                                     .help(L10n.t(.deleteRemoteDestination))
 
-                                    Toggle("", isOn: Binding(
-                                        get: { dest.isEnabled },
-                                        set: { enabled in
-                                            var updated = profile
-                                            if let idx = updated.copyJobConfig.destinations.firstIndex(where: { $0.id == dest.id }) {
-                                                updated.copyJobConfig.destinations[idx].isEnabled = enabled
-                                                appState.selectedProfile = updated
+                                    Toggle(
+                                        "",
+                                        isOn: Binding(
+                                            get: { dest.isEnabled },
+                                            set: { enabled in
+                                                var updated = profile
+                                                if let idx = updated.copyJobConfig.destinations.firstIndex(where: { $0.id == dest.id }) {
+                                                    updated.copyJobConfig.destinations[idx].isEnabled = enabled
+                                                    appState.selectedProfile = updated
+                                                }
                                             }
-                                        }
-                                    ))
+                                        )
+                                    )
                                     .toggleStyle(.switch)
                                     .controlSize(.small)
                                     .labelsHidden()
@@ -301,14 +316,17 @@ extension ProfileRulesView {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Toggle("", isOn: Binding(
-                    get: { profile.enableRateOfChangeGuard },
-                    set: { val in
-                        var updated = profile
-                        updated.enableRateOfChangeGuard = val
-                        appState.selectedProfile = updated
-                    }
-                ))
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { profile.enableRateOfChangeGuard },
+                        set: { val in
+                            var updated = profile
+                            updated.enableRateOfChangeGuard = val
+                            appState.selectedProfile = updated
+                        }
+                    )
+                )
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 .labelsHidden()
@@ -370,25 +388,30 @@ extension ProfileRulesView {
                     Divider()
 
                     // Known extensions
-                    Toggle(L10n.t(.ransomwareDetectExtensionsToggle), isOn: Binding(
-                        get: { profile.detectKnownRansomwareExtensions },
-                        set: { val in
-                            var updated = profile
-                            updated.detectKnownRansomwareExtensions = val
-                            appState.selectedProfile = updated
-                        }
-                    ))
+                    Toggle(
+                        L10n.t(.ransomwareDetectExtensionsToggle),
+                        isOn: Binding(
+                            get: { profile.detectKnownRansomwareExtensions },
+                            set: { val in
+                                var updated = profile
+                                updated.detectKnownRansomwareExtensions = val
+                                appState.selectedProfile = updated
+                            }
+                        )
+                    )
                     .font(.subheadline)
 
                     // Abort on anomaly
-                    Toggle(isOn: Binding(
-                        get: { profile.abortOnAnomaly },
-                        set: { val in
-                            var updated = profile
-                            updated.abortOnAnomaly = val
-                            appState.selectedProfile = updated
-                        }
-                    )) {
+                    Toggle(
+                        isOn: Binding(
+                            get: { profile.abortOnAnomaly },
+                            set: { val in
+                                var updated = profile
+                                updated.abortOnAnomaly = val
+                                appState.selectedProfile = updated
+                            }
+                        )
+                    ) {
                         HStack {
                             Text(L10n.t(.ransomwareAbortToggle))
                                 .font(.subheadline)
@@ -409,4 +432,236 @@ extension ProfileRulesView {
         .otterCard()
     }
 
+    // MARK: - 10. Power & Thermal Governor
+    func powerGovernorSection(profile: BackupProfile) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label(L10n.t(.powerGovernorHeader), systemImage: "bolt.batteryblock.fill")
+                    .font(.headline)
+                    .foregroundStyle(OtterTheme.oceanicTeal)
+                Spacer()
+            }
+
+            VStack(alignment: .leading, spacing: 14) {
+                // Pause on battery
+                Toggle(
+                    isOn: Binding(
+                        get: { profile.pauseOnBattery },
+                        set: { val in
+                            var updated = profile
+                            updated.pauseOnBattery = val
+                            appState.selectedProfile = updated
+                        }
+                    )
+                ) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.t(.pauseOnBatteryLabel))
+                            .font(.body.weight(.medium))
+                        Text(L10n.t(.pauseOnBatteryDesc))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.checkbox)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Divider()
+
+                // Thermal throttling
+                Toggle(
+                    isOn: Binding(
+                        get: { profile.throttleOnThermalPressure },
+                        set: { val in
+                            var updated = profile
+                            updated.throttleOnThermalPressure = val
+                            appState.selectedProfile = updated
+                        }
+                    )
+                ) {
+                    HStack(spacing: 6) {
+                        Text(L10n.t(.throttleOnThermalLabel))
+                            .font(.body.weight(.medium))
+                        InfoTooltipView(L10n.t(.throttleOnThermalDesc))
+                    }
+                }
+                .toggleStyle(.checkbox)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .otterCard()
+    }
+
+    // MARK: - 11. Canary Trap Tripwires & Anti-Ransomware Decoys
+    func canaryTrapSection(profile: BackupProfile) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label(L10n.t(.canaryTrapHeader), systemImage: "shield.lefthalf.filled.trianglebadge.exclamationmark")
+                    .font(.headline)
+                    .foregroundStyle(OtterTheme.otterAmber)
+                Spacer()
+            }
+
+            VStack(alignment: .leading, spacing: 14) {
+                Toggle(
+                    isOn: Binding(
+                        get: { profile.enableCanaryTraps },
+                        set: { val in
+                            var updated = profile
+                            updated.enableCanaryTraps = val
+                            appState.selectedProfile = updated
+                        }
+                    )
+                ) {
+                    HStack(spacing: 6) {
+                        Text(L10n.t(.enableCanaryTrapsLabel))
+                            .font(.body.weight(.medium))
+                        InfoTooltipView(L10n.t(.enableCanaryTrapsDesc))
+                    }
+                }
+                .toggleStyle(.checkbox)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .otterCard()
+    }
+
+    // MARK: - 12. Local Sparsebundle Encryption
+    func localEncryptionSection(profile: BackupProfile) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label(L10n.t(.localEncryptionHeader), systemImage: "lock.shield.fill")
+                    .font(.headline)
+                    .foregroundStyle(OtterTheme.oceanicTeal)
+                Spacer()
+            }
+
+            VStack(alignment: .leading, spacing: 14) {
+                if profile.encryptionConfig?.isEnabled == true {
+                    HStack(spacing: 10) {
+                        Image(systemName: "lock.shield.fill")
+                            .font(.title3)
+                            .foregroundStyle(OtterTheme.statusGreen)
+
+                        HStack(spacing: 6) {
+                            Text(L10n.t(.enableLocalEncryptionLabel) + " (OKENC2 - \(L10n.t(.encryptionPermanentTag)))")
+                                .font(.body.weight(.bold))
+                            InfoTooltipView(L10n.t(.encryptionLockedNotice))
+                        }
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+
+                    Divider()
+
+                    HStack {
+                        Text(L10n.t(.encryptionSparsebundleLabel))
+                            .font(.body)
+                        Spacer()
+                        Text(profile.encryptionConfig?.containerName ?? "OtterKeepSanctuary")
+                            .font(.body.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack {
+                        HStack(spacing: 6) {
+                            Text(L10n.t(.sparsebundlePasswordLabel))
+                                .font(.body)
+                            InfoTooltipView(L10n.t(.encryptionKeychainStoredDesc))
+                        }
+                        Spacer()
+                        Text("••••••••••••••••")
+                            .font(.body.monospaced())
+                            .foregroundStyle(.tertiary)
+                    }
+                } else {
+                    HStack(spacing: 10) {
+                        Image(systemName: "lock.slash")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+
+                        HStack(spacing: 6) {
+                            Text(L10n.t(.unencryptedProfileNotice))
+                                .font(.body.weight(.medium))
+                            InfoTooltipView(L10n.t(.encryptionLockedNotice))
+                        }
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                }
+            }
+        }
+        .otterCard()
+    }
+
+    // MARK: - 13. Multi-Drive Rotation
+    func multiDriveRotationSection(profile: BackupProfile) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label(L10n.t(.multiDriveRotationTitle), systemImage: "externaldrive.connected.to.line.below")
+                    .font(.headline)
+                    .foregroundStyle(OtterTheme.oceanicTeal)
+                Spacer()
+                Text(L10n.t(.multiDriveRotationDesc))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                if profile.destinationVolumeUUIDs.isEmpty {
+                    Text(L10n.t(.noRotationVolumes))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 4)
+                } else {
+                    ForEach(profile.destinationVolumeUUIDs, id: \.self) { uuid in
+                        HStack(spacing: 8) {
+                            Image(systemName: "externaldrive.fill")
+                                .foregroundStyle(OtterTheme.oceanicTeal)
+                            Text(uuid)
+                                .font(.callout.monospaced())
+                                .lineLimit(1)
+                            Spacer()
+                            Button {
+                                var updated = profile
+                                updated.destinationVolumeUUIDs.removeAll { $0 == uuid }
+                                appState.selectedProfile = updated
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.caption)
+                                    .foregroundStyle(OtterTheme.statusError)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(8)
+                        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                    }
+                }
+
+                HStack {
+                    Spacer()
+                    Button {
+                        if let uuid = (try? profile.destinationURL.resourceValues(forKeys: [.volumeUUIDStringKey]))?.volumeUUIDString,
+                            !uuid.isEmpty,
+                            !profile.destinationVolumeUUIDs.contains(uuid)
+                        {
+                            var updated = profile
+                            updated.destinationVolumeUUIDs.append(uuid)
+                            appState.selectedProfile = updated
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus.circle")
+                            Text(L10n.t(.addVolumeToRotation))
+                        }
+                        .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+        }
+        .otterCard()
+    }
 }

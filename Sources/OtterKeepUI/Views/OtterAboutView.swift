@@ -57,12 +57,12 @@ public struct OtterAboutView: View {
 
                     VStack(spacing: 4) {
                         Text("OtterKeep")
-                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .font(.title.bold()).fontDesign(.rounded)
                             .foregroundStyle(.primary)
 
                         HStack(spacing: 6) {
-                            Text("v\(CoreEngine.version) (Build \(CoreEngine.buildNumber))")
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            Text(L10n.format(.aboutVersionBuildFormat, CoreEngine.version, CoreEngine.buildNumber))
+                                .font(.caption.weight(.bold).monospaced())
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 2.5)
                                 .background(OtterTheme.oceanicTeal.opacity(0.15), in: Capsule())
@@ -77,12 +77,12 @@ public struct OtterAboutView: View {
 
                 // 2. Slogans
                 VStack(spacing: 3) {
-                    Text("„Keep what you love close to your chest.”")
-                        .font(.system(size: 12.5, weight: .semibold, design: .serif).italic())
+                    Text(L10n.t(.aboutTaglineEnglish))
+                        .font(.subheadline.weight(.semibold)).fontDesign(.serif).italic()
                         .foregroundStyle(OtterTheme.otterAmber)
 
-                    Text("„Őrizd a legfontosabb kincseidet biztos kezekben.”")
-                        .font(.system(size: 11, weight: .regular))
+                    Text(L10n.t(.aboutTaglineHungarian))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
@@ -93,7 +93,7 @@ public struct OtterAboutView: View {
                         .frame(width: 3)
 
                     Text(L10n.t(.aboutLoreStory))
-                        .font(.system(size: 11, weight: .regular))
+                        .font(.caption)
                         .lineSpacing(3)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.leading)
@@ -110,34 +110,34 @@ public struct OtterAboutView: View {
                     architectureBadge(
                         icon: "bolt.shield.fill",
                         color: OtterTheme.oceanicTeal,
-                        title: "APFS CoW Engine",
-                        subtitle: "Zero-latency instant clones"
+                        title: L10n.t(.aboutBadgeApfsTitle),
+                        subtitle: L10n.t(.aboutBadgeApfsSubtitle)
                     )
                     architectureBadge(
                         icon: "swift",
                         color: .orange,
-                        title: "Swift 6 Concurrency",
-                        subtitle: "Actor-isolated data safety"
+                        title: L10n.t(.aboutBadgeSwiftTitle),
+                        subtitle: L10n.t(.aboutBadgeSwiftSubtitle)
                     )
                     architectureBadge(
                         icon: "internaldrive.fill",
                         color: OtterTheme.otterAmber,
-                        title: "Local-First",
-                        subtitle: "100% on-device private vaults"
+                        title: L10n.t(.aboutBadgeLocalTitle),
+                        subtitle: L10n.t(.aboutBadgeLocalSubtitle)
                     )
                     architectureBadge(
                         icon: "hand.raised.slash.fill",
                         color: OtterTheme.statusGreen,
-                        title: "Zero Telemetry",
-                        subtitle: "No trackers, no telemetry"
+                        title: L10n.t(.aboutBadgeTelemetryTitle),
+                        subtitle: L10n.t(.aboutBadgeTelemetrySubtitle)
                     )
                 }
 
                 // 4.5. Subsystem Component Versions
                 VStack(spacing: 6) {
                     HStack {
-                        Text("Subsystem Components")
-                            .font(.system(size: 10, weight: .bold))
+                        Text(L10n.t(.aboutSubsystemComponentsTitle))
+                            .font(.caption2.bold())
                             .foregroundStyle(.secondary)
                         Spacer()
                     }
@@ -160,21 +160,25 @@ public struct OtterAboutView: View {
                 // 5. Interactive Resource Links
 
                 HStack(spacing: 8) {
-                    LinkButton(title: "Website", icon: "globe", url: "https://otterkeep.app")
-                    LinkButton(title: "GitHub", icon: "chevron.left.forwardslash.chevron.right", url: "https://github.com/richardeszeshu/otter-keep")
-                    LinkButton(title: "Releases", icon: "tag.fill", url: "https://github.com/richardeszeshu/otter-keep/releases")
-                    LinkButton(title: "MIT License", icon: "doc.text.fill", url: "https://github.com/richardeszeshu/otter-keep/blob/main/LICENSE")
+                    LinkButton(title: L10n.t(.aboutLinkWebsite), icon: "globe", url: "https://otterkeep.app")
+                    LinkButton(
+                        title: L10n.t(.aboutLinkGitHub), icon: "chevron.left.forwardslash.chevron.right",
+                        url: "https://github.com/OtterKeep/otter-keep")
+                    LinkButton(title: L10n.t(.aboutLinkReleases), icon: "tag.fill", url: "https://github.com/OtterKeep/otter-keep/releases")
+                    LinkButton(
+                        title: L10n.t(.aboutLinkLicense), icon: "doc.text.fill",
+                        url: "https://github.com/OtterKeep/otter-keep/blob/main/LICENSE")
                 }
                 .padding(.top, 2)
 
                 // 6. Credits & Copyright Footnote
                 VStack(spacing: 2) {
-                    Text("Crafted with care by Richárd Eszes & Open Source Contributors")
-                        .font(.system(size: 10, weight: .medium))
+                    Text(L10n.t(.aboutCraftedBy))
+                        .font(.caption2.weight(.medium))
                         .foregroundStyle(.tertiary)
 
-                    Text("© 2026 OtterKeep. All rights reserved.")
-                        .font(.system(size: 9.5, weight: .regular))
+                    Text(L10n.t(.aboutCopyrightNotice))
+                        .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
                 .padding(.top, 4)
@@ -218,7 +222,7 @@ public struct OtterAboutView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(L10n.t(.aboutWindowTitle))
                     .font(.headline.bold())
-                Text("v\(CoreEngine.version) (Build \(CoreEngine.buildNumber))")
+                Text(L10n.format(.aboutVersionBuildFormat, CoreEngine.version, CoreEngine.buildNumber))
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
@@ -241,18 +245,18 @@ public struct OtterAboutView: View {
     private func architectureBadge(icon: String, color: Color, title: String, subtitle: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(color)
                 .frame(width: 24, height: 24)
                 .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(.primary)
 
                 Text(subtitle)
-                    .font(.system(size: 9.5, weight: .regular))
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -270,14 +274,14 @@ public struct OtterAboutView: View {
         VStack(spacing: 2) {
             HStack(spacing: 3) {
                 Image(systemName: icon)
-                    .font(.system(size: 8))
+                    .font(.caption2)
                     .foregroundStyle(OtterTheme.oceanicTeal)
                 Text(name)
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(.primary)
             }
             Text("v\(version)")
-                .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                .font(.caption2.bold().monospaced())
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -301,9 +305,9 @@ private struct LinkButton: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.caption2.weight(.semibold))
                 Text(title)
-                    .font(.system(size: 10.5, weight: .medium))
+                    .font(.caption.weight(.medium))
             }
         }
         .buttonStyle(.bordered)

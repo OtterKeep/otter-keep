@@ -1,7 +1,6 @@
 import SwiftUI
 import AppKit
 import OtterKeepCore
-import OtterKeepStorage
 
 extension MenuBarContentView {
     // MARK: - Profiles Section
@@ -26,7 +25,7 @@ extension MenuBarContentView {
                     } label: {
                         HStack(spacing: 3) {
                             Image(systemName: "play.circle.fill")
-                                .font(.system(size: 9))
+                                .font(.caption2)
                             Text(L10n.t(.menuBarBackupAll))
                                 .font(.caption2.bold())
                         }
@@ -111,22 +110,24 @@ extension MenuBarContentView {
                     appState.cancelBackup(for: profile.id)
                 } label: {
                     Image(systemName: "stop.fill")
-                        .font(.system(size: 9))
+                        .font(.caption2)
                 }
                 .buttonStyle(.bordered)
                 .tint(OtterTheme.statusError)
                 .controlSize(.mini)
                 .help(L10n.t(.stopBackupButton))
+                .accessibilityLabel(L10n.t(.stopBackupAccessibility))
             } else {
                 Button {
                     appState.startBackup(for: profile, mode: .incremental)
                 } label: {
                     Image(systemName: "play.fill")
-                        .font(.system(size: 9))
+                        .font(.caption2)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.mini)
                 .help(L10n.t(.menuBarBackupProfile))
+                .accessibilityLabel(L10n.t(.startBackupAccessibility))
 
                 // Profile action menu
                 Menu {
@@ -170,14 +171,14 @@ extension MenuBarContentView {
 
                     Button {
                         appState.selectProfile(id: profile.id)
-                        appState.activeProfileTab = .rulesAndMaintenance
+                        appState.showProfileSettingsModal = true
                         openMainWindow()
                     } label: {
                         Label(L10n.t(.menuBarOpenRules), systemImage: "slider.horizontal.3")
                     }
                 } label: {
                     Image(systemName: "ellipsis")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.caption2.bold())
                         .foregroundStyle(.secondary)
                         .frame(width: 18, height: 18)
                 }
@@ -229,7 +230,7 @@ extension MenuBarContentView {
 
             Button {
                 appState.selectProfile(id: profile.id)
-                appState.activeProfileTab = .rulesAndMaintenance
+                appState.showProfileSettingsModal = true
                 openMainWindow()
             } label: {
                 Label(L10n.t(.menuBarOpenRules), systemImage: "slider.horizontal.3")

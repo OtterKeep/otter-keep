@@ -28,6 +28,12 @@ extension L10n {
         .delete: Translation(english: "Delete", hungarian: "Törlés"),
         .confirm: Translation(english: "Confirm", hungarian: "Megerősítés"),
         .details: Translation(english: "Details...", hungarian: "Részletek..."),
+        .modalPayloadUnavailableTitle: Translation(
+            english: "This panel is not ready yet",
+            hungarian: "Ez a panel még nem áll készen"),
+        .modalPayloadUnavailableMessage: Translation(
+            english: "The details for this panel are still being prepared. Close it and try again in a moment.",
+            hungarian: "A panel részletei még készülnek. Zárd be, és próbáld újra egy pillanat múlva."),
         .searchPlaceholder: Translation(english: "Search...", hungarian: "Keresés..."),
         .okDone: Translation(english: "Done", hungarian: "Rendben"),
         .unitCountFormat: Translation(english: "%d", hungarian: "%d db"),
@@ -293,6 +299,7 @@ extension L10n {
         .logEmptyDesc: Translation(english: "No log events match the current filter criteria.", hungarian: "Nincsenek a szűrőknek megfelelő logesemények."),
         .logExportSuccess: Translation(english: "Logs exported successfully to:\n%@", hungarian: "Logok sikeresen exportálva ide:\n%@"),
         .logExportError: Translation(english: "Log export failed: %@", hungarian: "Log exportálási hiba: %@"),
+        .supportBundleButton: Translation(english: "Support Bundle...", hungarian: "Támogatási csomag..."),
         .icloudStrategyDownloadAndEvict: Translation(english: "Download & Evict (Full, space-saving)", hungarian: "Letöltés és Evikció (Teljes, helytakarékos)"),
         .icloudStrategyDownloadAndEvictDesc: Translation(english: "Downloads cloud files for backup, then evicts local cache to preserve free space.", hungarian: "Letölti a felhőfájlokat a mentéshez, majd azonnal törli a helyi gyorsítótárat a helytakarékosságért."),
         .icloudStrategyMetadataOnly: Translation(english: "Metadata Only (Bandwidth-saving)", hungarian: "Csak Metaadatok (Sávszélesség-kímélő)"),
@@ -343,7 +350,7 @@ extension L10n {
         .noProfileSelectedTitle: Translation(english: "No Profile Selected", hungarian: "Nincs kiválasztott profil"),
         .noProfileSelectedDesc: Translation(english: "Select or create a folder backup profile at the bottom of the sidebar.", hungarian: "Válassz ki vagy hozz létre egy mappamentési profilt az oldalsáv alján."),
         .rulesProfileSubtitleFormat: Translation(english: "Configuration, exclusions, and scheduling for '%@'.", hungarian: "Beállítások, kizárások és ütemezés a(z) „%@” profilhoz."),
-        .rulesConfigOnDashboardNotice: Translation(english: "Folder setup: Overview & Backup", hungarian: "Mappák konfigurálása: Áttekintés & Mentés"),
+        .rulesConfigOnDashboardNotice: Translation(english: "Folders backed up by this profile", hungarian: "Az ezzel a profillal mentett mappák"),
         .commonRulesLabel: Translation(english: "Common patterns:", hungarian: "Gyakori minták:"),
         .noActiveRulesNotice: Translation(english: "No active exclusion rules for this profile.", hungarian: "Nincsenek aktív kizárási szabályok ehhez a profilhoz."),
         .scheduleAndRetentionHeader: Translation(english: "Schedule & Retention Policy", hungarian: "Ütemezés és Megőrzési Házirend"),
@@ -546,7 +553,6 @@ extension L10n {
         .clearLogsButton: Translation(english: "Clear Logs", hungarian: "Napló Ürítése"),
         .tabOverview: Translation(english: "Overview", hungarian: "Áttekintés"),
         .tabTimeMachine: Translation(english: "Time Machine", hungarian: "Time Machine"),
-        .tabRulesAndMaintenance: Translation(english: "Rules & Maintenance", hungarian: "Szabályok & Karbantartás"),
         .tabPhotosSync: Translation(english: "Backup & Status", hungarian: "Mentés & Állapot"),
         .tabPhotosSnapshots: Translation(english: "Photo Versions", hungarian: "Fotó-Verziók"),
         .pipelineSourceLabel: Translation(english: "Source Folder", hungarian: "Forrásmappa"),
@@ -748,6 +754,9 @@ extension L10n {
         .remoteDestEditorSFTPPathPlaceholder: Translation(english: "/var/backups/otterkeep", hungarian: "/var/backups/otterkeep"),
         .testConnectionSuccessWebDAVFormat: Translation(english: "WebDAV connection verified: '%@' is reachable!", hungarian: "Sikeres WebDAV kapcsolat: '%@' elérhető!"),
         .testConnectionSuccessSFTPFormat: Translation(english: "SFTP connection verified: '%@' reachable on port 22!", hungarian: "Sikeres SFTP kapcsolat: '%@' elérhető a 22-es porton!"),
+        .testConnectionSMBPortUnreachableFormat: Translation(english: "The NAS server ('%@') is not reachable on port 445 (SMB).", hungarian: "A NAS szerver ('%@') nem érhető el a 445-ös (SMB) porton."),
+        .testConnectionInvalidWebDAVURL: Translation(english: "Invalid WebDAV URL address.", hungarian: "Érvénytelen WebDAV URL cím."),
+        .testConnectionInvalidSFTPHost: Translation(english: "The specified SFTP server address is invalid.", hungarian: "A megadott SFTP szerver cím érvénytelen."),
         .testConnectionFailedFormat: Translation(english: "Connection error: %@", hungarian: "Kapcsolódási hiba: %@"),
         .remoteDestEditorSFTPAuthMethodLabel: Translation(english: "Authentication Method:", hungarian: "Hitelesítés módja:"),
         .remoteDestEditorSFTPAuthPassword: Translation(english: "Password", hungarian: "Jelszó"),
@@ -824,6 +833,7 @@ extension L10n {
         .menuRefreshData: Translation(english: "Refresh Data & Snapshots", hungarian: "Adatok és pillanatképek frissítése"),
         .menuMainWindow: Translation(english: "OtterKeep Main Window", hungarian: "OtterKeep főablak"),
         .menuDocumentation: Translation(english: "OtterKeep Documentation", hungarian: "OtterKeep dokumentáció"),
+        .menuWelcomeGuide: Translation(english: "Welcome Guide & Onboarding...", hungarian: "Kezdő útmutató és beállítás..."),
         .menuReleaseNotes: Translation(english: "Release Notes", hungarian: "Kiadási megjegyzések"),
         .menuRevealLogs: Translation(english: "Reveal Logs in Finder", hungarian: "Naplófájlok megnyitása Finderben"),
         .menuReportIssue: Translation(english: "Report an Issue on GitHub", hungarian: "Hibajelentés küldése (GitHub)"),
@@ -944,5 +954,257 @@ extension L10n {
         .menuBarExternalVolumeDisconnected: Translation(english: "Destination drive is not connected", hungarian: "A mentési meghajtó nincs csatlakoztatva"),
         .menuBarTargetVolumeLabel: Translation(english: "Target Volume", hungarian: "Célmeghajtó"),
         .errBackupInProgress: Translation(english: "Backup is currently in progress.", hungarian: "A mentés még folyamatban van."),
+        // MARK: - 2.0.0 UI/UX Modernization
+        .profileSettingsTitle: Translation(english: "Profile Settings", hungarian: "Profil beállítások"),
+        .profileSettingsButton: Translation(english: "Profile Settings...", hungarian: "Profil beállítások..."),
+        .lastBackupResultTitle: Translation(english: "Last Backup Outcome", hungarian: "Utolsó mentés eredménye"),
+        .lastBackupResultSubtitle: Translation(english: "Detailed operational telemetry for this profile", hungarian: "Részletes műveleti telemetria ehhez a profilhoz"),
+        .tabGeneral: Translation(english: "General", hungarian: "Általános"),
+        .tabFinderIntegration: Translation(english: "Finder Extension", hungarian: "Finder bővítmény"),
+        .tabStorageAndDb: Translation(english: "Storage & DB", hungarian: "Tárhely & Adatbázis"),
+        .tabDiagnosticsAndUpdates: Translation(english: "Diagnostics & Updates", hungarian: "Diagnosztika & Frissítések"),
+        .tabAbout: Translation(english: "About", hungarian: "Névjegy"),
+        .menuSystemLogs: Translation(english: "System Logs", hungarian: "Rendszer naplók"),
+        .welcomeSanctuaryTitle: Translation(english: "Welcome to OtterKeep Sanctuary", hungarian: "Üdvözlünk az OtterKeep szentélyben"),
+        .welcomeSanctuarySubtitle: Translation(english: "Your personal guardian for cherished files, photos, and projects. Create your first profile to begin.", hungarian: "Féltett fájljaid, fotóid és projektjeid személyes őrzője. Hozd létre az első profilodat a kezdéshez."),
+        .createFirstProfileButton: Translation(english: "Create First Backup Profile", hungarian: "Első mentési profil létrehozása"),
+
+        // MARK: - 2.0.0 Core Engine & Resilience
+        .executionModeScheduled: Translation(english: "Scheduled (Periodic)", hungarian: "Ütemezett (Periodikus)"),
+        .executionModeContinuous: Translation(english: "Continuous (Real-time)", hungarian: "Folyamatos (Valós idejű)"),
+        .continuousDebounceLabel: Translation(english: "Quiet Window (Seconds)", hungarian: "Csendes időablak (másodperc)"),
+        .continuousDebounceDesc: Translation(english: "Wait this many seconds after the last file change before snapshotting.", hungarian: "Ennyi másodpercet vár az utolsó fájlváltozás után a pillanatkép készítésével."),
+        .powerGovernorHeader: Translation(english: "Power & Thermal Governor", hungarian: "Energiagazdálkodás és hőkímélés"),
+        .pauseOnBatteryLabel: Translation(english: "Pause Backups on Battery", hungarian: "Mentések szüneteltetése akkumulátorról"),
+        .pauseOnBatteryDesc: Translation(english: "Postpone backup cycles when running on battery power to conserve charge.", hungarian: "Akkumulátoros működéskor elhalasztja a mentéseket az üzemidő kímélése érdekében."),
+        .throttleOnThermalLabel: Translation(english: "Thermal Throttling Protection", hungarian: "Hőmérsékleti terhelés korlátozása"),
+        .throttleOnThermalDesc: Translation(english: "Throttle disk I/O and concurrency when macOS reports elevated thermal pressure.", hungarian: "Csökkenti az I/O terhelést és a párhuzamosságot, ha a Mac hőmérséklete megemelkedik."),
+        .canaryTrapHeader: Translation(english: "Canary Traps & Ransomware Defense", hungarian: "Kanári csapdák és zsarolóvírus védelem"),
+        .enableCanaryTrapsLabel: Translation(english: "Deploy Canary Trap Decoy Files", hungarian: "Kanári csalifájlok elhelyezése"),
+        .enableCanaryTrapsDesc: Translation(english: "Monitors hidden canary tokens in source directories. Aborts backup and locks repository if altered outside OtterKeep.", hungarian: "Rejtett kanári fájlokat helyez el a mappákban; külső módosítás esetén azonnal leállítja a mentést és zárolja a tárolót."),
+        .localEncryptionHeader: Translation(english: "Sanctuary Local Encryption", hungarian: "Helyi Sanctuary Titkosítás"),
+        .enableLocalEncryptionLabel: Translation(english: "Encrypt Local Target with Sparsebundle", hungarian: "Helyi mentés titkosítása Sparsebundle tárolóban"),
+        .enableLocalEncryptionDesc: Translation(english: "Stores snapshots in an AES-256 encrypted APFS container protected by macOS Keychain.", hungarian: "A pillanatképeket AES-256 titkosított APFS tárolóban tárolja a macOS Kulcskarika védelmében."),
+        .canaryTrapTriggeredAlertTitle: Translation(english: "Canary Trap Tamper Alert!", hungarian: "Kanári Csapda Riasztás!"),
+        .canaryTrapTriggeredAlertMessage: Translation(english: "Canary file modification detected outside OtterKeep! Ongoing backup aborted and repository locked for protection.", hungarian: "Külső kanári fájl módosítás észlelve! A futó mentés leállítva és a tároló zárolva az adatok védelmében."),
+
+        // MARK: - 2.0.0 Multi-Drive & Storage
+        .multiDriveRotationTitle: Translation(english: "Multi-Drive Rotation & Auto-Adoption", hungarian: "Többlemezes rotáció és automatikus befogadás"),
+        .multiDriveRotationDesc: Translation(english: "Recognizes alternate external backup drives belonging to this profile.", hungarian: "Felismeri és kezeli a profilhoz rendelt másodlagos külső mentési lemezeket."),
+        .dedupCdcTitle: Translation(english: "Content-Defined Chunking (FastCDC)", hungarian: "Tartalomfüggő szeletelés (FastCDC)"),
+        .dedupCdcDesc: Translation(english: "Deduplicates large files at block boundaries using content-addressable storage.", hungarian: "Blokkszintű tartalomcímzett deduplikáció nagyméretű fájlokhoz."),
+
+        // MARK: - 2.0.0 Sanctuary Onboarding & Scrubber
+        .onboardingWelcomeTitle: Translation(english: "Welcome to OtterKeep", hungarian: "Üdvözlünk az OtterKeepben"),
+        .onboardingWelcomeDesc: Translation(english: "Let's prepare your digital sanctuary in four simple steps.", hungarian: "Készítsük elő digitális menedékedet négy egyszerű lépésben."),
+        .onboardingStepFDA: Translation(english: "Full Disk Access", hungarian: "Teljes lemezhozzáférés"),
+        .onboardingStepProfile: Translation(english: "First Backup Profile", hungarian: "Első mentési profil"),
+        .onboardingStepSchedule: Translation(english: "Schedule & Mode", hungarian: "Ütemezés és mód"),
+        .onboardingStepFinish: Translation(english: "Ready to Protect", hungarian: "Menedék felkészült"),
+        .onboardingContinue: Translation(english: "Continue", hungarian: "Folytatás"),
+        .onboardingSkip: Translation(english: "Skip Setup", hungarian: "Beállítás kihagyása"),
+        .onboardingFinish: Translation(english: "Enter Sanctuary", hungarian: "Belépés a menedékbe"),
+        .timelineScrubberTitle: Translation(english: "Visual Timeline Scrubber", hungarian: "Vizuális idővonal tekerő"),
+        .smartHeroTitle: Translation(english: "S.M.A.R.T. Drive Health", hungarian: "S.M.A.R.T. Meghajtó Állapot"),
+        .smartHeroHealthy: Translation(english: "Verified Healthy", hungarian: "Egészséges"),
+        .smartHeroWarning: Translation(english: "Degraded / Attention Required", hungarian: "Figyelmet igényel"),
+        .presetExclusionsTitle: Translation(english: "Exclusion Presets", hungarian: "Kizárási sablonok"),
+        .presetExclusionNodeModules: Translation(english: "Node.js & Web (node_modules, .next, .nuxt)", hungarian: "Node.js & Web (node_modules, .next, .nuxt)"),
+        .presetExclusionXcode: Translation(english: "Xcode & Swift (DerivedData, .build)", hungarian: "Xcode & Swift (DerivedData, .build)"),
+        .presetExclusionPython: Translation(english: "Python & Virtualenvs (.venv, __pycache__)", hungarian: "Python & Virtuális környezetek (.venv, __pycache__)"),
+        .presetExclusionMediaCaches: Translation(english: "Media Caches & Temp (Render Files, Caches)", hungarian: "Média gyorsítótárak és átmeneti fájlok"),
+        .sparsebundlePasswordLabel: Translation(english: "Container Passphrase", hungarian: "Tároló jelszava"),
+        .sparsebundlePasswordPlaceholder: Translation(english: "Enter secure passphrase", hungarian: "Add meg a titkosítási jelszót"),
+        .sparsebundlePasswordHint: Translation(english: "Saved securely to macOS Keychain", hungarian: "Biztonságosan elmentve a macOS Kulcskarikára"),
+        .menuSaveSupportBundle: Translation(english: "Save Support Bundle...", hungarian: "Diagnosztikai csomag mentése..."),
+        .daemonStatusHeader: Translation(english: "Background Daemon Service", hungarian: "Háttérbeli Daemon Szolgáltatás"),
+        .daemonStatusActive: Translation(english: "Active & Monitored", hungarian: "Aktív és figyelt"),
+        .daemonStatusRequiresApproval: Translation(english: "Requires Approval in System Settings", hungarian: "Jóváhagyást igényel a Rendszerbeállításokban"),
+        .daemonStatusNotFound: Translation(english: "Not Installed / Disabled", hungarian: "Nincs telepítve / Kikapcsolva"),
+        .daemonOpenSystemSettings: Translation(english: "Open Login Items Settings…", hungarian: "Bejelentkezési elemek beállításai…"),
+        .addVolumeToRotation: Translation(english: "Add Current Volume to Rotation", hungarian: "Aktuális kötet hozzáadása a rotációhoz"),
+        .noRotationVolumes: Translation(english: "No alternate backup drives registered yet", hungarian: "Még nincs másodlagos mentési kötet regisztrálva"),
+        .onboardingFeatureApfsTitle: Translation(english: "APFS Copy-on-Write", hungarian: "APFS Másolás-íráskor"),
+        .onboardingFeatureApfsDesc: Translation(english: "Zero-duplicate instantaneous snapshots without taking extra storage.", hungarian: "Azonnali, duplikációmentes pillanatképek extra tárhelyfoglalás nélkül."),
+        .onboardingFeatureLocalTitle: Translation(english: "Private & Local First", hungarian: "Bizalmas & Helyi Védelem"),
+        .onboardingFeatureLocalDesc: Translation(english: "Your data stays entirely under your control on your trusted drives.", hungarian: "Adataid teljes mértékben a te felügyeleted alatt maradnak a saját lemezeiden."),
+        .onboardingFeatureGentleTitle: Translation(english: "Gentle on Battery & Hardware", hungarian: "Kíméletes az Akkumulátorral és Lemezzel"),
+        .onboardingFeatureGentleDesc: Translation(english: "Smart power throttling keeps your Mac cool and silent.", hungarian: "Az intelligens energiagazdálkodó hűvösen és csendben tartja a Macet."),
+        .onboardingFDADesc: Translation(english: "OtterKeep requires Full Disk Access to safely back up protected user directories like Documents, Desktop, and Mail without permission errors.", hungarian: "Az OtterKeep számára Teljes Lemezelérés szükséges a védett könyvtárak (Dokumentumok, Íróasztal, Mail) hibamentes és biztonságos mentéséhez."),
+        .onboardingRecheckFDA: Translation(english: "Recheck Full Disk Access", hungarian: "Teljes Lemezelérés Újraellenőrzése"),
+        .onboardingProfileFoldersSubtitle: Translation(english: "Select the primary folders you wish to safeguard.", hungarian: "Válaszd ki az elsődleges mappákat, amelyeket biztonságba szeretnél helyezni."),
+        .onboardingProfileNameLabel: Translation(english: "Profile Name", hungarian: "Profil Neve"),
+        .onboardingProtectionSubtitle: Translation(english: "Configure real-time monitoring and anti-ransomware traps.", hungarian: "Valós idejű fájlfigyelés és zsarolóvírus-csapdák beállítása."),
+        .back: Translation(english: "Back", hungarian: "Vissza"),
+        .daysCountFormat: Translation(english: "%d days", hungarian: "%d nap"),
+        .forecastRefreshHelp: Translation(english: "Refresh Storage Forecast", hungarian: "Tárhely-előrejelzés frissítése"),
+        .photosMaxBufferFormat: Translation(english: "Max %@", hungarian: "Max. %@"),
+        .replicationEncryptionBadge: Translation(english: "AES-256", hungarian: "AES-256"),
+        .replicationArchiveBadgeFormat: Translation(english: "TAR.ZST (L%d)", hungarian: "TAR.ZST (L%d)"),
+        .encryptionSparsebundleLabel: Translation(english: "Sparsebundle:", hungarian: "Sparsebundle:"),
+        .debounceSecondsFormat: Translation(english: "%d s", hungarian: "%d mp"),
+        .snapshotPathLabelFormat: Translation(english: "Snapshot: %@", hungarian: "Pillanatkép: %@"),
+        .aboutSubsystemComponentsTitle: Translation(english: "Subsystem Components", hungarian: "Alrendszer-összetevők"),
+        .aboutCraftedBy: Translation(
+            english: "Crafted with care by Richárd Eszes & Open Source Contributors",
+            hungarian: "Gondos kézzel készítette Eszes Richárd és a nyílt forráskódú közreműködők"),
+        .aboutCopyrightNotice: Translation(english: "© 2026 OtterKeep. All rights reserved.", hungarian: "© 2026 OtterKeep. Minden jog fenntartva."),
+        .aboutSubsystemsSummaryFormat: Translation(
+            english: "Subsystems: Storage v%@ • DB v%@ • Core v%@ • UI v%@ • CLI v%@",
+            hungarian: "Alrendszerek: Tárhely v%@ • Adatbázis v%@ • Mag v%@ • Felület v%@ • CLI v%@"),
+        .aboutVersionBuildFormat: Translation(english: "v%@ (Build %@)", hungarian: "v%@ (%@ build)"),
+        .aboutBuildFormat: Translation(english: "Build %@", hungarian: "%@ build"),
+        .aboutAppVersionFormat: Translation(english: "OtterKeep v%@", hungarian: "OtterKeep v%@"),
+        .aboutTaglineEnglish: Translation(
+            english: "„Keep what you love close to your chest.”", hungarian: "„Keep what you love close to your chest.”"),
+        .aboutTaglineHungarian: Translation(
+            english: "„Őrizd a legfontosabb kincseidet biztos kezekben.”", hungarian: "„Őrizd a legfontosabb kincseidet biztos kezekben.”"),
+        .aboutBadgeApfsTitle: Translation(english: "APFS CoW Engine", hungarian: "APFS CoW motor"),
+        .aboutBadgeApfsSubtitle: Translation(english: "Zero-latency instant clones", hungarian: "Azonnali, késleltetés nélküli klónok"),
+        .aboutBadgeSwiftTitle: Translation(english: "Swift 6 Concurrency", hungarian: "Swift 6 párhuzamosság"),
+        .aboutBadgeSwiftSubtitle: Translation(english: "Actor-isolated data safety", hungarian: "Actor-alapú adatbiztonság"),
+        .aboutBadgeLocalTitle: Translation(english: "Local-First", hungarian: "Helyi elsőbbség"),
+        .aboutBadgeLocalSubtitle: Translation(english: "100% on-device private vaults", hungarian: "100%-ban helyi, privát széfek"),
+        .aboutBadgeTelemetryTitle: Translation(english: "Zero Telemetry", hungarian: "Nincs telemetria"),
+        .aboutBadgeTelemetrySubtitle: Translation(english: "No trackers, no telemetry", hungarian: "Nincsenek követők, nincs telemetria"),
+        .aboutLinkWebsite: Translation(english: "Website", hungarian: "Weboldal"),
+        .aboutLinkGitHub: Translation(english: "GitHub", hungarian: "GitHub"),
+        .aboutLinkReleases: Translation(english: "Releases", hungarian: "Kiadások"),
+        .aboutLinkLicense: Translation(english: "MIT License", hungarian: "MIT licenc"),
+        .closeButton: Translation(english: "Close", hungarian: "Bezárás"),
+        .clearSearchButton: Translation(english: "Clear Search", hungarian: "Keresés törlése"),
+        .removeExclusionButton: Translation(english: "Remove Exclusion", hungarian: "Kizárás eltávolítása"),
+        .compareVersionsButton: Translation(english: "Compare Versions", hungarian: "Verziók összehasonlítása"),
+        .openInFinderButton: Translation(english: "Open in Finder", hungarian: "Megnyitás a Finderben"),
+        .previousSnapshotButton: Translation(english: "Previous Snapshot", hungarian: "Előző pillanatkép"),
+        .nextSnapshotButton: Translation(english: "Next Snapshot", hungarian: "Következő pillanatkép"),
+        .refreshLogsButton: Translation(english: "Refresh Logs", hungarian: "Napló frissítése"),
+        .stopBackupAccessibility: Translation(english: "Stop Backup", hungarian: "Mentés leállítása"),
+        .startBackupAccessibility: Translation(english: "Start Backup", hungarian: "Mentés indítása"),
+        .feedbackGuaranteeTitle: Translation(english: "Your sanctuary is intact", hungarian: "A védett adataid sértetlenek"),
+        .feedbackGuaranteeSnapshotsSafe: Translation(
+            english: "Your existing snapshots and the original files on your Mac were not modified.",
+            hungarian: "A korábbi pillanatképek és a Mac-en lévő eredeti fájlok változatlanok maradtak."
+        ),
+        .feedbackGuaranteeNothingModified: Translation(
+            english: "Nothing on your Mac was changed by this attempt.",
+            hungarian: "Ez a kísérlet semmit nem módosított a Mac-en."
+        ),
+        .recoveryOpenFullDiskAccess: Translation(
+            english: "Open Full Disk Access Settings",
+            hungarian: "Teljes lemezhozzáférés megnyitása"
+        ),
+        .recoveryViewLogs: Translation(english: "View Diagnostic Logs", hungarian: "Hibanapló megtekintése"),
+
+        // MARK: - Emergency Kit, Biometrics & Automation (v2.1)
+        .encryptionAndEmergencyKitTitle: Translation(english: "Client-Side Encryption & Emergency Kit", hungarian: "Kliensoldali titkosítás és Vészhelyzeti Kit"),
+        .emergencyKitTitle: Translation(english: "Emergency Recovery Kit", hungarian: "Vészhelyzeti Helyreállítási Készlet"),
+        .emergencyKitSubtitle: Translation(
+            english: "Print or securely store this recovery document to restore encrypted backups in an emergency.",
+            hungarian: "Nyomtasd ki vagy mentsd el biztonságos helyre ezt a dokumentumot a titkosított mentések vészhelyzeti visszaállításához."
+        ),
+        .emergencyKitExportButton: Translation(english: "Download Emergency Kit (PDF)...", hungarian: "Vészhelyzeti Kit Letöltése (PDF)..."),
+        .emergencyKitExportedNotice: Translation(english: "Emergency Kit successfully saved.", hungarian: "A Vészhelyzeti Kit sikeresen elmentve."),
+        .emergencyKitDownloadPrompt: Translation(
+            english: "Download your Emergency Kit now. For your security, this document cannot be generated later.",
+            hungarian: "Töltsd le a Vészhelyzeti Kitet most. A biztonságod érdekében ez a dokumentum később már nem tölthető le."
+        ),
+        .emergencyKitCreatedOnlyWarning: Translation(
+            english: "The Emergency Kit is only available during profile creation. Keep it safe!",
+            hungarian: "A Vészhelyzeti Kit kizárólag a profil létrehozásakor tölthető le. Őrizd meg biztonságos helyen!"
+        ),
+        .emergencyKitIncludePassword: Translation(english: "Include Passphrase in PDF", hungarian: "Jelszó beágyazása a PDF-be"),
+        .emergencyKitIncludePasswordDesc: Translation(
+            english: "Warning: Anyone with this document can decrypt your backup. Keep paper copies in a safe.",
+            hungarian: "Figyelem: Bárki, aki hozzáfér ehhez a dokumentumhoz, feloldhatja a mentésedet. Tartsd páncélszekrényben a papírpéldányt."
+        ),
+        .emergencyKitHandwriteNotice: Translation(
+            english: "Write your encryption passphrase by hand in the boxes below:",
+            hungarian: "Írd be kézzel a titkosítási jelszavadat az alábbi mezőkbe:"
+        ),
+        .emergencyKitSecuritySummary: Translation(english: "Cryptographic Specifications", hungarian: "Kriptográfiai Jellemzők"),
+        .emergencyKitRestoreSteps: Translation(english: "Disaster Recovery Instructions", hungarian: "Katasztrófa-helyreállítási Lépések"),
+        .emergencyKitTerminalCommand: Translation(english: "Terminal Recovery Command", hungarian: "Terminál Helyreállító Parancs"),
+        .emergencyKitQRCodeLabel: Translation(english: "Scannable Recovery QR Code", hungarian: "Beolvasható Helyreállító QR Kód"),
+        .biometricsTabTitle: Translation(english: "Biometrics & Hardware", hungarian: "Biometria és Hardver"),
+        .biometricsEnableMasterToggle: Translation(english: "Enable Touch ID & Biometrics", hungarian: "Touch ID & Hitelesítés engedélyezése"),
+        .biometricsTouchIDAvailable: Translation(english: "Touch ID sensor active", hungarian: "Touch ID érzékelő aktív"),
+        .biometricsTouchIDUnavailable: Translation(english: "Biometrics unavailable (passcode fallback)", hungarian: "Biometria nem érhető el (jelszó fallback)"),
+        .biometricsRequireForRestore: Translation(english: "Require Touch ID to restore files", hungarian: "Touch ID megkövetelése fájlok visszaállításakor"),
+        .biometricsRequireForRestoreDesc: Translation(
+            english: "Prevents unauthorized users from restoring backups on an unlocked Mac.",
+            hungarian: "Megakadályozza, hogy illetéktelenek fájlokat állítsanak vissza egy feloldott Macen."
+        ),
+        .biometricsRequireForDelete: Translation(english: "Require Touch ID to delete profiles", hungarian: "Touch ID megkövetelése profil törlésekor"),
+        .biometricsRequireForDeleteDesc: Translation(
+            english: "Requires biometric confirmation before permanently removing a backup profile and history.",
+            hungarian: "Biometrikus megerősítést kér a mentési profil és előzmények végleges törlése előtt."
+        ),
+        .biometricsRequireForKeyReveal: Translation(english: "Require Touch ID to reveal encryption keys", hungarian: "Touch ID megkövetelése titkosítási kulcsok felfedésekor"),
+        .biometricsRequireForKeyRevealDesc: Translation(
+            english: "Demands Touch ID before viewing passphrases or exporting security kits.",
+            hungarian: "Touch ID-t kér a jelszavak megtekintése vagy a biztonsági készlet exportálása előtt."
+        ),
+        .biometricsHardwareSecureEnclave: Translation(english: "Hardware Secure Enclave Key Protection", hungarian: "Hardveres Secure Enclave Kulcsvédelem"),
+        .biometricsHardwareSecureEnclaveDesc: Translation(
+            english: "Stores encryption keys in the Apple Secure Enclave coprocessor, requiring user presence.",
+            hungarian: "A titkosítási kulcsokat az Apple Secure Enclave hardver chipjében tárolja, felhasználói jelenlétet igényelve."
+        ),
+        .biometricsAuthPromptRestore: Translation(english: "Authorize restoring files from OtterKeep backup", hungarian: "Fájlok visszaállításának jóváhagyása az OtterKeep mentésből"),
+        .biometricsAuthPromptDelete: Translation(english: "Authorize permanently deleting this backup profile", hungarian: "A mentési profil végleges törlésének jóváhagyása"),
+        .biometricsAuthPromptKeyReveal: Translation(english: "Authorize viewing encryption passphrase", hungarian: "Titkosítási jelszó megtekintésének jóváhagyása"),
+        .biometricsAuthPromptEmergencyKit: Translation(english: "Authorize exporting Emergency Recovery Kit", hungarian: "A Vészhelyzeti Helyreállítási Készlet exportálásának jóváhagyása"),
+        .biometricsAuthFailed: Translation(english: "Biometric authentication failed or was cancelled.", hungarian: "A biometrikus azonosítás sikertelen volt vagy meg lett szakítva."),
+        .encryptionLockedNotice: Translation(
+            english: "Encryption settings were permanently configured during profile creation and cannot be modified.",
+            hungarian: "A titkosítási beállítások a profil létrehozásakor véglegesen rögzültek, és a biztonság védelmében nem módosíthatók."
+        ),
+        .intentStartBackupTitle: Translation(english: "Start OtterKeep Backup", hungarian: "OtterKeep Mentés Indítása"),
+        .intentStartBackupDesc: Translation(
+            english: "Starts a silent background backup for the configured profile.",
+            hungarian: "Csendes háttérmentést indít a megadott profilhoz."
+        ),
+        .intentGetStatusTitle: Translation(english: "Get Backup Status", hungarian: "Mentési Állapot Lekérdezése"),
+        .intentGetStatusDesc: Translation(
+            english: "Returns the current health and timestamp of the latest backup.",
+            hungarian: "Visszaadja a legutóbbi mentés állapotát és időbélyegét."
+        ),
+        .ignoreFilesTooltipDesc: Translation(
+            english: "Automatically omit exclusion rules and hidden dotfiles from the backup snapshot.",
+            hungarian: "Kizárási szabályok és rejtett fájlok automatikus kihagyása a biztonsági mentésből."
+        ),
+        .driveAutomationTooltipDesc: Translation(
+            english: "Automatically run backup when external drive is mounted and safely eject upon completion.",
+            hungarian: "Automatikus biztonsági mentés külső meghajtó csatlakoztatásakor és befejezés utáni leválasztás."
+        ),
+        .clientEncryptionTooltipDesc: Translation(
+            english: "Zero-knowledge AES-GCM-256 client-side encryption with PBKDF2 key derivation. Passphrases are stored in the macOS Keychain.",
+            hungarian: "Zero-knowledge AES-GCM-256 kliensoldali titkosítás PBKDF2 kulcslevezetéssel. A jelszót a rendszer a macOS Keychainben őrzi."
+        ),
+        .encryptionPassphraseFieldLabel: Translation(english: "Encryption Passphrase", hungarian: "Titkosítási jelszó"),
+        .encryptionPassphraseFieldPlaceholder: Translation(english: "Enter encryption passphrase...", hungarian: "Titkosítási jelszó megadása..."),
+        .confirmPassphraseFieldLabel: Translation(english: "Confirm Passphrase", hungarian: "Jelszó megerősítése"),
+        .confirmPassphraseFieldPlaceholder: Translation(english: "Confirm passphrase...", hungarian: "Jelszó megerősítése..."),
+        .passphraseMismatchError: Translation(english: "Passphrases do not match.", hungarian: "A megadott jelszavak nem egyeznek."),
+        .biometricsActionGatesSection: Translation(english: "Protected Operations (Action Gates)", hungarian: "Védett Műveletek (Action Gates)"),
+        .biometricsSecureEnclaveToggle: Translation(english: "Apple Secure Enclave Hardware Key Protection", hungarian: "Apple Secure Enclave Hardveres Kulcszárolás"),
+        .encryptionPermanentTag: Translation(english: "Permanent", hungarian: "Végleges"),
+        .encryptionKeychainStoredDesc: Translation(
+            english: "The passphrase was securely stored in the Keychain and Secure Enclave at creation.",
+            hungarian: "A jelszó a létrehozáskor a Keychainbe és a Secure Enclave-be került."
+        ),
+        .unencryptedProfileNotice: Translation(
+            english: "Profile created without client-side encryption",
+            hungarian: "Titkosítás nélkül létrehozott profil"
+        ),
+        .centralDatabaseTitle: Translation(english: "Central SQLite Database", hungarian: "Központi SQLite Adatbázis"),
+        .centralDatabaseVacuumButton: Translation(english: "Self-Healing & VACUUM", hungarian: "Öngyógyítás & VACUUM"),
+        .unadoptedDriveDiscoveredTitle: Translation(english: "Existing Sanctuary Discovered", hungarian: "Létező mentés található a meghajtón"),
+        .unadoptedDriveDiscoveredMessageFormat: Translation(
+            english: "We discovered an existing backup archive for „%1$@” on „%2$@”. Would you like to adopt this profile into your sanctuary to safeguard and explore its historical snapshots?",
+            hungarian: "A(z) „%2$@” meghajtón megtaláltuk a(z) „%1$@” mentési archívumot. Szeretnéd hozzáadni a helyi profiljaidhoz, hogy biztonságban tudd és böngészhesd a pillanatképeit?"
+        ),
+        .unadoptedDriveAdoptAction: Translation(english: "Adopt into Sanctuary", hungarian: "Hozzáadás a Menedékhez"),
+        .unadoptedDriveDismissAction: Translation(english: "Not Now", hungarian: "Most nem"),
     ]
 }

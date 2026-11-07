@@ -179,7 +179,6 @@ extension SettingsView {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
-        .padding(20)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
+        .otterCard(padding: 20)
     }
 }

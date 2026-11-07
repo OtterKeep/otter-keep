@@ -2,7 +2,6 @@ import SwiftUI
 import Photos
 import UniformTypeIdentifiers
 import OtterKeepCore
-import OtterKeepDatabase
 
 extension PhotosBackupView {
     // MARK: - Schedule Section
@@ -78,8 +77,8 @@ extension PhotosBackupView {
                                             appState.savePhotosConfig()
                                         }
                                     )) {
-                                        ForEach(0..<24, id: \.self) { h in
-                                            Text(String(format: "%02d:00", h)).tag(h)
+                                        ForEach(ScheduleTimeFormatting.hourLabels, id: \.hour) { entry in
+                                            Text(entry.label).tag(entry.hour)
                                         }
                                     }
                                     .labelsHidden()
@@ -92,8 +91,8 @@ extension PhotosBackupView {
                                             appState.savePhotosConfig()
                                         }
                                     )) {
-                                        ForEach([0, 15, 30, 45], id: \.self) { m in
-                                            Text(String(format: ":%02d", m)).tag(m)
+                                        ForEach(ScheduleTimeFormatting.minuteOptions, id: \.self) { m in
+                                            Text(ScheduleTimeFormatting.minuteLabel(m)).tag(m)
                                         }
                                     }
                                     .labelsHidden()
@@ -131,8 +130,8 @@ extension PhotosBackupView {
                                         appState.savePhotosConfig()
                                     }
                                 )) {
-                                    ForEach(0..<24, id: \.self) { h in
-                                        Text(String(format: "%02d:00", h)).tag(h)
+                                    ForEach(ScheduleTimeFormatting.hourLabels, id: \.hour) { entry in
+                                        Text(entry.label).tag(entry.hour)
                                     }
                                 }
                                 .labelsHidden()

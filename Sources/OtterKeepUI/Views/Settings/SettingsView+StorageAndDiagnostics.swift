@@ -73,9 +73,43 @@ extension SettingsView {
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
             }
+
+            Divider()
+
+            // Central SQLite Database & Self-Healing
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L10n.t(.centralDatabaseTitle))
+                        .font(.body.weight(.medium))
+                    Text(appState.centralDatabasePath)
+                        .font(.callout.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer()
+                Button {
+                    let dbURL = URL(fileURLWithPath: appState.centralDatabasePath)
+                    NSWorkspace.shared.activateFileViewerSelecting([dbURL])
+                } label: {
+                    Text(L10n.t(.settingsOpenFolder))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+
+                Button {
+                    Task {
+                        try? appState.performCentralDatabaseSelfHealing()
+                    }
+                } label: {
+                    Label(L10n.t(.centralDatabaseVacuumButton), systemImage: "bandage")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(OtterTheme.oceanicTeal)
+                .controlSize(.regular)
+            }
         }
-        .padding(20)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
+        .otterCard(padding: 20)
     }
 
     private var debugLoggingBinding: Binding<Bool> {
@@ -187,7 +221,6 @@ extension SettingsView {
             }
             .padding(.top, 2)
         }
-        .padding(20)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))
+        .otterCard(padding: 20)
     }
 }

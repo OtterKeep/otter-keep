@@ -1,6 +1,6 @@
 import SwiftUI
 import QuickLook
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 extension RestoreExplorerView {
@@ -40,7 +40,7 @@ extension RestoreExplorerView {
                                         .font(.body.bold())
                                     if snap.backupType == "full" {
                                         Text(L10n.t(.backupTypeFull))
-                                            .font(.system(size: 9, weight: .bold))
+                                            .font(.caption2.bold())
                                             .padding(.horizontal, 5)
                                             .padding(.vertical, 1.5)
                                             .background(OtterTheme.oceanicTeal.opacity(0.20), in: Capsule())
@@ -51,7 +51,7 @@ extension RestoreExplorerView {
                                             Image(systemName: "lock.shield.fill")
                                             Text(L10n.t(.wormLockedBadge))
                                         }
-                                        .font(.system(size: 9, weight: .bold))
+                                        .font(.caption2.bold())
                                         .padding(.horizontal, 5)
                                         .padding(.vertical, 1.5)
                                         .background(OtterTheme.accentPurple.opacity(0.20), in: Capsule())
@@ -144,6 +144,7 @@ extension RestoreExplorerView {
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(L10n.t(.clearSearchButton))
                     }
                 }
                 .padding(8)
@@ -223,6 +224,14 @@ extension RestoreExplorerView {
             Image(systemName: node.isDirectory ? "folder.fill" : "doc.fill")
                 .foregroundStyle(node.isDirectory ? OtterTheme.oceanicTeal : .secondary)
                 .font(.body)
+
+            if !node.isDirectory {
+                let status = appState.snapshotFileDiffStatuses[node.relativePath] ?? .unchanged
+                Circle()
+                    .fill(diffStatusColor(status))
+                    .frame(width: 7, height: 7)
+                    .help(diffStatusTooltip(status))
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(node.name)
@@ -334,6 +343,22 @@ extension RestoreExplorerView {
         }
     }
 
-    // MARK: - 2. File Timeline View with Directory Tree
+    private func diffStatusColor(_ status: DiffChangeType) -> Color {
+        switch status {
+        case .added: return OtterTheme.statusGreen
+        case .modified: return OtterTheme.otterAmber
+        case .unchanged: return Color.secondary.opacity(0.4)
+        case .deleted: return OtterTheme.statusError
+        }
+    }
+
+    private func diffStatusTooltip(_ status: DiffChangeType) -> String {
+        switch status {
+        case .added: return L10n.t(.diffTabAdded)
+        case .modified: return L10n.t(.diffTabModified)
+        case .unchanged: return L10n.t(.timelineUnmodifiedCoW)
+        case .deleted: return L10n.t(.diffTabDeleted)
+        }
+    }
 
 }

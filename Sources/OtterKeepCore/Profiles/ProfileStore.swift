@@ -1,4 +1,5 @@
 import Foundation
+import OtterKeepDatabase
 
 /// Thread-safe persistence store managing backup profile configurations stored in `~/.otterkeep/profiles.json`.
 public final class ProfileStore: @unchecked Sendable {
@@ -26,7 +27,15 @@ public final class ProfileStore: @unchecked Sendable {
         storageDirectory.appendingPathComponent("profiles.json")
     }
 
-    private init() {
+    private let centralDatabase: CentralDatabase
+
+    /// Full path to the central SQLite database (`~/.otterkeep/central.sqlite`).
+    public var centralDatabasePath: String {
+        centralDatabase.databasePath
+    }
+
+    private init(centralDatabase: CentralDatabase = .shared) {
+        self.centralDatabase = centralDatabase
         createDirectoryIfNeeded()
     }
 
@@ -39,7 +48,7 @@ public final class ProfileStore: @unchecked Sendable {
         try? fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dir.path)
     }
 
-    /// Loads all configured backup profiles from disk. If no profiles exist, creates and persists a default initial profile.
+    /// Loads all configured backup profiles from the central SQLite database or disk. If no profiles exist, creates and persists a default initial profile.
     /// - Returns: Array of `BackupProfile` instances.
     public func loadProfiles() -> [BackupProfile] {
         lock.lock()
@@ -60,7 +69,7 @@ public final class ProfileStore: @unchecked Sendable {
         }
     }
 
-    /// Persists an array of backup profiles to disk atomically.
+    /// Persists an array of backup profiles to disk and the central database atomically.
     /// - Parameter profiles: Array of profiles to write.
     public func saveProfiles(_ profiles: [BackupProfile]) throws {
         lock.lock()
@@ -70,9 +79,28 @@ public final class ProfileStore: @unchecked Sendable {
 
     private func saveProfilesUnlocked(_ profiles: [BackupProfile]) throws {
         createDirectoryIfNeeded()
+
+        // 1. Persist to Central SQLite Database
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
+
+        var records: [CentralProfileRecord] = []
+        for profile in profiles {
+            if let data = try? encoder.encode(profile),
+               let jsonStr = String(data: data, encoding: .utf8) {
+                records.append(CentralProfileRecord(
+                    id: profile.id.uuidString,
+                    name: profile.name,
+                    jsonData: jsonStr,
+                    createdAt: Date(),
+                    updatedAt: Date()
+                ))
+            }
+        }
+        try centralDatabase.replaceAllProfileRecords(records)
+
+        // 2. Persist to profiles.json for JSON portability and legacy/FinderSync support
         let data = try encoder.encode(profiles)
         try data.write(to: profilesFileURL, options: .atomic)
         // Enforce strict 0600 permissions on profiles.json
@@ -143,11 +171,30 @@ public final class ProfileStore: @unchecked Sendable {
                 KeychainManager.deleteSecret(for: "sftp_\(dest.id.uuidString)")
             }
         }
+        try? centralDatabase.deleteProfileRecord(id: id.uuidString)
         current.removeAll(where: { $0.id == id })
         try saveProfilesUnlocked(current)
     }
 
     private func loadProfilesUnlocked() -> [BackupProfile] {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        // 1. Primary Store: Central SQLite Database
+        if let dbRecords = try? centralDatabase.loadProfileRecords(), !dbRecords.isEmpty {
+            var loaded: [BackupProfile] = []
+            for rec in dbRecords {
+                if let data = rec.jsonData.data(using: .utf8),
+                   let prof = try? decoder.decode(BackupProfile.self, from: data) {
+                    loaded.append(prof)
+                }
+            }
+            if !loaded.isEmpty {
+                return loaded
+            }
+        }
+
+        // 2. Fallback / Migration: Legacy profiles.json files
         var candidateFiles: [URL] = [profilesFileURL]
         if let pw = getpwuid(getuid()) {
             let realHome = URL(fileURLWithPath: String(cString: pw.pointee.pw_dir))
@@ -170,14 +217,17 @@ public final class ProfileStore: @unchecked Sendable {
         for file in candidateFiles {
             if fileManager.fileExists(atPath: file.path),
                let data = try? Data(contentsOf: file) {
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
                 if let list = try? decoder.decode([BackupProfile].self, from: data), !list.isEmpty {
+                    // Automatically migrate legacy profiles into Central Database
+                    try? saveProfilesUnlocked(list)
                     return list
                 }
             }
         }
-        return [createDefaultInitialProfile()]
+
+        let initialProfile = createDefaultInitialProfile()
+        try? saveProfilesUnlocked([initialProfile])
+        return [initialProfile]
     }
 
     /// Creates a default initial profile pointing to standard user Documents and a local backup destination.

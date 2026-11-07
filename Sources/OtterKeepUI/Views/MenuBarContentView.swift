@@ -1,7 +1,6 @@
 import SwiftUI
 import AppKit
 import OtterKeepCore
-import OtterKeepStorage
 
 /// MenuBar popup window interface presenting live backup status, all configured profiles, quick trigger actions, and system shortcuts.
 public struct MenuBarContentView: View {
@@ -25,16 +24,23 @@ public struct MenuBarContentView: View {
 
             Divider()
 
-            // Profiles list & trigger all
-            profilesSection
+            // Scrollable middle so the footer stays reachable on short screens or with many profiles.
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 10) {
+                    // Profiles list & trigger all
+                    profilesSection
 
-            Divider()
+                    Divider()
 
-            // Apple Photos Backup Card
-            photosBackupCard
+                    // Apple Photos Backup Card
+                    photosBackupCard
 
-            // Destination Storage Glance Card (if available)
-            storageGlanceCard
+                    // Destination Storage Glance Card (if available)
+                    storageGlanceCard
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .scrollBounceBehavior(.basedOnSize)
 
             Divider()
 
@@ -42,7 +48,8 @@ public struct MenuBarContentView: View {
             footerControls
         }
         .padding(12)
-        .frame(width: 320)
+        .frame(minWidth: 320, idealWidth: 320, maxWidth: 320)
+        .frame(maxHeight: 560)
         .preferredColorScheme(appState.currentTheme.colorScheme)
     }
 

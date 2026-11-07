@@ -1,25 +1,6 @@
 import Foundation
-
-/// Storage capacity metrics for a filesystem or volume.
-public struct StorageCapacity: Sendable, Equatable {
-    /// Total capacity in bytes.
-    public let totalBytes: Int64
-    /// Free storage space in bytes.
-    public let freeBytes: Int64
-    /// Available storage space in bytes (accounting for system reservations).
-    public let availableBytes: Int64
-
-    /// Initializes a new `StorageCapacity` instance.
-    /// - Parameters:
-    ///   - totalBytes: Total capacity in bytes.
-    ///   - freeBytes: Free bytes available on disk.
-    ///   - availableBytes: Available bytes usable by unprivileged applications.
-    public init(totalBytes: Int64, freeBytes: Int64, availableBytes: Int64) {
-        self.totalBytes = totalBytes
-        self.freeBytes = freeBytes
-        self.availableBytes = availableBytes
-    }
-}
+import Darwin
+import OtterKeepDomain
 
 /// Volume capabilities and supported filesystem features.
 public struct FileSystemCapabilities: Sendable, Equatable {
@@ -169,6 +150,28 @@ public enum FileSystemError: Error, Sendable, LocalizedError, Equatable {
     case unsupportedOperation(String)
     /// An unknown or unclassified filesystem error occurred.
     case unknown(String)
+
+    /// Whether this error represents an out-of-disk-space condition (ENOSPC).
+    public var isOutOfSpace: Bool {
+        switch self {
+        case .notEnoughSpace:
+            return true
+        case .copyFailed(_, let code, _), .cloneFailed(_, let code, _), .hardLinkFailed(_, let code, _), .atomicMoveFailed(_, _, let code, _):
+            return code == ENOSPC
+        default:
+            return false
+        }
+    }
+
+    /// Whether this error represents a fatal device disconnection or unmounted volume (EIO, ENODEV, EROFS).
+    public var isFatalVolumeError: Bool {
+        switch self {
+        case .copyFailed(_, let code, _), .cloneFailed(_, let code, _), .hardLinkFailed(_, let code, _), .atomicMoveFailed(_, _, let code, _):
+            return code == EIO || code == ENODEV || code == EROFS
+        default:
+            return false
+        }
+    }
 
     /// Human-readable localized error description.
     public var errorDescription: String? {

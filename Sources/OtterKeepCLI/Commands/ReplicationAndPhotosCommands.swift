@@ -159,7 +159,7 @@ extension OtterKeepCLI {
 
         case "snapshots", "list":
             let db = DatabaseEngine()
-            let unifiedPath = config.destinationURL.appendingPathComponent(".otterkeep/manifest.sqlite").path(percentEncoded: false)
+            let unifiedPath = BackupProfile.manifestDatabasePath(forDestination: config.destinationURL)
             if FileManager.default.fileExists(atPath: unifiedPath) {
                 do {
                     try await db.open(at: unifiedPath)

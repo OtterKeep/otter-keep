@@ -20,8 +20,34 @@ public struct HookExecutionResult: Sendable, Equatable {
 /// Actor managing the discovery and sandboxed/isolated execution of lifecycle shell hook scripts.
 public actor HookExecutionManager {
     public static let shared = HookExecutionManager()
+    private let logger = Logger(subsystem: "com.otterkeep", category: "HookExecution")
 
     public init() {}
+
+    /// Verifies that a hook script is a regular file owned by the current user (or root) and not world/group writable.
+    public func isTrustedHookScript(at url: URL) -> Bool {
+        let path = url.standardizedFileURL.path(percentEncoded: false)
+        var statBuf = stat()
+        guard stat(path, &statBuf) == 0 else { return false }
+
+        // Must be a regular file
+        guard (statBuf.st_mode & S_IFMT) == S_IFREG else { return false }
+
+        // Ownership: must be owned by current user (geteuid()) or root (0)
+        let currentUID = geteuid()
+        guard statBuf.st_uid == currentUID || statBuf.st_uid == 0 else {
+            logger.warning("Rejecting untrusted hook script '\(path)': owner UID (\(statBuf.st_uid)) does not match current user UID (\(currentUID)).")
+            return false
+        }
+
+        // Permissions: must not be group-writable or other-writable (0o022)
+        if (statBuf.st_mode & 0o022) != 0 {
+            logger.warning("Rejecting untrusted hook script '\(path)': file is group or world writable (mode: \(String(statBuf.st_mode, radix: 8))).")
+            return false
+        }
+
+        return true
+    }
 
     /// Searches for a hook script following the conventional resolution order:
     /// 1. ~/.otterkeep/hooks/<ProfileUUID-or-ProfileName>/<hookName>.sh
@@ -44,23 +70,23 @@ public actor HookExecutionManager {
 
         // 1. Profile-specific global directory: by UUID then by profile Name
         let byUUID = globalHooksDir.appendingPathComponent(profile.id.uuidString).appendingPathComponent(scriptName)
-        if fileManager.isExecutableFile(atPath: byUUID.path) {
+        if fileManager.isExecutableFile(atPath: byUUID.path) && isTrustedHookScript(at: byUUID) {
             return byUUID
         }
 
         let byName = globalHooksDir.appendingPathComponent(profile.name).appendingPathComponent(scriptName)
-        if fileManager.isExecutableFile(atPath: byName.path) {
+        if fileManager.isExecutableFile(atPath: byName.path) && isTrustedHookScript(at: byName) {
             return byName
         }
 
-        // 2. Profile-specific source and destination directory: .otterkeep/hooks/
+        // 2. Profile-specific source and destination directory: .otterkeep/hooks/ (strictly validated for security)
         let sourceHook = profile.sourceURL.appendingPathComponent(".otterkeep/hooks").appendingPathComponent(scriptName)
-        if fileManager.isExecutableFile(atPath: sourceHook.path) {
+        if fileManager.isExecutableFile(atPath: sourceHook.path) && isTrustedHookScript(at: sourceHook) {
             return sourceHook
         }
 
         let destHook = profile.destinationURL.appendingPathComponent(".otterkeep/hooks").appendingPathComponent(scriptName)
-        if fileManager.isExecutableFile(atPath: destHook.path) {
+        if fileManager.isExecutableFile(atPath: destHook.path) && isTrustedHookScript(at: destHook) {
             return destHook
         }
 
@@ -81,6 +107,10 @@ public actor HookExecutionManager {
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: scriptURL.path) else {
             throw FileSystemError.itemNotFound(path: scriptURL.path)
+        }
+
+        guard isTrustedHookScript(at: scriptURL) else {
+            throw FileSystemError.permissionDenied(path: "Untrusted hook script rejected for security reasons: \(scriptURL.path)")
         }
 
         let process = Process()

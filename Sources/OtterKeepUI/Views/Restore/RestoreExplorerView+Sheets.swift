@@ -1,6 +1,5 @@
 import SwiftUI
 import QuickLook
-import OtterKeepDatabase
 import OtterKeepCore
 
 extension RestoreExplorerView {

@@ -101,6 +101,61 @@ public final class LocalizationManager: @unchecked Sendable {
         }
     }
 
+    /// Gets or sets whether biometric authentication is enabled.
+    public var isBiometricsEnabled: Bool {
+        get { settings.isBiometricsEnabled }
+        set {
+            lock.lock()
+            currentSettings.isBiometricsEnabled = newValue
+            saveSettingsUnlocked()
+            lock.unlock()
+        }
+    }
+
+    /// Gets or sets whether biometrics are required to restore files.
+    public var requireBiometricsForRestore: Bool {
+        get { settings.requireBiometricsForRestore }
+        set {
+            lock.lock()
+            currentSettings.requireBiometricsForRestore = newValue
+            saveSettingsUnlocked()
+            lock.unlock()
+        }
+    }
+
+    /// Gets or sets whether biometrics are required to delete profiles.
+    public var requireBiometricsForProfileDeletion: Bool {
+        get { settings.requireBiometricsForProfileDeletion }
+        set {
+            lock.lock()
+            currentSettings.requireBiometricsForProfileDeletion = newValue
+            saveSettingsUnlocked()
+            lock.unlock()
+        }
+    }
+
+    /// Gets or sets whether biometrics are required to reveal encryption passphrases.
+    public var requireBiometricsForKeyReveal: Bool {
+        get { settings.requireBiometricsForKeyReveal }
+        set {
+            lock.lock()
+            currentSettings.requireBiometricsForKeyReveal = newValue
+            saveSettingsUnlocked()
+            lock.unlock()
+        }
+    }
+
+    /// Gets or sets whether Secure Enclave is used for Keychain items.
+    public var useSecureEnclaveForKeychain: Bool {
+        get { settings.useSecureEnclaveForKeychain }
+        set {
+            lock.lock()
+            currentSettings.useSecureEnclaveForKeychain = newValue
+            saveSettingsUnlocked()
+            lock.unlock()
+        }
+    }
+
     /// Resolves the effective active language, resolving `.system` to either `.hungarian` or `.english`.
     public var effectiveLanguage: AppLanguage {
         let lang = currentLanguage

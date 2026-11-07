@@ -51,17 +51,24 @@ public final class LogManager: @unchecked Sendable {
     private let saveQueue = DispatchQueue(label: "com.otterkeep.logpersist", qos: .utility)
     private var saveWorkItem: DispatchWorkItem?
 
-    /// Persistent directory path for logs (`~/.otterkeep/`).
+    /// Persistent directory path for logs (`~/Library/Logs/OtterKeep/`).
     public var logDirectory: URL {
-        fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".otterkeep", isDirectory: true)
+        DebugFileLogger.shared.logsDirectory
     }
 
-    /// Full path to the persisted `logs.json` file.
+    /// Full path to the persisted `logs.json` file (`~/Library/Logs/OtterKeep/logs.json`).
     public var logFileURL: URL {
         logDirectory.appendingPathComponent("logs.json")
     }
 
-    /// Standard directory for structured timestamped `.log` files (`~/.otterkeep/logs/`).
+    /// Legacy logs file URL (`~/.otterkeep/logs.json`) for backward-compatibility migration.
+    public var legacyLogFileURL: URL {
+        fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent(".otterkeep", isDirectory: true)
+            .appendingPathComponent("logs.json")
+    }
+
+    /// Standard directory for structured timestamped `.log` files (`~/Library/Logs/OtterKeep/`).
     public var debugLogsDirectory: URL {
         DebugFileLogger.shared.logsDirectory
     }
@@ -94,6 +101,13 @@ public final class LogManager: @unchecked Sendable {
     private func loadPersistedLogs() {
         createDirectoryIfNeeded()
         let file = logFileURL
+
+        // Migration from legacy ~/.otterkeep/logs.json if needed
+        if !fileManager.fileExists(atPath: file.path(percentEncoded: false)),
+           fileManager.fileExists(atPath: legacyLogFileURL.path(percentEncoded: false)) {
+            try? fileManager.moveItem(at: legacyLogFileURL, to: file)
+        }
+
         guard fileManager.fileExists(atPath: file.path(percentEncoded: false)),
               let data = try? Data(contentsOf: file) else { return }
 
@@ -250,5 +264,6 @@ public final class LogManager: @unchecked Sendable {
         entries.removeAll()
         lock.unlock()
         try? fileManager.removeItem(at: logFileURL)
+        try? fileManager.removeItem(at: legacyLogFileURL)
     }
 }

@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 import OtterKeepCore
-import OtterKeepDatabase
+import OtterKeepDomain
 
 /// Modal sheet displaying point-in-time snapshot versions of a specific file with Quick Look and in-place restore.
 public struct FileVersionHistoryModalView: View {
@@ -86,7 +86,7 @@ public struct FileVersionHistoryModalView: View {
                     .frame(width: 36, height: 36)
             } else {
                 Image(systemName: "doc.text.fill")
-                    .font(.system(size: 32))
+                    .font(.largeTitle)
                     .foregroundStyle(.secondary)
             }
 
@@ -122,6 +122,7 @@ public struct FileVersionHistoryModalView: View {
                     .font(.title3)
                     .foregroundStyle(.tertiary)
             }
+            .accessibilityLabel(L10n.t(.closeButton))
             .buttonStyle(.plain)
         }
         .padding(16)
@@ -179,7 +180,7 @@ public struct FileVersionHistoryModalView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(Self.dateFormatter.string(from: item.snapshot.timestamp))
                         .font(.body.bold())
-                    Text("Snapshot: \(item.snapshot.snapshotPath)")
+                    Text(L10n.format(.snapshotPathLabelFormat, item.snapshot.snapshotPath))
                         .font(.caption2.monospaced())
                         .foregroundStyle(.tertiary)
                 }

@@ -3,8 +3,7 @@ import AppKit
 import Observation
 import Photos
 import UniformTypeIdentifiers
-import OtterKeepStorage
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 extension AppState {
@@ -53,6 +52,8 @@ extension AppState {
                             title: L10n.t(.scrubCorruptedTitle),
                             message: L10n.format(.scrubCorruptedMessage, prof.name, Int64(audit.corruptedFilesCount)),
                             detailedReason: audit.detailsJson,
+                            guaranteeText: L10n.t(.feedbackGuaranteeSnapshotsSafe),
+                            recoveryAction: RecoveryAction(kind: .viewLogs, label: L10n.t(.recoveryViewLogs)),
                             profileName: prof.name
                         )
                     }
@@ -68,6 +69,8 @@ extension AppState {
                         title: L10n.t(.scrubberCorruptedAlertTitle),
                         message: error.localizedDescription,
                         detailedReason: error.localizedDescription,
+                        guaranteeText: L10n.t(.feedbackGuaranteeSnapshotsSafe),
+                        recoveryAction: RecoveryAction(kind: .viewLogs, label: L10n.t(.recoveryViewLogs)),
                         profileName: prof.name
                     )
                     self.showFeedbackModal = true
@@ -87,11 +90,10 @@ extension AppState {
         self.isLoadingForecast = true
         Task {
             do {
-                let dbPath = profile.destinationURL.appendingPathComponent(".otterkeep/manifest.sqlite").path
-                try await self.database.open(at: dbPath)
+                let snapshots = try await SnapshotCatalogService.shared.listSnapshots(for: profile)
                 let forecast = try await StorageForecastEngine.shared.evaluateForecast(
                     profile: profile,
-                    database: self.database
+                    snapshots: snapshots
                 )
                 Task { @MainActor in
                     self.storageForecastReport = forecast
@@ -137,28 +139,34 @@ extension AppState {
     ) {
         guard let profile = selectedProfile else { return }
 
-        Task {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if self.isBiometricsEnabled && self.requireBiometricsForRestore {
+                let authResult = await BiometricSecurityService.shared.authenticate(
+                    reason: L10n.t(.biometricsAuthPromptRestore)
+                )
+                if case .failure = authResult {
+                    self.showError(L10n.t(.biometricsAuthFailed))
+                    return
+                }
+            }
             do {
-                let dest = try await restoreEngine.restore(
+                let dest = try await self.engines.restore.restore(
                     snapshotPath: snapshot.snapshotPath,
                     backupRootURL: profile.destinationURL,
                     relativePath: file.relativePath,
                     targetDirectoryURL: targetDirectory,
                     collisionResolution: collision
                 )
-                Task { @MainActor in
-                    LogManager.shared.log("File restored successfully: '\(dest.path)' from snapshot '\(snapshot.id)' (Collision mode: \(collision))", level: .info, category: "Restore")
-                    self.refreshLogs()
-                    NotificationDeliveryService.shared.notifyRestoreCompleted(fileName: dest.lastPathComponent, profileName: profile.name)
-                    self.showSuccess(L10n.format(.restoreSuccessMessage, dest.path))
-                }
+                LogManager.shared.log("File restored successfully: '\(dest.path)' from snapshot '\(snapshot.id)' (Collision mode: \(collision))", level: .info, category: "Restore")
+                self.refreshLogs()
+                NotificationDeliveryService.shared.notifyRestoreCompleted(fileName: dest.lastPathComponent, profileName: profile.name)
+                self.showSuccess(L10n.format(.restoreSuccessMessage, dest.path))
             } catch {
-                Task { @MainActor in
-                    LogManager.shared.log("Restore failed for target '\(targetDirectory.path)' [File: \(file.relativePath)]: \(error.localizedDescription)", level: .error, category: "Restore")
-                    self.refreshLogs()
-                    NotificationDeliveryService.shared.notifyRestoreFailed(fileName: file.relativePath, errorMessage: error.localizedDescription)
-                    self.showError(error.localizedDescription)
-                }
+                LogManager.shared.log("Restore failed for target '\(targetDirectory.path)' [File: \(file.relativePath)]: \(error.localizedDescription)", level: .error, category: "Restore")
+                self.refreshLogs()
+                NotificationDeliveryService.shared.notifyRestoreFailed(fileName: file.relativePath, errorMessage: error.localizedDescription)
+                self.showError(error.localizedDescription)
             }
         }
     }
@@ -172,20 +180,30 @@ extension AppState {
     ) {
         guard let profile = selectedProfile else { return }
 
-        self.isSnapshotRestoreInProgress = true
-        self.snapshotRestoreProgress = RestoreProgressState(
-            phase: .preparing,
-            totalFiles: Int(snapshot.totalFiles),
-            processedFiles: 0,
-            totalBytes: snapshot.totalBytes,
-            processedBytes: 0,
-            currentItem: ""
-        )
-
-        Task { [weak self] in
+        Task { @MainActor [weak self] in
             guard let self else { return }
+            if self.isBiometricsEnabled && self.requireBiometricsForRestore {
+                let authResult = await BiometricSecurityService.shared.authenticate(
+                    reason: L10n.t(.biometricsAuthPromptRestore)
+                )
+                if case .failure = authResult {
+                    self.showError(L10n.t(.biometricsAuthFailed))
+                    return
+                }
+            }
+
+            self.isSnapshotRestoreInProgress = true
+            self.snapshotRestoreProgress = RestoreProgressState(
+                phase: .preparing,
+                totalFiles: Int(snapshot.totalFiles),
+                processedFiles: 0,
+                totalBytes: snapshot.totalBytes,
+                processedBytes: 0,
+                currentItem: ""
+            )
+
             do {
-                let summary = try await restoreEngine.restoreSnapshot(
+                let summary = try await self.engines.restore.restoreSnapshot(
                     snapshotPath: snapshot.snapshotPath,
                     backupRootURL: profile.destinationURL,
                     targetDirectoryURL: targetDirectory,
@@ -197,41 +215,39 @@ extension AppState {
                     }
                 )
 
-                Task { @MainActor in
-                    self.isSnapshotRestoreInProgress = false
-                    self.snapshotRestoreProgress = nil
-                    LogManager.shared.log("Entire snapshot '\(snapshot.id)' restored successfully to '\(targetDirectory.path)' (\(summary.restoredFiles) files, \(summary.restoredBytes) bytes, \(String(format: "%.2f", summary.durationSeconds))s)", level: .info, category: "Restore")
-                    self.refreshLogs()
-                    NotificationDeliveryService.shared.notifyRestoreCompleted(fileName: snapshot.snapshotPath, profileName: profile.name)
+                self.isSnapshotRestoreInProgress = false
+                self.snapshotRestoreProgress = nil
+                LogManager.shared.log("Entire snapshot '\(snapshot.id)' restored successfully to '\(targetDirectory.path)' (\(summary.restoredFiles) files, \(summary.restoredBytes) bytes, \(String(format: "%.2f", summary.durationSeconds))s)", level: .info, category: "Restore")
+                self.refreshLogs()
+                NotificationDeliveryService.shared.notifyRestoreCompleted(fileName: snapshot.snapshotPath, profileName: profile.name)
 
-                    // Trigger Operation Feedback Modal with Ottie mascot
-                    self.activeFeedback = OperationFeedback(
-                        type: .success,
-                        title: L10n.t(.feedbackRestoreSuccessTitle),
-                        message: L10n.format(.feedbackRestoreSuccessMessage, snapshot.snapshotPath, Int64(summary.restoredFiles)),
-                        profileName: profile.name,
-                        restoreSummary: summary
-                    )
-                    self.showFeedbackModal = true
-                }
+                // Trigger Operation Feedback Modal with Ottie mascot
+                self.activeFeedback = OperationFeedback(
+                    type: .success,
+                    title: L10n.t(.feedbackRestoreSuccessTitle),
+                    message: L10n.format(.feedbackRestoreSuccessMessage, snapshot.snapshotPath, Int64(summary.restoredFiles)),
+                    profileName: profile.name,
+                    restoreSummary: summary
+                )
+                self.showFeedbackModal = true
             } catch {
-                Task { @MainActor in
-                    self.isSnapshotRestoreInProgress = false
-                    self.snapshotRestoreProgress = nil
-                    LogManager.shared.log("Entire snapshot restore failed for '\(snapshot.id)': \(error.localizedDescription)", level: .error, category: "Restore")
-                    self.refreshLogs()
-                    NotificationDeliveryService.shared.notifyRestoreFailed(fileName: snapshot.snapshotPath, errorMessage: error.localizedDescription)
+                self.isSnapshotRestoreInProgress = false
+                self.snapshotRestoreProgress = nil
+                LogManager.shared.log("Entire snapshot restore failed for '\(snapshot.id)': \(error.localizedDescription)", level: .error, category: "Restore")
+                self.refreshLogs()
+                NotificationDeliveryService.shared.notifyRestoreFailed(fileName: snapshot.snapshotPath, errorMessage: error.localizedDescription)
 
-                    // Trigger Operation Feedback Modal with Ottie reassurance
-                    self.activeFeedback = OperationFeedback(
-                        type: .failure,
-                        title: L10n.t(.feedbackRestoreFailedTitle),
-                        message: L10n.format(.feedbackRestoreFailedMessage, error.localizedDescription),
-                        detailedReason: error.localizedDescription,
-                        profileName: profile.name
-                    )
-                    self.showFeedbackModal = true
-                }
+                // Trigger Operation Feedback Modal with Ottie reassurance
+                self.activeFeedback = OperationFeedback(
+                    type: .failure,
+                    title: L10n.t(.feedbackRestoreFailedTitle),
+                    message: L10n.format(.feedbackRestoreFailedMessage, error.localizedDescription),
+                    detailedReason: error.localizedDescription,
+                    guaranteeText: L10n.t(.feedbackGuaranteeSnapshotsSafe),
+                    recoveryAction: RecoveryAction(kind: .viewLogs, label: L10n.t(.recoveryViewLogs)),
+                    profileName: profile.name
+                )
+                self.showFeedbackModal = true
             }
         }
     }
@@ -268,12 +284,9 @@ extension AppState {
         self.selectedFileVersionHistoryRecord = nil
         self.showFileVersionHistoryModal = true
 
-        let dbPath = matchingProfile.destinationURL.appendingPathComponent(".otterkeep").appendingPathComponent("manifest.sqlite").path(percentEncoded: false)
-
         Task {
             do {
-                try await database.open(at: dbPath)
-                let versions = try await database.listVersions(ofRelativePath: relPath)
+                let versions = try await SnapshotCatalogService.shared.listFileVersions(relativePath: relPath, in: matchingProfile)
                 // Race condition safeguard: ensure active file hasn't changed while awaiting database
                 guard self.activeVersionHistoryFile == stdURL else { return }
                 self.activeVersionHistoryRecords = versions
@@ -300,9 +313,19 @@ extension AppState {
         guard let targetURL = activeVersionHistoryFile,
               let profile = activeVersionHistoryProfile else { return }
 
-        Task {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if self.isBiometricsEnabled && self.requireBiometricsForRestore {
+                let authResult = await BiometricSecurityService.shared.authenticate(
+                    reason: L10n.t(.biometricsAuthPromptRestore)
+                )
+                if case .failure = authResult {
+                    self.showError(L10n.t(.biometricsAuthFailed))
+                    return
+                }
+            }
             do {
-                let finalURL = try await restoreEngine.restoreToFile(
+                let finalURL = try await engines.restore.restoreToFile(
                     snapshotPath: version.snapshot.snapshotPath,
                     backupRootURL: profile.destinationURL,
                     relativePath: version.file.relativePath,
@@ -399,7 +422,7 @@ extension AppState {
         Task {
             do {
                 let policy = PruningPolicy(isAutoPruningEnabled: profile.pruningPolicy.isAutoPruningEnabled, maxSnapshotsToKeep: maxKeep, keepDailyDays: 30)
-                let deletedIds = try await retentionManager.applyRetentionPolicy(destinationURL: profile.destinationURL, policy: policy)
+                let deletedIds = try await engines.retention.applyRetentionPolicy(destinationURL: profile.destinationURL, policy: policy)
 
                 Task { @MainActor in
                     LogManager.shared.log("Retention pruning completed for profile '\(profile.name)': \(deletedIds.count) snapshots pruned. Pruned IDs: [\(deletedIds.joined(separator: ", "))]", level: .info, category: "Retention")
@@ -421,7 +444,7 @@ extension AppState {
 
         Task {
             do {
-                let count = try await restoreEngine.rebuildCatalog(at: profile.destinationURL)
+                let count = try await engines.restore.rebuildCatalog(at: profile.destinationURL)
                 Task { @MainActor in
                     LogManager.shared.log("Disaster recovery catalog rebuilt for profile '\(profile.name)': \(count) snapshots indexed from target disk", level: .info, category: "Rebuild")
                     self.refreshLogs()

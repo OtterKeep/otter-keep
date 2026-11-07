@@ -1,6 +1,5 @@
 import SwiftUI
 import OtterKeepCore
-import OtterKeepStorage
 
 /// Card component configuring Wi-Fi SSID allow/disallow filtering and mobile hotspot metering safeguards.
 public struct WiFiProtectionCardView: View {
@@ -13,14 +12,13 @@ public struct WiFiProtectionCardView: View {
     }
 
     private var currentSSID: String? {
-        NetworkReachability.shared.currentWiFiSSID
+        appState.currentWiFiSSID
     }
 
     private func updateProfile(_ block: (inout BackupProfile) -> Void) {
         var copy = profile
         block(&copy)
         appState.selectedProfile = copy
-        appState.saveProfiles()
     }
 
     private var allowedSSIDBinding: Binding<String> {
@@ -217,6 +215,7 @@ public struct WiFiProtectionCardView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            .accessibilityLabel(L10n.t(.removeExclusionButton))
             .buttonStyle(.plain)
         }
         .padding(.horizontal, OtterTheme.spacing8)

@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 import Photos
-import OtterKeepDatabase
+import OtterKeepDomain
 import OtterKeepCore
 
 /// Forwarding accessors exposing the maintenance, diagnostics and settings state owned by
@@ -9,6 +9,37 @@ import OtterKeepCore
 ///
 /// Settings that previously carried `didSet` observers keep them in their setters here.
 extension AppState {
+    // MARK: - Central Modal Route
+    /// The single top-level modal currently presented by the main window.
+    public var activeModal: AppModalRoute? {
+        get { maintenanceSettings.activeModal }
+        set { maintenanceSettings.activeModal = newValue }
+    }
+    /// A modal requested while another one was still on screen.
+    public var pendingModal: AppModalRoute? {
+        get { maintenanceSettings.pendingModal }
+        set { maintenanceSettings.pendingModal = newValue }
+    }
+    /// Presents `route`, or queues it when another modal is already visible.
+    public func presentModal(_ route: AppModalRoute) { maintenanceSettings.presentModal(route) }
+    /// Queues `route` to be presented after the currently visible modal dismisses.
+    public func queueModalAfterDismiss(_ route: AppModalRoute) { maintenanceSettings.queueModalAfterDismiss(route) }
+    /// Clears the active modal.
+    public func dismissModal() { maintenanceSettings.dismissModal() }
+    /// Promotes a queued modal request once the previous sheet has finished dismissing.
+    public func promotePendingModal() { maintenanceSettings.promotePendingModal() }
+
+    /// Presents or dismisses `route` from a boolean flag owned by another feature store.
+    func setModalRoute(_ route: AppModalRoute, presented: Bool) {
+        if presented {
+            maintenanceSettings.presentModal(route)
+        } else if maintenanceSettings.activeModal == route {
+            maintenanceSettings.dismissModal()
+        } else if maintenanceSettings.pendingModal == route {
+            maintenanceSettings.pendingModal = nil
+        }
+    }
+
     // MARK: - Modal Operation Feedback State
     /// Feedback of the last modal operation.
     public var activeFeedback: OperationFeedback? { get { maintenanceSettings.activeFeedback } set { maintenanceSettings.activeFeedback = newValue } }
@@ -31,6 +62,11 @@ extension AppState {
         get { maintenanceSettings.softwareUpdateAvailableInfo }
         set { maintenanceSettings.softwareUpdateAvailableInfo = newValue }
     }
+    /// Native update callback (e.g. Sparkle).
+    public var onCheckForUpdatesNative: (@MainActor () -> Void)? {
+        get { maintenanceSettings.onCheckForUpdatesNative }
+        set { maintenanceSettings.onCheckForUpdatesNative = newValue }
+    }
 
     // MARK: - Pre-backup Simulation (Dry-Run)
     /// Indicates an ongoing dry-run simulation.
@@ -51,14 +87,66 @@ extension AppState {
         get { maintenanceSettings.lastSessionSummary }
         set { maintenanceSettings.lastSessionSummary = newValue }
     }
+    /// Summary presented by the last-backup-summary modal, resolved from the selected profile first.
+    public var lastBackupSummaryForPresentation: BackupSessionSummary? {
+        if let profile = selectedProfile, let summary = lastStatusInfo(for: profile).lastSessionSummary {
+            return summary
+        }
+        return lastSessionSummary
+    }
     /// Controls presentation of the backup inspector modal.
     public var showInspectorModal: Bool { get { maintenanceSettings.showInspectorModal } set { maintenanceSettings.showInspectorModal = newValue } }
+    /// Controls presentation of the global preferences modal.
+    public var showPreferencesModal: Bool { get { maintenanceSettings.showPreferencesModal } set { maintenanceSettings.showPreferencesModal = newValue } }
+    /// Active tab in the preferences modal sheet.
+    public var activePreferencesTab: PreferencesTab { get { maintenanceSettings.activePreferencesTab } set { maintenanceSettings.activePreferencesTab = newValue } }
+    /// Controls presentation of the system logs modal.
+    public var showSystemLogsModal: Bool { get { maintenanceSettings.showSystemLogsModal } set { maintenanceSettings.showSystemLogsModal = newValue } }
+    /// Controls presentation of the tabbed profile settings modal.
+    public var showProfileSettingsModal: Bool {
+        get { maintenanceSettings.showProfileSettingsModal }
+        set {
+            if newValue && maintenanceSettings.profileSettingsBaseline == nil {
+                maintenanceSettings.profileSettingsBaseline = selectedProfile
+            }
+            maintenanceSettings.showProfileSettingsModal = newValue
+        }
+    }
+    /// Baseline profile captured when entering profile settings.
+    public var profileSettingsBaseline: BackupProfile? {
+        get { maintenanceSettings.profileSettingsBaseline }
+        set { maintenanceSettings.profileSettingsBaseline = newValue }
+    }
+
+    /// Persists profile configuration changes from the profile settings modal to disk and dismisses.
+    public func saveProfileSettings() {
+        maintenanceSettings.profileSettingsBaseline = nil
+        saveProfiles()
+        showProfileSettingsModal = false
+    }
+
+    /// Discards unpersisted profile configuration changes and reverts to baseline snapshot.
+    public func cancelProfileSettings() {
+        if let baseline = maintenanceSettings.profileSettingsBaseline {
+            revertProfile(to: baseline)
+            maintenanceSettings.profileSettingsBaseline = nil
+        }
+        showProfileSettingsModal = false
+    }
+    /// Controls presentation of the last backup session summary modal.
+    public var showLastBackupSummaryModal: Bool { get { maintenanceSettings.showLastBackupSummaryModal } set { maintenanceSettings.showLastBackupSummaryModal = newValue } }
+    /// Controls presentation of the delete profile confirmation dialog.
+    public var showDeleteProfileConfirmation: Bool { get { maintenanceSettings.showDeleteProfileConfirmation } set { maintenanceSettings.showDeleteProfileConfirmation = newValue } }
+    /// Profile queued for deletion confirmation.
+    public var profilePendingDeletion: BackupProfile? { get { maintenanceSettings.profilePendingDeletion } set { maintenanceSettings.profilePendingDeletion = newValue } }
     /// Active tab of the backup inspector modal.
     public var inspectorSelectedTab: String { get { maintenanceSettings.inspectorSelectedTab } set { maintenanceSettings.inspectorSelectedTab = newValue } }
     /// Search query of the backup inspector modal.
     public var inspectorSearchQuery: String { get { maintenanceSettings.inspectorSearchQuery } set { maintenanceSettings.inspectorSearchQuery = newValue } }
 
     // MARK: - Profile Management Dialogs
+    /// Controls presentation of the 4-step Sanctuary Onboarding Wizard modal.
+    public var showOnboardingModal: Bool { get { maintenanceSettings.showOnboardingModal } set { maintenanceSettings.showOnboardingModal = newValue } }
     /// Controls presentation of the new profile sheet.
     public var showNewProfileSheet: Bool { get { maintenanceSettings.showNewProfileSheet } set { maintenanceSettings.showNewProfileSheet = newValue } }
     /// Draft profile name.
@@ -99,6 +187,49 @@ extension AppState {
     public var newProfileAutoEjectOnCompletion: Bool {
         get { maintenanceSettings.newProfileAutoEjectOnCompletion }
         set { maintenanceSettings.newProfileAutoEjectOnCompletion = newValue }
+    }
+    /// Draft switch for continuous real-time FSEvents backup mode.
+    public var newProfileIsContinuous: Bool {
+        get { maintenanceSettings.newProfileIsContinuous }
+        set { maintenanceSettings.newProfileIsContinuous = newValue }
+    }
+    /// Draft quiet-window debouncing seconds for continuous mode.
+    public var newProfileDebouncingSeconds: Int {
+        get { maintenanceSettings.newProfileDebouncingSeconds }
+        set { maintenanceSettings.newProfileDebouncingSeconds = newValue }
+    }
+    /// Draft encryption toggle for new profile creation.
+    public var newProfileEnableEncryption: Bool {
+        get { maintenanceSettings.newProfileEnableEncryption }
+        set { maintenanceSettings.newProfileEnableEncryption = newValue }
+    }
+    /// Draft encryption passphrase for new profile creation.
+    public var newProfileEncryptionPassphrase: String {
+        get { maintenanceSettings.newProfileEncryptionPassphrase }
+        set { maintenanceSettings.newProfileEncryptionPassphrase = newValue }
+    }
+    /// Draft confirmation passphrase for new profile creation.
+    public var newProfileConfirmPassphrase: String {
+        get { maintenanceSettings.newProfileConfirmPassphrase }
+        set { maintenanceSettings.newProfileConfirmPassphrase = newValue }
+    }
+    /// Draft option to include passphrase in Emergency Kit PDF.
+    public var newProfileIncludePassphraseInPDF: Bool {
+        get { maintenanceSettings.newProfileIncludePassphraseInPDF }
+        set { maintenanceSettings.newProfileIncludePassphraseInPDF = newValue }
+    }
+    /// Draft status flag whether Emergency Kit was exported.
+    public var newProfileIsEmergencyKitExported: Bool {
+        get { maintenanceSettings.newProfileIsEmergencyKitExported }
+        set { maintenanceSettings.newProfileIsEmergencyKitExported = newValue }
+    }
+    /// Hardware state for Biometrics (Touch ID / LocalAuthentication).
+    public var biometricHardwareState: BiometricHardwareState {
+        get { maintenanceSettings.biometricHardwareState }
+        set { maintenanceSettings.biometricHardwareState = newValue }
+    }
+    public func refreshBiometricHardwareState() {
+        biometricHardwareState = BiometricSecurityService.shared.evaluateHardwareState()
     }
     /// Tag of the currently applied configuration preset.
     public var selectedPresetTag: String? { get { maintenanceSettings.selectedPresetTag } set { maintenanceSettings.selectedPresetTag = newValue } }
@@ -156,6 +287,12 @@ extension AppState {
     public var alertMessage: String? { get { maintenanceSettings.alertMessage } set { maintenanceSettings.alertMessage = newValue } }
     /// Controls presentation of the global alert.
     public var showAlert: Bool { get { maintenanceSettings.showAlert } set { maintenanceSettings.showAlert = newValue } }
+
+    /// Transient success banner text; `nil` when no banner is visible.
+    public var successBannerMessage: String? {
+        get { maintenanceSettings.successBannerMessage }
+        set { maintenanceSettings.successBannerMessage = newValue }
+    }
     /// Active log level filter.
     public var selectedLogLevel: LogEntry.LogLevel? { get { maintenanceSettings.selectedLogLevel } set { maintenanceSettings.selectedLogLevel = newValue } }
     /// Free-text filter applied to diagnostics log entries.
@@ -271,5 +408,50 @@ extension AppState {
     /// Computes the active SwiftUI color scheme, dynamically synchronizing system mode with the OS interface style.
     public var effectiveColorScheme: ColorScheme {
         maintenanceSettings.effectiveColorScheme
+    }
+
+    /// Whether biometric authentication (Touch ID) is active.
+    public var isBiometricsEnabled: Bool {
+        get { maintenanceSettings.isBiometricsEnabled }
+        set {
+            maintenanceSettings.isBiometricsEnabled = newValue
+            LocalizationManager.shared.isBiometricsEnabled = newValue
+        }
+    }
+
+    /// Require biometrics for restore operations.
+    public var requireBiometricsForRestore: Bool {
+        get { maintenanceSettings.requireBiometricsForRestore }
+        set {
+            maintenanceSettings.requireBiometricsForRestore = newValue
+            LocalizationManager.shared.requireBiometricsForRestore = newValue
+        }
+    }
+
+    /// Require biometrics for profile deletion.
+    public var requireBiometricsForProfileDeletion: Bool {
+        get { maintenanceSettings.requireBiometricsForProfileDeletion }
+        set {
+            maintenanceSettings.requireBiometricsForProfileDeletion = newValue
+            LocalizationManager.shared.requireBiometricsForProfileDeletion = newValue
+        }
+    }
+
+    /// Require biometrics to reveal passphrases and keys.
+    public var requireBiometricsForKeyReveal: Bool {
+        get { maintenanceSettings.requireBiometricsForKeyReveal }
+        set {
+            maintenanceSettings.requireBiometricsForKeyReveal = newValue
+            LocalizationManager.shared.requireBiometricsForKeyReveal = newValue
+        }
+    }
+
+    /// Use hardware Secure Enclave protection for Keychain items.
+    public var useSecureEnclaveForKeychain: Bool {
+        get { maintenanceSettings.useSecureEnclaveForKeychain }
+        set {
+            maintenanceSettings.useSecureEnclaveForKeychain = newValue
+            LocalizationManager.shared.useSecureEnclaveForKeychain = newValue
+        }
     }
 }

@@ -1,8 +1,7 @@
-import SwiftUI
 import AppKit
 import Network
 import OtterKeepCore
-import OtterKeepStorage
+import SwiftUI
 
 /// Modal sheet for adding and editing remote 3-2-1 backup targets (S3 Cloud / SMB NAS).
 public struct RemoteDestinationEditorModalView: View {
@@ -42,19 +41,19 @@ public struct RemoteDestinationEditorModalView: View {
 
         switch appState.destinationEditorTypeIndex {
         case 0:
-            return !appState.destinationEditorS3Endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-                   !appState.destinationEditorS3Bucket.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return !appState.destinationEditorS3Endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !appState.destinationEditorS3Bucket.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case 1:
             return !appState.destinationEditorSmbShareURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case 2:
             return !appState.destinationEditorWebDAVURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case 3:
-            return !appState.destinationEditorSFTPHost.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-                   !appState.destinationEditorSFTPUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return !appState.destinationEditorSFTPHost.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !appState.destinationEditorSFTPUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case 4:
-            return !appState.destinationEditorB2KeyId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-                   !appState.destinationEditorB2AppKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-                   !appState.destinationEditorB2BucketName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return !appState.destinationEditorB2KeyId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !appState.destinationEditorB2AppKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !appState.destinationEditorB2BucketName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         default:
             return false
         }
@@ -103,12 +102,45 @@ public struct RemoteDestinationEditorModalView: View {
             }
             .frame(maxHeight: 520)
 
-            Divider()
-
             // MARK: - Footer Actions
-            footerView
-                .padding(.horizontal, 24)
-                .padding(.vertical, 16)
+            ModalFooterActionsView(
+                cancelTitle: L10n.t(.cancel),
+                primaryTitle: appState.destinationEditorTargetId == nil ? L10n.t(.remoteDestEditorAddButton) : L10n.t(.save),
+                isPrimaryDisabled: !canSave,
+                onCancel: {
+                    appState.showRemoteDestinationEditorSheet = false
+                },
+                onPrimary: {
+                    appState.saveDestinationEditor()
+                }
+            ) {
+                HStack(spacing: 8) {
+                    Button {
+                        appState.testDestinationEditorConnection()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "network")
+                            Text(L10n.t(.remoteDestEditorTestButton))
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .disabled(appState.destinationEditorIsTesting || !canSave)
+
+                    if let targetId = appState.destinationEditorTargetId {
+                        Button(role: .destructive) {
+                            appState.deleteDestinationEditor(destinationId: targetId)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "trash")
+                                Text(L10n.t(.delete))
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.regular)
+                    }
+                }
+            }
         }
         .frame(width: 620)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -140,55 +172,8 @@ public struct RemoteDestinationEditorModalView: View {
                     .font(.title3)
                     .foregroundStyle(.secondary)
             }
+            .accessibilityLabel(L10n.t(.closeButton))
             .buttonStyle(.plain)
-        }
-    }
-
-    // MARK: - Footer View
-    private var footerView: some View {
-        HStack(spacing: 12) {
-            Button {
-                appState.testDestinationEditorConnection()
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "network")
-                    Text(L10n.t(.remoteDestEditorTestButton))
-                }
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
-            .disabled(appState.destinationEditorIsTesting || !canSave)
-
-            if let targetId = appState.destinationEditorTargetId {
-                Button(role: .destructive) {
-                    appState.deleteDestinationEditor(destinationId: targetId)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "trash")
-                        Text(L10n.t(.delete))
-                    }
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-            }
-
-            Spacer()
-
-            Button(L10n.t(.cancel)) {
-                appState.showRemoteDestinationEditorSheet = false
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
-            .keyboardShortcut(.cancelAction)
-
-            Button(appState.destinationEditorTargetId == nil ? L10n.t(.remoteDestEditorAddButton) : L10n.t(.save)) {
-                appState.saveDestinationEditor()
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(OtterTheme.otterAmber)
-            .controlSize(.regular)
-            .keyboardShortcut(.defaultAction)
-            .disabled(!canSave)
         }
     }
 }
