@@ -13,6 +13,10 @@ public struct ProfileRulesAndMaintenanceView: View {
         self.profile = profile
     }
 
+    private var currentProfile: BackupProfile {
+        appState.selectedProfile ?? profile
+    }
+
     private var selectedSubTabBinding: Binding<ProfileMaintenanceSubTab> {
         Binding(
             get: { appState.activeMaintenanceSubTab },
@@ -25,7 +29,7 @@ public struct ProfileRulesAndMaintenanceView: View {
             get: { appState.maxSnapshotsToKeep },
             set: { val in
                 appState.maxSnapshotsToKeep = val
-                var updated = profile
+                var updated = currentProfile
                 updated.pruningPolicy.maxSnapshotsToKeep = val
                 appState.selectedProfile = updated
             }
@@ -139,23 +143,23 @@ public struct ProfileRulesAndMaintenanceView: View {
     // MARK: - 1. Rules & Exclusions Tab Content
     @ViewBuilder
     private var rulesContent: some View {
-        rulesView.folderSummaryHeader(profile: profile)
-        rulesView.exclusionRulesSection(profile: profile)
-        rulesView.localEncryptionSection(profile: profile)
-        rulesView.icloudStrategySection(profile: profile)
-        WiFiProtectionCardView(appState: appState, profile: profile)
-        rulesView.ransomwareGuardSection(profile: profile)
-        rulesView.canaryTrapSection(profile: profile)
+        rulesView.folderSummaryHeader(profile: currentProfile)
+        rulesView.exclusionRulesSection(profile: currentProfile)
+        rulesView.localEncryptionSection(profile: currentProfile)
+        rulesView.icloudStrategySection(profile: currentProfile)
+        WiFiProtectionCardView(appState: appState, profile: currentProfile)
+        rulesView.ransomwareGuardSection(profile: currentProfile)
+        rulesView.canaryTrapSection(profile: currentProfile)
     }
 
     // MARK: - 2. Automation & Schedule Tab Content
     @ViewBuilder
     private var automationContent: some View {
-        rulesView.scheduleSection(profile: profile)
-        rulesView.powerGovernorSection(profile: profile)
-        rulesView.externalDriveSection(profile: profile)
-        rulesView.backupCopyJobSection(profile: profile)
-        WebhookSettingsCardView(appState: appState, profile: profile)
+        rulesView.scheduleSection(profile: currentProfile)
+        rulesView.powerGovernorSection(profile: currentProfile)
+        rulesView.externalDriveSection(profile: currentProfile)
+        rulesView.backupCopyJobSection(profile: currentProfile)
+        WebhookSettingsCardView(appState: appState, profile: currentProfile)
     }
 
     // MARK: - 3. Maintenance & Storage Tab Content
@@ -165,7 +169,7 @@ public struct ProfileRulesAndMaintenanceView: View {
         unifiedRetentionSection
 
         // WORM Immutability & Background Scrub
-        rulesView.immutabilityAndScrubSection(profile: profile)
+        rulesView.immutabilityAndScrubSection(profile: currentProfile)
 
         // Disaster Recovery
         catalogRecoverySection
@@ -191,9 +195,9 @@ public struct ProfileRulesAndMaintenanceView: View {
             // Auto-pruning toggle
             Toggle(
                 isOn: Binding(
-                    get: { profile.pruningPolicy.isAutoPruningEnabled },
+                    get: { currentProfile.pruningPolicy.isAutoPruningEnabled },
                     set: { enabled in
-                        var updated = profile
+                        var updated = currentProfile
                         updated.pruningPolicy.isAutoPruningEnabled = enabled
                         appState.selectedProfile = updated
                     }
@@ -274,7 +278,7 @@ public struct ProfileRulesAndMaintenanceView: View {
                         Text(L10n.t(.uuidLabel))
                             .font(.caption.bold())
                             .foregroundStyle(.secondary)
-                        Text(profile.id.uuidString)
+                        Text(currentProfile.id.uuidString)
                             .font(.callout.monospaced())
                             .foregroundStyle(.primary)
                             .textSelection(.enabled)
@@ -284,7 +288,7 @@ public struct ProfileRulesAndMaintenanceView: View {
 
                     Button {
                         NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(profile.id.uuidString, forType: .string)
+                        NSPasteboard.general.setString(currentProfile.id.uuidString, forType: .string)
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "doc.on.doc")
@@ -303,7 +307,7 @@ public struct ProfileRulesAndMaintenanceView: View {
                         Text(L10n.t(.sourceFolderTitle))
                             .font(.caption.bold())
                             .foregroundStyle(.secondary)
-                        Text(profile.sourceURL.path)
+                        Text(currentProfile.sourceURL.path)
                             .font(.caption.monospaced())
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -316,7 +320,7 @@ public struct ProfileRulesAndMaintenanceView: View {
                         Text(L10n.t(.destinationFolderTitle))
                             .font(.caption.bold())
                             .foregroundStyle(.secondary)
-                        Text(profile.destinationURL.path)
+                        Text(currentProfile.destinationURL.path)
                             .font(.caption.monospaced())
                             .foregroundStyle(.secondary)
                             .lineLimit(1)

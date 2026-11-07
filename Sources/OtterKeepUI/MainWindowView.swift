@@ -31,6 +31,7 @@ public struct MainWindowView: View {
         .modifier(MainWindowModalRouteModifier(appState: appState))
         .modifier(MainWindowAlertsModifier(appState: appState))
         .preferredColorScheme(appState.effectiveColorScheme)
+        .id(appState.currentLanguage)
     }
 
     @ToolbarContentBuilder

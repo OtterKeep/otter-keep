@@ -244,6 +244,7 @@ extension AppState {
         if let pIdx = profiles.firstIndex(where: { $0.id == profile.id }) {
             profiles[pIdx] = profile
         }
+        maintenanceSettings.profileSettingsBaseline = profile
         saveProfiles()
         showRemoteDestinationEditorSheet = false
     }
@@ -260,6 +261,7 @@ extension AppState {
         if let pIdx = profiles.firstIndex(where: { $0.id == profile.id }) {
             profiles[pIdx] = profile
         }
+        maintenanceSettings.profileSettingsBaseline = profile
         saveProfiles()
         showRemoteDestinationEditorSheet = false
     }

@@ -132,6 +132,9 @@ public final class MaintenanceSettingsStore: Sendable {
         set { setModal(.systemLogs, presented: newValue) }
     }
 
+    /// Baseline backup profile captured when the profile settings modal was opened.
+    public var profileSettingsBaseline: BackupProfile? = nil
+
     /// Controls presentation of the tabbed profile settings modal.
     public var showProfileSettingsModal: Bool {
         get { activeModal == .profileSettings }

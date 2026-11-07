@@ -247,11 +247,76 @@ struct UXRegressionTests {
             .feedbackGuaranteeNothingModified,
             .recoveryOpenFullDiskAccess,
             .recoveryViewLogs,
+            .ignoreFilesTooltipDesc,
+            .driveAutomationTooltipDesc,
+            .clientEncryptionTooltipDesc,
+            .encryptionPassphraseFieldLabel,
+            .encryptionPassphraseFieldPlaceholder,
+            .confirmPassphraseFieldLabel,
+            .confirmPassphraseFieldPlaceholder,
+            .passphraseMismatchError,
+            .biometricsActionGatesSection,
+            .biometricsSecureEnclaveToggle,
+            .encryptionPermanentTag,
+            .encryptionKeychainStoredDesc,
+            .unencryptedProfileNotice,
+            .centralDatabaseTitle,
+            .centralDatabaseVacuumButton,
+            .unadoptedDriveDiscoveredTitle,
+            .unadoptedDriveDiscoveredMessageFormat,
+            .unadoptedDriveAdoptAction,
+            .unadoptedDriveDismissAction,
         ]
 
         for key in keys {
             try assertTrue(L10n.hasExplicitTranslation(for: key, in: .english), "Missing EN translation for \(key.rawValue)")
             try assertTrue(L10n.hasExplicitTranslation(for: key, in: .hungarian), "Missing HU translation for \(key.rawValue)")
         }
+    }
+
+    // MARK: - Profile Settings Transactional Lifecycle
+
+    @Test func testProfileSettingsCancelRevertsEditsAndSavePersists() throws {
+        let appState = AppState()
+        let testProfile = BackupProfile(
+            id: UUID(),
+            name: "Initial Profile Name",
+            sourceURL: URL(fileURLWithPath: "/tmp/source"),
+            destinationURL: URL(fileURLWithPath: "/tmp/dest")
+        )
+        appState.profiles = [testProfile]
+        appState.selectedProfileId = testProfile.id
+
+        // 1. Open profile settings modal -> baseline is captured
+        appState.showProfileSettingsModal = true
+        try assertEqual(appState.showProfileSettingsModal, true)
+        try assertEqual(appState.profileSettingsBaseline?.name, "Initial Profile Name")
+
+        // 2. Modify profile properties while modal is open
+        var edited = testProfile
+        edited.name = "Unsaved Draft Name"
+        edited.pruningPolicy.isAutoPruningEnabled = true
+        appState.selectedProfile = edited
+
+        try assertEqual(appState.selectedProfile?.name, "Unsaved Draft Name")
+        try assertEqual(appState.selectedProfile?.pruningPolicy.isAutoPruningEnabled, true)
+
+        // 3. Cancel settings -> must revert to baseline
+        appState.cancelProfileSettings()
+        try assertEqual(appState.showProfileSettingsModal, false)
+        try assertNil(appState.profileSettingsBaseline)
+        try assertEqual(appState.selectedProfile?.name, "Initial Profile Name")
+        try assertEqual(appState.selectedProfile?.pruningPolicy.isAutoPruningEnabled, false)
+
+        // 4. Open again and test saving
+        appState.showProfileSettingsModal = true
+        var savedEdit = testProfile
+        savedEdit.name = "Persisted Name"
+        appState.selectedProfile = savedEdit
+
+        appState.saveProfileSettings()
+        try assertEqual(appState.showProfileSettingsModal, false)
+        try assertNil(appState.profileSettingsBaseline)
+        try assertEqual(appState.selectedProfile?.name, "Persisted Name")
     }
 }

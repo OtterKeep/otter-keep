@@ -103,7 +103,36 @@ extension AppState {
     /// Controls presentation of the system logs modal.
     public var showSystemLogsModal: Bool { get { maintenanceSettings.showSystemLogsModal } set { maintenanceSettings.showSystemLogsModal = newValue } }
     /// Controls presentation of the tabbed profile settings modal.
-    public var showProfileSettingsModal: Bool { get { maintenanceSettings.showProfileSettingsModal } set { maintenanceSettings.showProfileSettingsModal = newValue } }
+    public var showProfileSettingsModal: Bool {
+        get { maintenanceSettings.showProfileSettingsModal }
+        set {
+            if newValue && maintenanceSettings.profileSettingsBaseline == nil {
+                maintenanceSettings.profileSettingsBaseline = selectedProfile
+            }
+            maintenanceSettings.showProfileSettingsModal = newValue
+        }
+    }
+    /// Baseline profile captured when entering profile settings.
+    public var profileSettingsBaseline: BackupProfile? {
+        get { maintenanceSettings.profileSettingsBaseline }
+        set { maintenanceSettings.profileSettingsBaseline = newValue }
+    }
+
+    /// Persists profile configuration changes from the profile settings modal to disk and dismisses.
+    public func saveProfileSettings() {
+        maintenanceSettings.profileSettingsBaseline = nil
+        saveProfiles()
+        showProfileSettingsModal = false
+    }
+
+    /// Discards unpersisted profile configuration changes and reverts to baseline snapshot.
+    public func cancelProfileSettings() {
+        if let baseline = maintenanceSettings.profileSettingsBaseline {
+            revertProfile(to: baseline)
+            maintenanceSettings.profileSettingsBaseline = nil
+        }
+        showProfileSettingsModal = false
+    }
     /// Controls presentation of the last backup session summary modal.
     public var showLastBackupSummaryModal: Bool { get { maintenanceSettings.showLastBackupSummaryModal } set { maintenanceSettings.showLastBackupSummaryModal = newValue } }
     /// Controls presentation of the delete profile confirmation dialog.

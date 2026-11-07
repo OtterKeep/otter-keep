@@ -68,7 +68,7 @@ public final class BiometricSecurityService: @unchecked Sendable {
         }
 
         let context = LAContext()
-        context.localizedCancelTitle = "Mégse"
+        context.localizedCancelTitle = L10n.t(.cancel)
 
         var error: NSError?
         guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {

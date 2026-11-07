@@ -15,7 +15,6 @@ public struct WebhookSettingsCardView: View {
         var copy = profile
         block(&copy)
         appState.selectedProfile = copy
-        appState.saveProfiles()
     }
 
     public var body: some View {

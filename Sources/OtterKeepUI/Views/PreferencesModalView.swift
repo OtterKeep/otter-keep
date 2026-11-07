@@ -136,6 +136,7 @@ public struct PreferencesModalView: View {
         .onAppear {
             appState.refreshFinderPermissionStatus()
         }
+        .id(appState.currentLanguage)
     }
 
     // MARK: - 1. General Tab

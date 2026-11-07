@@ -480,9 +480,16 @@ public final class AppState: Sendable {
         set {
             if let newValue = newValue, let index = profiles.firstIndex(where: { $0.id == newValue.id }) {
                 profiles[index] = newValue
-                saveProfiles()
                 refreshVolumeEvaluation()
             }
+        }
+    }
+
+    /// Reverts a backup profile back to its baseline snapshot without saving to disk.
+    public func revertProfile(to original: BackupProfile) {
+        if let index = profiles.firstIndex(where: { $0.id == original.id }) {
+            profiles[index] = original
+            refreshVolumeEvaluation()
         }
     }
 

@@ -79,7 +79,7 @@ extension SettingsView {
             // Central SQLite Database & Self-Healing
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(LocalizationManager.shared.effectiveLanguage == .hungarian ? "Központi SQLite Adatbázis" : "Central SQLite Database")
+                    Text(L10n.t(.centralDatabaseTitle))
                         .font(.body.weight(.medium))
                     Text(appState.centralDatabasePath)
                         .font(.callout.monospaced())
@@ -102,7 +102,7 @@ extension SettingsView {
                         try? appState.performCentralDatabaseSelfHealing()
                     }
                 } label: {
-                    Label(LocalizationManager.shared.effectiveLanguage == .hungarian ? "Öngyógyítás & VACUUM" : "Self-Healing & VACUUM", systemImage: "bandage")
+                    Label(L10n.t(.centralDatabaseVacuumButton), systemImage: "bandage")
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(OtterTheme.oceanicTeal)

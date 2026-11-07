@@ -1169,5 +1169,42 @@ extension L10n {
             english: "Returns the current health and timestamp of the latest backup.",
             hungarian: "Visszaadja a legutóbbi mentés állapotát és időbélyegét."
         ),
+        .ignoreFilesTooltipDesc: Translation(
+            english: "Automatically omit exclusion rules and hidden dotfiles from the backup snapshot.",
+            hungarian: "Kizárási szabályok és rejtett fájlok automatikus kihagyása a biztonsági mentésből."
+        ),
+        .driveAutomationTooltipDesc: Translation(
+            english: "Automatically run backup when external drive is mounted and safely eject upon completion.",
+            hungarian: "Automatikus biztonsági mentés külső meghajtó csatlakoztatásakor és befejezés utáni leválasztás."
+        ),
+        .clientEncryptionTooltipDesc: Translation(
+            english: "Zero-knowledge AES-GCM-256 client-side encryption with PBKDF2 key derivation. Passphrases are stored in the macOS Keychain.",
+            hungarian: "Zero-knowledge AES-GCM-256 kliensoldali titkosítás PBKDF2 kulcslevezetéssel. A jelszót a rendszer a macOS Keychainben őrzi."
+        ),
+        .encryptionPassphraseFieldLabel: Translation(english: "Encryption Passphrase", hungarian: "Titkosítási jelszó"),
+        .encryptionPassphraseFieldPlaceholder: Translation(english: "Enter encryption passphrase...", hungarian: "Titkosítási jelszó megadása..."),
+        .confirmPassphraseFieldLabel: Translation(english: "Confirm Passphrase", hungarian: "Jelszó megerősítése"),
+        .confirmPassphraseFieldPlaceholder: Translation(english: "Confirm passphrase...", hungarian: "Jelszó megerősítése..."),
+        .passphraseMismatchError: Translation(english: "Passphrases do not match.", hungarian: "A megadott jelszavak nem egyeznek."),
+        .biometricsActionGatesSection: Translation(english: "Protected Operations (Action Gates)", hungarian: "Védett Műveletek (Action Gates)"),
+        .biometricsSecureEnclaveToggle: Translation(english: "Apple Secure Enclave Hardware Key Protection", hungarian: "Apple Secure Enclave Hardveres Kulcszárolás"),
+        .encryptionPermanentTag: Translation(english: "Permanent", hungarian: "Végleges"),
+        .encryptionKeychainStoredDesc: Translation(
+            english: "The passphrase was securely stored in the Keychain and Secure Enclave at creation.",
+            hungarian: "A jelszó a létrehozáskor a Keychainbe és a Secure Enclave-be került."
+        ),
+        .unencryptedProfileNotice: Translation(
+            english: "Profile created without client-side encryption",
+            hungarian: "Titkosítás nélkül létrehozott profil"
+        ),
+        .centralDatabaseTitle: Translation(english: "Central SQLite Database", hungarian: "Központi SQLite Adatbázis"),
+        .centralDatabaseVacuumButton: Translation(english: "Self-Healing & VACUUM", hungarian: "Öngyógyítás & VACUUM"),
+        .unadoptedDriveDiscoveredTitle: Translation(english: "Existing Sanctuary Discovered", hungarian: "Létező mentés található a meghajtón"),
+        .unadoptedDriveDiscoveredMessageFormat: Translation(
+            english: "We discovered an existing backup archive for „%1$@” on „%2$@”. Would you like to adopt this profile into your sanctuary to safeguard and explore its historical snapshots?",
+            hungarian: "A(z) „%2$@” meghajtón megtaláltuk a(z) „%1$@” mentési archívumot. Szeretnéd hozzáadni a helyi profiljaidhoz, hogy biztonságban tudd és böngészhesd a pillanatképeit?"
+        ),
+        .unadoptedDriveAdoptAction: Translation(english: "Adopt into Sanctuary", hungarian: "Hozzáadás a Menedékhez"),
+        .unadoptedDriveDismissAction: Translation(english: "Not Now", hungarian: "Most nem"),
     ]
 }

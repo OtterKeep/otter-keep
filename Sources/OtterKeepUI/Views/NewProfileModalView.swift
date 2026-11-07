@@ -119,6 +119,7 @@ public struct NewProfileModalView: View {
                 isNameFocused = true
             }
         }
+        .id(appState.currentLanguage)
     }
 
     // MARK: - Subviews
@@ -358,7 +359,7 @@ public struct NewProfileModalView: View {
                     Label(".otterkeepignore", systemImage: "eye.slash.fill")
                         .font(.caption.bold())
                         .foregroundStyle(.secondary)
-                    InfoTooltipView("Kizárási szabályok és rejtett fájlok automatikus kihagyása a biztonsági mentésből.")
+                    InfoTooltipView(L10n.t(.ignoreFilesTooltipDesc))
                     Spacer()
                 }
 
@@ -396,7 +397,7 @@ public struct NewProfileModalView: View {
                     Label(L10n.t(.backupOnVolumeMountTitle), systemImage: "externaldrive.badge.timemachine")
                         .font(.caption.bold())
                         .foregroundStyle(.secondary)
-                    InfoTooltipView("Automatikus biztonsági mentés külső meghajtó csatlakoztatásakor és befejezés utáni leválasztás.")
+                    InfoTooltipView(L10n.t(.driveAutomationTooltipDesc))
                     Spacer()
                 }
 
@@ -437,7 +438,7 @@ public struct NewProfileModalView: View {
                 Label(L10n.t(.encryptionAndEmergencyKitTitle), systemImage: "lock.shield.fill")
                     .font(.caption.bold())
                     .foregroundStyle(OtterTheme.oceanicTeal)
-                InfoTooltipView("Zero-knowledge AES-GCM-256 kliensoldali titkosítás PBKDF2 kulcslevezetéssel. A jelszót a rendszer a macOS Keychainben őrzi.")
+                InfoTooltipView(L10n.t(.clientEncryptionTooltipDesc))
                 Spacer()
                 Toggle("", isOn: enableEncryptionBinding)
                     .toggleStyle(.switch)
@@ -447,18 +448,18 @@ public struct NewProfileModalView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Titkosítási jelszó")
+                            Text(L10n.t(.encryptionPassphraseFieldLabel))
                                 .font(.caption2.bold())
                                 .foregroundStyle(.secondary)
-                            SecureField("Titkosítási jelszó megadása...", text: encryptionPassphraseBinding)
+                            SecureField(L10n.t(.encryptionPassphraseFieldPlaceholder), text: encryptionPassphraseBinding)
                                 .textFieldStyle(.roundedBorder)
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Jelszó megerősítése")
+                            Text(L10n.t(.confirmPassphraseFieldLabel))
                                 .font(.caption2.bold())
                                 .foregroundStyle(.secondary)
-                            SecureField("Jelszó megerősítése...", text: confirmPassphraseBinding)
+                            SecureField(L10n.t(.confirmPassphraseFieldPlaceholder), text: confirmPassphraseBinding)
                                 .textFieldStyle(.roundedBorder)
                         }
                     }
@@ -466,7 +467,7 @@ public struct NewProfileModalView: View {
                     if !appState.newProfileEncryptionPassphrase.isEmpty && !appState.newProfileConfirmPassphrase.isEmpty
                         && appState.newProfileEncryptionPassphrase != appState.newProfileConfirmPassphrase
                     {
-                        Text("A megadott jelszavak nem egyeznek.")
+                        Text(L10n.t(.passphraseMismatchError))
                             .font(.caption2.bold())
                             .foregroundStyle(OtterTheme.statusError)
                     }

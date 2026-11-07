@@ -1241,6 +1241,25 @@ public enum L10n {
         case intentStartBackupDesc
         case intentGetStatusTitle
         case intentGetStatusDesc
+        case ignoreFilesTooltipDesc
+        case driveAutomationTooltipDesc
+        case clientEncryptionTooltipDesc
+        case encryptionPassphraseFieldLabel
+        case encryptionPassphraseFieldPlaceholder
+        case confirmPassphraseFieldLabel
+        case confirmPassphraseFieldPlaceholder
+        case passphraseMismatchError
+        case biometricsActionGatesSection
+        case biometricsSecureEnclaveToggle
+        case encryptionPermanentTag
+        case encryptionKeychainStoredDesc
+        case unencryptedProfileNotice
+        case centralDatabaseTitle
+        case centralDatabaseVacuumButton
+        case unadoptedDriveDiscoveredTitle
+        case unadoptedDriveDiscoveredMessageFormat
+        case unadoptedDriveAdoptAction
+        case unadoptedDriveDismissAction
     }
 
     // MARK: - Translation Dictionaries

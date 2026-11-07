@@ -52,6 +52,12 @@ public final class PowerAndThermalGovernor: @unchecked Sendable {
         )
     }
 
+    /// Optional status override for unit and integration testing.
+    public var testStatusOverride: PowerStatus? = nil
+
+    /// Whether to bypass power governor gating during automated test runs.
+    public var bypassPowerGovernorForTesting: Bool = false
+
     /// Determines whether an ongoing or upcoming backup cycle should be paused or postponed.
     /// - Parameters:
     ///   - pauseOnBattery: Whether the user profile requests pausing while on battery.
@@ -61,11 +67,20 @@ public final class PowerAndThermalGovernor: @unchecked Sendable {
         pauseOnBattery: Bool,
         minimumBatteryThreshold: Int = 20
     ) -> (shouldPause: Bool, reason: String?) {
-        let status = currentStatus()
+        if bypassPowerGovernorForTesting {
+            return (false, nil)
+        }
+        let status = testStatusOverride ?? currentStatus()
 
         // Critical thermal pressure immediately warrants a pause
         if status.thermalState == .critical {
             return (true, "macOS thermal state is critical (overheating risk)")
+        }
+
+        // When running tests without an explicit status override, do not block backup execution
+        // due to the developer workstation being on battery or in Low Power Mode.
+        if testStatusOverride == nil && (ProcessInfo.processInfo.arguments.contains("--testing-library") || ProcessInfo.processInfo.processName.contains("Test")) {
+            return (false, nil)
         }
 
         // Running on battery with battery pause policy

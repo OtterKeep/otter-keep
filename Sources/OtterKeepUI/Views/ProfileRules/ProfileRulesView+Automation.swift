@@ -23,7 +23,6 @@ extension ProfileRulesView {
                                 updated.executionMode = .scheduled(profile.schedule)
                             }
                             appState.selectedProfile = updated
-                            appState.saveProfiles()
                         }
                     )
                 ) {
@@ -56,7 +55,6 @@ extension ProfileRulesView {
                                         var updated = profile
                                         updated.executionMode = .continuous(debouncingSeconds: sec)
                                         appState.selectedProfile = updated
-                                        appState.saveProfiles()
                                     }
                                 )
                             ) {
@@ -77,7 +75,6 @@ extension ProfileRulesView {
                                 var updated = profile
                                 updated.schedule.isEnabled = enabled
                                 appState.selectedProfile = updated
-                                appState.saveProfiles()
                             }
                         )
                     ) {

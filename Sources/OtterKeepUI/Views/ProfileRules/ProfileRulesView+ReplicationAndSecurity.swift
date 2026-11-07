@@ -543,7 +543,7 @@ extension ProfileRulesView {
                             .foregroundStyle(OtterTheme.statusGreen)
 
                         HStack(spacing: 6) {
-                            Text(L10n.t(.enableLocalEncryptionLabel) + " (OKENC2 - Végleges)")
+                            Text(L10n.t(.enableLocalEncryptionLabel) + " (OKENC2 - \(L10n.t(.encryptionPermanentTag)))")
                                 .font(.body.weight(.bold))
                             InfoTooltipView(L10n.t(.encryptionLockedNotice))
                         }
@@ -567,7 +567,7 @@ extension ProfileRulesView {
                         HStack(spacing: 6) {
                             Text(L10n.t(.sparsebundlePasswordLabel))
                                 .font(.body)
-                            InfoTooltipView("A jelszó a létrehozáskor a Keychainbe és a Secure Enclave-be került.")
+                            InfoTooltipView(L10n.t(.encryptionKeychainStoredDesc))
                         }
                         Spacer()
                         Text("••••••••••••••••")
@@ -581,7 +581,7 @@ extension ProfileRulesView {
                             .foregroundStyle(.secondary)
 
                         HStack(spacing: 6) {
-                            Text("Titkosítás nélkül létrehozott profil")
+                            Text(L10n.t(.unencryptedProfileNotice))
                                 .font(.body.weight(.medium))
                             InfoTooltipView(L10n.t(.encryptionLockedNotice))
                         }

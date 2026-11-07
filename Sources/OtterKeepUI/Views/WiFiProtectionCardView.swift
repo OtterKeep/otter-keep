@@ -19,7 +19,6 @@ public struct WiFiProtectionCardView: View {
         var copy = profile
         block(&copy)
         appState.selectedProfile = copy
-        appState.saveProfiles()
     }
 
     private var allowedSSIDBinding: Binding<String> {

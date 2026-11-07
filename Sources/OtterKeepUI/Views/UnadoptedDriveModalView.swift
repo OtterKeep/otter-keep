@@ -25,31 +25,23 @@ public struct UnadoptedDriveModalView: View {
                 OttieSanctuaryMascotView(mood: .safe, size: 96)
 
                 VStack(spacing: 8) {
-                    Text(
-                        LocalizationManager.shared.effectiveLanguage == .hungarian
-                            ? "Létező mentés található a meghajtón"
-                            : "Existing Sanctuary Discovered"
-                    )
-                    .font(.title2.bold())
-                    .multilineTextAlignment(.center)
+                    Text(L10n.t(.unadoptedDriveDiscoveredTitle))
+                        .font(.title2.bold())
+                        .multilineTextAlignment(.center)
 
-                    Text(
-                        LocalizationManager.shared.effectiveLanguage == .hungarian
-                            ? "A(z) „\(volumeName)” meghajtón megtaláltuk a(z) „\(profileName)” mentési archívumot. Szeretnéd hozzáadni a helyi profiljaidhoz, hogy biztonságban tudd és böngészhesd a pillanatképeit?"
-                            : "We discovered an existing backup archive for „\(profileName)” on „\(volumeName)”. Would you like to adopt this profile into your sanctuary to safeguard and explore its historical snapshots?"
-                    )
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 16)
+                    Text(L10n.format(.unadoptedDriveDiscoveredMessageFormat, profileName, volumeName))
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 16)
                 }
             }
             .padding(24)
 
             // Pinned Footer
             ModalFooterActionsView(
-                cancelTitle: LocalizationManager.shared.effectiveLanguage == .hungarian ? "Most nem" : "Not Now",
-                primaryTitle: LocalizationManager.shared.effectiveLanguage == .hungarian ? "Hozzáadás a Menedékhez" : "Adopt into Sanctuary",
+                cancelTitle: L10n.t(.unadoptedDriveDismissAction),
+                primaryTitle: L10n.t(.unadoptedDriveAdoptAction),
                 onCancel: {
                     appState.dismissDiscoveredDrive()
                 },
@@ -60,5 +52,6 @@ public struct UnadoptedDriveModalView: View {
         }
         .frame(width: 480)
         .background(Color(nsColor: .windowBackgroundColor))
+        .id(appState.currentLanguage)
     }
 }

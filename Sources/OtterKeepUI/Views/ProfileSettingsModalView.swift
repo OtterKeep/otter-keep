@@ -20,6 +20,10 @@ public struct ProfileSettingsModalView: View {
         self.profile = profile
     }
 
+    private var currentProfile: BackupProfile {
+        appState.selectedProfile ?? profile
+    }
+
     public var body: some View {
         VStack(spacing: 0) {
             // Header Bar
@@ -31,7 +35,7 @@ public struct ProfileSettingsModalView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L10n.t(.profileSettingsTitle))
                         .font(.headline.bold())
-                    Text(profile.name)
+                    Text(currentProfile.name)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -39,7 +43,7 @@ public struct ProfileSettingsModalView: View {
                 Spacer()
 
                 Button {
-                    appState.showProfileSettingsModal = false
+                    appState.cancelProfileSettings()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title3)
@@ -55,22 +59,37 @@ public struct ProfileSettingsModalView: View {
             Divider()
 
             // Tabbed Content
-            ProfileRulesAndMaintenanceView(appState: appState, profile: profile)
+            ProfileRulesAndMaintenanceView(appState: appState, profile: currentProfile)
 
             // Pinned Action Buttons Footer
             ModalFooterActionsView(
                 cancelTitle: L10n.t(.cancel),
                 primaryTitle: L10n.t(.save),
                 onCancel: {
-                    appState.showProfileSettingsModal = false
+                    appState.cancelProfileSettings()
                 },
                 onPrimary: {
-                    appState.saveProfiles()
-                    appState.showProfileSettingsModal = false
+                    appState.saveProfileSettings()
                 }
             )
         }
         .frame(minWidth: 720, idealWidth: 760, maxWidth: .infinity, minHeight: 520, idealHeight: 580, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
+        .onAppear {
+            if appState.profileSettingsBaseline == nil {
+                appState.profileSettingsBaseline = currentProfile
+            }
+        }
+        .onDisappear {
+            if appState.profileSettingsBaseline != nil {
+                appState.cancelProfileSettings()
+            }
+        }
+        .onChange(of: appState.showRemoteDestinationEditorSheet) { _, isShowing in
+            if !isShowing, let current = appState.selectedProfile {
+                appState.profileSettingsBaseline = current
+            }
+        }
+        .id(appState.currentLanguage)
     }
 }

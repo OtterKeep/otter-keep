@@ -67,7 +67,7 @@ public struct SecurityPreferencesView: View {
                 Image(systemName: "hand.raised.shield.fill")
                     .font(.title3)
                     .foregroundStyle(OtterTheme.oceanicTeal)
-                Text("Védett Műveletek (Action Gates)")
+                Text(L10n.t(.biometricsActionGatesSection))
                     .font(.headline)
             }
 
@@ -144,7 +144,7 @@ public struct SecurityPreferencesView: View {
                 get: { appState.useSecureEnclaveForKeychain },
                 set: { appState.useSecureEnclaveForKeychain = $0 }
             )) {
-                Text("Apple Secure Enclave Hardveres Kulcszárolás")
+                Text(L10n.t(.biometricsSecureEnclaveToggle))
                     .font(.body.weight(.medium))
             }
             .toggleStyle(.switch)
