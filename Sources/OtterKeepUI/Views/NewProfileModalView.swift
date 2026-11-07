@@ -95,10 +95,17 @@ public struct NewProfileModalView: View {
             }
 
             // Pinned Action Buttons Footer
-            footerActionsView
-                .padding(.horizontal, 22)
-                .padding(.vertical, 14)
-                .background(.ultraThinMaterial)
+            ModalFooterActionsView(
+                cancelTitle: L10n.t(.cancel),
+                primaryTitle: L10n.t(.create),
+                isPrimaryDisabled: !canCreate,
+                onCancel: {
+                    appState.showNewProfileSheet = false
+                },
+                onPrimary: {
+                    performCreate()
+                }
+            )
         }
         .frame(
             minWidth: 780, idealWidth: 820, maxWidth: 960,
@@ -592,23 +599,5 @@ public struct NewProfileModalView: View {
         let pass = appState.newProfileEnableEncryption ? appState.newProfileEncryptionPassphrase : nil
         appState.createProfileFromDraft(encryptionPassphrase: pass)
         appState.showNewProfileSheet = false
-    }
-
-    private var footerActionsView: some View {
-        HStack {
-            Button(L10n.t(.cancel)) {
-                appState.showNewProfileSheet = false
-            }
-            .keyboardShortcut(.cancelAction)
-
-            Spacer()
-
-            Button(L10n.t(.create)) {
-                performCreate()
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(!canCreate)
-            .keyboardShortcut(.defaultAction)
-        }
     }
 }
