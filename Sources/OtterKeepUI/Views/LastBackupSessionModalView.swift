@@ -6,9 +6,9 @@
 //  latest backup session.
 //
 
-import SwiftUI
 import AppKit
 import OtterKeepCore
+import SwiftUI
 
 /// Modal view displaying the detailed operational result of the active profile's latest backup.
 public struct LastBackupSessionModalView: View {
@@ -42,12 +42,15 @@ public struct LastBackupSessionModalView: View {
 
                 Spacer()
 
-                Button(L10n.t(.okDone)) {
+                Button {
                     appState.showLastBackupSummaryModal = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.t(.closeButton))
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
@@ -67,9 +70,12 @@ public struct LastBackupSessionModalView: View {
                             Text(isSuccess ? L10n.t(.lastBackupSuccess) : L10n.t(.lastBackupWarning))
                                 .font(.title3.bold())
 
-                            Text(L10n.format(.sessionSummaryStatsFormat, summary.totalScannedFiles, summary.copiedCount, summary.clonedCount, summary.durationSeconds))
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
+                            Text(
+                                L10n.format(
+                                    .sessionSummaryStatsFormat, summary.totalScannedFiles, summary.copiedCount, summary.clonedCount, summary.durationSeconds)
+                            )
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
                         }
                     }
                     .padding(16)
@@ -145,6 +151,15 @@ public struct LastBackupSessionModalView: View {
                 }
                 .padding(20)
             }
+
+            // Pinned Action Buttons Footer
+            ModalFooterActionsView(
+                primaryTitle: L10n.t(.okDone),
+                onCancel: nil,
+                onPrimary: {
+                    appState.showLastBackupSummaryModal = false
+                }
+            )
         }
         .frame(minWidth: 580, idealWidth: 620, minHeight: 400, idealHeight: 460)
         .background(Color(nsColor: .windowBackgroundColor))

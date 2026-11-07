@@ -1,6 +1,6 @@
-import SwiftUI
 import AppKit
 import OtterKeepCore
+import SwiftUI
 
 /// A reassuring, calm modal presented when an external drive with an unadopted OtterKeep backup is discovered.
 public struct UnadoptedDriveModalView: View {
@@ -19,50 +19,45 @@ public struct UnadoptedDriveModalView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 20) {
-            // Ottie calming sanctuary mascot
-            OttieSanctuaryMascotView(mood: .safe, size: 96)
+        VStack(spacing: 0) {
+            VStack(spacing: 20) {
+                // Ottie calming sanctuary mascot
+                OttieSanctuaryMascotView(mood: .safe, size: 96)
 
-            VStack(spacing: 8) {
-                Text(LocalizationManager.shared.effectiveLanguage == .hungarian
-                     ? "Létező mentés található a meghajtón"
-                     : "Existing Sanctuary Discovered")
+                VStack(spacing: 8) {
+                    Text(
+                        LocalizationManager.shared.effectiveLanguage == .hungarian
+                            ? "Létező mentés található a meghajtón"
+                            : "Existing Sanctuary Discovered"
+                    )
                     .font(.title2.bold())
                     .multilineTextAlignment(.center)
 
-                Text(LocalizationManager.shared.effectiveLanguage == .hungarian
-                     ? "A(z) „\(volumeName)” meghajtón megtaláltuk a(z) „\(profileName)” mentési archívumot. Szeretnéd hozzáadni a helyi profiljaidhoz, hogy biztonságban tudd és böngészhesd a pillanatképeit?"
-                     : "We discovered an existing backup archive for „\(profileName)” on „\(volumeName)”. Would you like to adopt this profile into your sanctuary to safeguard and explore its historical snapshots?")
+                    Text(
+                        LocalizationManager.shared.effectiveLanguage == .hungarian
+                            ? "A(z) „\(volumeName)” meghajtón megtaláltuk a(z) „\(profileName)” mentési archívumot. Szeretnéd hozzáadni a helyi profiljaidhoz, hogy biztonságban tudd és böngészhesd a pillanatképeit?"
+                            : "We discovered an existing backup archive for „\(profileName)” on „\(volumeName)”. Would you like to adopt this profile into your sanctuary to safeguard and explore its historical snapshots?"
+                    )
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 16)
+                }
             }
+            .padding(24)
 
-            Divider()
-
-            HStack(spacing: 12) {
-                Button(LocalizationManager.shared.effectiveLanguage == .hungarian ? "Most nem" : "Not Now") {
+            // Pinned Footer
+            ModalFooterActionsView(
+                cancelTitle: LocalizationManager.shared.effectiveLanguage == .hungarian ? "Most nem" : "Not Now",
+                primaryTitle: LocalizationManager.shared.effectiveLanguage == .hungarian ? "Hozzáadás a Menedékhez" : "Adopt into Sanctuary",
+                onCancel: {
                     appState.dismissDiscoveredDrive()
-                }
-                .keyboardShortcut(.cancelAction)
-
-                Spacer()
-
-                Button {
+                },
+                onPrimary: {
                     appState.adoptDiscoveredDrive()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "folder.badge.plus")
-                        Text(LocalizationManager.shared.effectiveLanguage == .hungarian ? "Hozzáadás a Menedékhez" : "Adopt into Sanctuary")
-                    }
                 }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
-            }
-            .padding(.horizontal, 4)
+            )
         }
-        .padding(24)
         .frame(width: 480)
         .background(Color(nsColor: .windowBackgroundColor))
     }

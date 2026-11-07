@@ -1097,6 +1097,7 @@ extension L10n {
         .recoveryViewLogs: Translation(english: "View Diagnostic Logs", hungarian: "Hibanapló megtekintése"),
 
         // MARK: - Emergency Kit, Biometrics & Automation (v2.1)
+        .encryptionAndEmergencyKitTitle: Translation(english: "Client-Side Encryption & Emergency Kit", hungarian: "Kliensoldali titkosítás és Vészhelyzeti Kit"),
         .emergencyKitTitle: Translation(english: "Emergency Recovery Kit", hungarian: "Vészhelyzeti Helyreállítási Készlet"),
         .emergencyKitSubtitle: Translation(
             english: "Print or securely store this recovery document to restore encrypted backups in an emergency.",

@@ -94,13 +94,18 @@ public struct NewProfileModalView: View {
                 .padding(22)
             }
 
-            Divider()
-
             // Pinned Action Buttons Footer
-            footerActionsView
-                .padding(.horizontal, 22)
-                .padding(.vertical, 14)
-                .background(.ultraThinMaterial)
+            ModalFooterActionsView(
+                cancelTitle: L10n.t(.cancel),
+                primaryTitle: L10n.t(.create),
+                isPrimaryDisabled: !canCreate,
+                onCancel: {
+                    appState.showNewProfileSheet = false
+                },
+                onPrimary: {
+                    performCreate()
+                }
+            )
         }
         .frame(
             minWidth: 700, idealWidth: 780, maxWidth: 880,
@@ -196,15 +201,12 @@ public struct NewProfileModalView: View {
 
     private var sourceFolderView: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
+            HStack(spacing: 6) {
                 Label(L10n.t(.sourceFolderTitle), systemImage: "folder.fill")
                     .font(.caption.bold())
                     .foregroundStyle(OtterTheme.cyberTeal)
+                InfoTooltipView(L10n.t(.newProfileSourceDesc))
                 Spacer()
-                Text(L10n.t(.newProfileSourceDesc))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
 
             HStack(spacing: 10) {
@@ -246,15 +248,12 @@ public struct NewProfileModalView: View {
 
     private var destinationFolderView: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
+            HStack(spacing: 6) {
                 Label(L10n.t(.destinationFolderTitle), systemImage: "internaldrive.fill")
                     .font(.caption.bold())
                     .foregroundStyle(OtterTheme.otterAmber)
+                InfoTooltipView(L10n.t(.newProfileDestinationDesc))
                 Spacer()
-                Text(L10n.t(.newProfileDestinationDesc))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
 
             HStack(spacing: 10) {
@@ -354,10 +353,14 @@ public struct NewProfileModalView: View {
     private var advancedOptionsView: some View {
         HStack(alignment: .top, spacing: 14) {
             // 1. Ignore rules group
-            VStack(alignment: .leading, spacing: 6) {
-                Label(".otterkeepignore", systemImage: "eye.slash.fill")
-                    .font(.caption.bold())
-                    .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Label(".otterkeepignore", systemImage: "eye.slash.fill")
+                        .font(.caption.bold())
+                        .foregroundStyle(.secondary)
+                    InfoTooltipView("Kizárási szabályok és rejtett fájlok automatikus kihagyása a biztonsági mentésből.")
+                    Spacer()
+                }
 
                 Toggle(
                     isOn: Binding(
@@ -388,10 +391,14 @@ public struct NewProfileModalView: View {
             .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
 
             // 2. Drive Automation group
-            VStack(alignment: .leading, spacing: 6) {
-                Label(L10n.t(.backupOnVolumeMountTitle), systemImage: "externaldrive.badge.timemachine")
-                    .font(.caption.bold())
-                    .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Label(L10n.t(.backupOnVolumeMountTitle), systemImage: "externaldrive.badge.timemachine")
+                        .font(.caption.bold())
+                        .foregroundStyle(.secondary)
+                    InfoTooltipView("Automatikus biztonsági mentés külső meghajtó csatlakoztatásakor és befejezés utáni leválasztás.")
+                    Spacer()
+                }
 
                 Toggle(
                     isOn: Binding(
@@ -426,10 +433,11 @@ public struct NewProfileModalView: View {
     // MARK: - Zero-Knowledge Client Encryption & Emergency Kit
     private var encryptionAndEmergencyKitView: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("Kliensoldali Titkosítás (OKENC2) & Vészhelyzeti Kit", systemImage: "lock.shield.fill")
+            HStack(spacing: 6) {
+                Label(L10n.t(.encryptionAndEmergencyKitTitle), systemImage: "lock.shield.fill")
                     .font(.caption.bold())
                     .foregroundStyle(OtterTheme.oceanicTeal)
+                InfoTooltipView("Zero-knowledge AES-GCM-256 kliensoldali titkosítás PBKDF2 kulcslevezetéssel. A jelszót a rendszer a macOS Keychainben őrzi.")
                 Spacer()
                 Toggle("", isOn: enableEncryptionBinding)
                     .toggleStyle(.switch)
@@ -437,10 +445,6 @@ public struct NewProfileModalView: View {
 
             if appState.newProfileEnableEncryption {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Állíts be egy erős jelszót. A jelszót a rendszer a macOS Keychainben tárolja.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Titkosítási jelszó")
@@ -468,18 +472,16 @@ public struct NewProfileModalView: View {
                     }
 
                     Toggle(isOn: includePassphraseBinding) {
-                        VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 6) {
                             Text(L10n.t(.emergencyKitIncludePassword))
                                 .font(.caption.bold())
-                            Text(L10n.t(.emergencyKitIncludePasswordDesc))
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                            InfoTooltipView(L10n.t(.emergencyKitIncludePasswordDesc))
                         }
                     }
                     .toggleStyle(.checkbox)
                     .padding(.top, 4)
 
-                    HStack {
+                    HStack(spacing: 8) {
                         Button {
                             downloadEmergencyKitNow()
                         } label: {
@@ -494,12 +496,9 @@ public struct NewProfileModalView: View {
                         .disabled(
                             appState.newProfileEncryptionPassphrase.isEmpty || appState.newProfileEncryptionPassphrase != appState.newProfileConfirmPassphrase)
 
-                        Spacer()
+                        InfoTooltipView(L10n.t(.emergencyKitCreatedOnlyWarning))
 
-                        Text(L10n.t(.emergencyKitCreatedOnlyWarning))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.trailing)
+                        Spacer()
                     }
                     .padding(.top, 4)
                 }
@@ -543,24 +542,6 @@ public struct NewProfileModalView: View {
                     .foregroundStyle(OtterTheme.statusError)
             }
             .padding(.horizontal, 4)
-        }
-    }
-
-    private var footerActionsView: some View {
-        HStack {
-            Button(L10n.t(.cancel)) {
-                appState.showNewProfileSheet = false
-            }
-            .keyboardShortcut(.cancelAction)
-
-            Spacer()
-
-            Button(L10n.t(.create)) {
-                performCreate()
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(!canCreate)
-            .keyboardShortcut(.defaultAction)
         }
     }
 

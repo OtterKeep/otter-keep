@@ -6,9 +6,9 @@
 //  text search, and export.
 //
 
-import SwiftUI
 import AppKit
 import OtterKeepCore
+import SwiftUI
 
 /// Dedicated modal sheet presenting live system logs and diagnostics.
 public struct SystemLogsModalView: View {
@@ -36,12 +36,15 @@ public struct SystemLogsModalView: View {
 
                 Spacer()
 
-                Button(L10n.t(.okDone)) {
+                Button {
                     appState.showSystemLogsModal = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.t(.closeButton))
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
@@ -51,6 +54,15 @@ public struct SystemLogsModalView: View {
 
             // Main Logs View
             DiagnosticLogView(appState: appState)
+
+            // Pinned Footer
+            ModalFooterActionsView(
+                primaryTitle: L10n.t(.okDone),
+                onCancel: nil,
+                onPrimary: {
+                    appState.showSystemLogsModal = false
+                }
+            )
         }
         .frame(minWidth: 780, idealWidth: 840, minHeight: 520, idealHeight: 600)
         .background(Color(nsColor: .windowBackgroundColor))

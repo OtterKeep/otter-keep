@@ -5,9 +5,9 @@
 //  Charming, reassuring mascot-adorned confirmation modal for profile deletion.
 //
 
-import SwiftUI
 import AppKit
 import OtterKeepCore
+import SwiftUI
 
 /// Charming, reassuring modal dialog with Ottie looking questioningly and adorably at the user
 /// before confirming profile deletion.
@@ -70,20 +70,16 @@ public struct DeleteProfileConfirmationModalView: View {
 
             Spacer(minLength: 20)
 
-            Divider()
-
-            // Footer Actions
-            HStack(spacing: 12) {
-                Button(L10n.t(.cancel)) {
+            // Pinned Footer Actions
+            ModalFooterActionsView(
+                cancelTitle: L10n.t(.cancel),
+                primaryTitle: L10n.t(.deleteProfileButton),
+                isPrimaryDestructive: true,
+                onCancel: {
                     appState.showDeleteProfileConfirmation = false
                     appState.profilePendingDeletion = nil
-                }
-                .keyboardShortcut(.cancelAction)
-                .controlSize(.regular)
-
-                Spacer()
-
-                Button(role: .destructive) {
+                },
+                onPrimary: {
                     if let profile = targetProfile {
                         Task { @MainActor in
                             if appState.isBiometricsEnabled && appState.requireBiometricsForProfileDeletion {
@@ -103,20 +99,8 @@ public struct DeleteProfileConfirmationModalView: View {
                         appState.showDeleteProfileConfirmation = false
                         appState.profilePendingDeletion = nil
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "trash.fill")
-                        Text(L10n.t(.deleteProfileButton))
-                    }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(OtterTheme.statusError)
-                .controlSize(.regular)
-                .keyboardShortcut(.defaultAction)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
-            .background(.ultraThinMaterial)
+            )
         }
         .frame(
             minWidth: 400, idealWidth: 440, maxWidth: 560,

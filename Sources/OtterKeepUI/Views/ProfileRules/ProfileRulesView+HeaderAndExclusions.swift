@@ -1,6 +1,6 @@
-import SwiftUI
 import AppKit
 import OtterKeepCore
+import SwiftUI
 
 extension ProfileRulesView {
     // MARK: - 1. Folder Overview Header
@@ -45,23 +45,26 @@ extension ProfileRulesView {
                     .frame(width: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(profile.icloudStrategy.localizedTitle)
-                        .font(.body.weight(.medium))
-                    Text(profile.icloudStrategy.localizedDescription)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Text(profile.icloudStrategy.localizedTitle)
+                            .font(.body.weight(.medium))
+                        InfoTooltipView(profile.icloudStrategy.localizedDescription)
+                    }
                 }
 
                 Spacer()
 
-                Picker("", selection: Binding(
-                    get: { profile.icloudStrategy },
-                    set: { strat in
-                        var updated = profile
-                        updated.icloudStrategy = strat
-                        appState.selectedProfile = updated
-                    }
-                )) {
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { profile.icloudStrategy },
+                        set: { strat in
+                            var updated = profile
+                            updated.icloudStrategy = strat
+                            appState.selectedProfile = updated
+                        }
+                    )
+                ) {
                     ForEach(ICloudBackupStrategy.allCases, id: \.self) { strat in
                         Text(strat.localizedTitle).tag(strat)
                     }
@@ -186,39 +189,39 @@ extension ProfileRulesView {
 
                 // Ignore files and markers engine toggles
                 VStack(alignment: .leading, spacing: 8) {
-                    Toggle(isOn: Binding(
-                        get: { profile.enableIgnoreFiles },
-                        set: { val in
-                            var updated = profile
-                            updated.enableIgnoreFiles = val
-                            appState.selectedProfile = updated
-                        }
-                    )) {
-                        VStack(alignment: .leading, spacing: 2) {
+                    Toggle(
+                        isOn: Binding(
+                            get: { profile.enableIgnoreFiles },
+                            set: { val in
+                                var updated = profile
+                                updated.enableIgnoreFiles = val
+                                appState.selectedProfile = updated
+                            }
+                        )
+                    ) {
+                        HStack(spacing: 6) {
                             Text(L10n.t(.enableIgnoreFilesToggle))
                                 .font(.body.weight(.medium))
-                            Text(L10n.t(.enableIgnoreFilesDesc))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            InfoTooltipView(L10n.t(.enableIgnoreFilesDesc))
                         }
                     }
                     .toggleStyle(.checkbox)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Toggle(isOn: Binding(
-                        get: { profile.respectGitIgnore },
-                        set: { val in
-                            var updated = profile
-                            updated.respectGitIgnore = val
-                            appState.selectedProfile = updated
-                        }
-                    )) {
-                        VStack(alignment: .leading, spacing: 2) {
+                    Toggle(
+                        isOn: Binding(
+                            get: { profile.respectGitIgnore },
+                            set: { val in
+                                var updated = profile
+                                updated.respectGitIgnore = val
+                                appState.selectedProfile = updated
+                            }
+                        )
+                    ) {
+                        HStack(spacing: 6) {
                             Text(L10n.t(.respectGitIgnoreToggle))
                                 .font(.body)
-                            Text(L10n.t(.respectGitIgnoreDesc))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            InfoTooltipView(L10n.t(.respectGitIgnoreDesc))
                         }
                     }
                     .toggleStyle(.checkbox)

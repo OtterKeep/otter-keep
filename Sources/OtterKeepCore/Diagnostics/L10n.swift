@@ -153,9 +153,6 @@ public enum L10n {
         case errNTFSTargetReadOnly
         case errDestinationReadOnly
 
-
-
-
         // MARK: - Scheduling
         case scheduleCardTitle
         case scheduleCardSubtitle
@@ -1208,6 +1205,7 @@ public enum L10n {
         case recoveryViewLogs
 
         // MARK: - Emergency Kit, Biometrics & Automation (v2.1)
+        case encryptionAndEmergencyKitTitle
         case emergencyKitTitle
         case emergencyKitSubtitle
         case emergencyKitExportButton
@@ -1244,7 +1242,6 @@ public enum L10n {
         case intentGetStatusTitle
         case intentGetStatusDesc
     }
-
 
     // MARK: - Translation Dictionaries
 

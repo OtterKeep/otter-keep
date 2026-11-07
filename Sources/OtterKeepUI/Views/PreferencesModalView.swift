@@ -5,9 +5,9 @@
 //  Tabbed popup sheet for global preferences and application configuration.
 //
 
-import SwiftUI
 import AppKit
 import OtterKeepCore
+import SwiftUI
 
 /// Tabbed popup modal sheet for general application settings, preferences, and diagnostics.
 public struct PreferencesModalView: View {
@@ -70,12 +70,15 @@ public struct PreferencesModalView: View {
 
                 Spacer()
 
-                Button(L10n.t(.save)) {
+                Button {
                     appState.showPreferencesModal = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.t(.closeButton))
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
@@ -115,6 +118,18 @@ public struct PreferencesModalView: View {
                 .padding(24)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            // Pinned Action Buttons Footer
+            ModalFooterActionsView(
+                cancelTitle: L10n.t(.cancel),
+                primaryTitle: L10n.t(.save),
+                onCancel: {
+                    appState.showPreferencesModal = false
+                },
+                onPrimary: {
+                    appState.showPreferencesModal = false
+                }
+            )
         }
         .frame(minWidth: 720, idealWidth: 760, minHeight: 520, idealHeight: 580)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -208,12 +223,10 @@ public struct PreferencesModalView: View {
             Divider()
 
             Toggle(isOn: startMinimizedBinding) {
-                VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
                     Text(L10n.t(.settingsStartMinimizedToggle))
                         .font(.body.weight(.medium))
-                    Text(L10n.t(.settingsStartMinimizedDesc))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    InfoTooltipView(L10n.t(.settingsStartMinimizedDesc))
                 }
             }
             .toggleStyle(.switch)

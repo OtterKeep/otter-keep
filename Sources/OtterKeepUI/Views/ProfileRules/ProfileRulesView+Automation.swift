@@ -1,6 +1,6 @@
-import SwiftUI
 import AppKit
 import OtterKeepCore
+import SwiftUI
 
 extension ProfileRulesView {
     // MARK: - 4. Backup Schedule
@@ -11,19 +11,22 @@ extension ProfileRulesView {
 
             VStack(alignment: .leading, spacing: 14) {
                 // Execution mode selector
-                Picker("", selection: Binding(
-                    get: { profile.executionMode.isContinuous ? 1 : 0 },
-                    set: { modeIndex in
-                        var updated = profile
-                        if modeIndex == 1 {
-                            updated.executionMode = .continuous(debouncingSeconds: profile.executionMode.debouncingSeconds)
-                        } else {
-                            updated.executionMode = .scheduled(profile.schedule)
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { profile.executionMode.isContinuous ? 1 : 0 },
+                        set: { modeIndex in
+                            var updated = profile
+                            if modeIndex == 1 {
+                                updated.executionMode = .continuous(debouncingSeconds: profile.executionMode.debouncingSeconds)
+                            } else {
+                                updated.executionMode = .scheduled(profile.schedule)
+                            }
+                            appState.selectedProfile = updated
+                            appState.saveProfiles()
                         }
-                        appState.selectedProfile = updated
-                        appState.saveProfiles()
-                    }
-                )) {
+                    )
+                ) {
                     Text(L10n.t(.executionModeScheduled)).tag(0)
                     Text(L10n.t(.executionModeContinuous)).tag(1)
                 }
@@ -37,26 +40,26 @@ extension ProfileRulesView {
                                 .foregroundStyle(OtterTheme.otterAmber)
                             Text(L10n.t(.executionModeContinuous))
                                 .font(.body.weight(.medium))
+                            InfoTooltipView(L10n.t(.continuousDebounceDesc))
                             Spacer()
                         }
-
-                        Text(L10n.t(.continuousDebounceDesc))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
 
                         HStack(spacing: 8) {
                             Text(L10n.t(.continuousDebounceLabel))
                                 .font(.body)
                             Spacer()
-                            Picker("", selection: Binding(
-                                get: { profile.executionMode.debouncingSeconds },
-                                set: { sec in
-                                    var updated = profile
-                                    updated.executionMode = .continuous(debouncingSeconds: sec)
-                                    appState.selectedProfile = updated
-                                    appState.saveProfiles()
-                                }
-                            )) {
+                            Picker(
+                                "",
+                                selection: Binding(
+                                    get: { profile.executionMode.debouncingSeconds },
+                                    set: { sec in
+                                        var updated = profile
+                                        updated.executionMode = .continuous(debouncingSeconds: sec)
+                                        appState.selectedProfile = updated
+                                        appState.saveProfiles()
+                                    }
+                                )
+                            ) {
                                 ForEach([10, 30, 60, 120], id: \.self) { seconds in
                                     Text(L10n.format(.debounceSecondsFormat, seconds)).tag(seconds)
                                 }
@@ -67,21 +70,21 @@ extension ProfileRulesView {
                     }
                 } else {
                     // Schedule toggle
-                    Toggle(isOn: Binding(
-                        get: { profile.schedule.isEnabled },
-                        set: { enabled in
-                            var updated = profile
-                            updated.schedule.isEnabled = enabled
-                            appState.selectedProfile = updated
-                            appState.saveProfiles()
-                        }
-                    )) {
-                        VStack(alignment: .leading, spacing: 2) {
+                    Toggle(
+                        isOn: Binding(
+                            get: { profile.schedule.isEnabled },
+                            set: { enabled in
+                                var updated = profile
+                                updated.schedule.isEnabled = enabled
+                                appState.selectedProfile = updated
+                                appState.saveProfiles()
+                            }
+                        )
+                    ) {
+                        HStack(spacing: 6) {
                             Text(L10n.t(.scheduleEnableToggle))
                                 .font(.body.weight(.medium))
-                            Text(L10n.t(.scheduleCardSubtitle))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            InfoTooltipView(L10n.t(.scheduleCardSubtitle))
                         }
                     }
                     .toggleStyle(.checkbox)
@@ -89,164 +92,182 @@ extension ProfileRulesView {
 
                     if profile.schedule.isEnabled {
                         VStack(alignment: .leading, spacing: 12) {
-                        Divider()
+                            Divider()
 
-                        HStack(spacing: 8) {
-                            Text(L10n.t(.scheduleFrequencyLabel))
-                                .font(.body)
-                            Spacer()
-                            Picker("", selection: Binding(
-                                get: { profile.schedule.frequency },
-                                set: { freq in
-                                    var updated = profile
-                                    updated.schedule.frequency = freq
-                                    appState.selectedProfile = updated
-                                }
-                            )) {
-                                ForEach(ScheduleFrequency.allCases, id: \.self) { freq in
-                                    Text(freq.localizedTitle).tag(freq)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                            .frame(width: 200)
-                        }
-
-                        // Detailed controls for selected frequency
-                        switch profile.schedule.frequency {
-                        case .hourly:
-                            HStack(spacing: 6) {
-                                Image(systemName: "info.circle")
-                                    .foregroundStyle(.secondary)
-                                Text(L10n.t(.scheduleHourlyDesc))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(.vertical, 2)
-
-                        case .daily:
-                            HStack {
-                                Text(L10n.t(.scheduleHourLabel))
+                            HStack(spacing: 8) {
+                                Text(L10n.t(.scheduleFrequencyLabel))
                                     .font(.body)
                                 Spacer()
-                                HStack(spacing: 8) {
-                                    Picker("", selection: Binding(
-                                        get: { profile.schedule.hour },
-                                        set: { h in
+                                Picker(
+                                    "",
+                                    selection: Binding(
+                                        get: { profile.schedule.frequency },
+                                        set: { freq in
                                             var updated = profile
-                                            updated.schedule.hour = h
+                                            updated.schedule.frequency = freq
                                             appState.selectedProfile = updated
                                         }
-                                    )) {
+                                    )
+                                ) {
+                                    ForEach(ScheduleFrequency.allCases, id: \.self) { freq in
+                                        Text(freq.localizedTitle).tag(freq)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .frame(width: 200)
+                            }
+
+                            // Detailed controls for selected frequency
+                            switch profile.schedule.frequency {
+                            case .hourly:
+                                HStack(spacing: 6) {
+                                    Image(systemName: "info.circle")
+                                        .foregroundStyle(.secondary)
+                                    Text(L10n.t(.scheduleHourlyDesc))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.vertical, 2)
+
+                            case .daily:
+                                HStack {
+                                    Text(L10n.t(.scheduleHourLabel))
+                                        .font(.body)
+                                    Spacer()
+                                    HStack(spacing: 8) {
+                                        Picker(
+                                            "",
+                                            selection: Binding(
+                                                get: { profile.schedule.hour },
+                                                set: { h in
+                                                    var updated = profile
+                                                    updated.schedule.hour = h
+                                                    appState.selectedProfile = updated
+                                                }
+                                            )
+                                        ) {
+                                            ForEach(ScheduleTimeFormatting.hourLabels, id: \.hour) { entry in
+                                                Text(entry.label).tag(entry.hour)
+                                            }
+                                        }
+                                        .labelsHidden()
+                                        .frame(width: 90)
+
+                                        Picker(
+                                            "",
+                                            selection: Binding(
+                                                get: { profile.schedule.minute },
+                                                set: { m in
+                                                    var updated = profile
+                                                    updated.schedule.minute = m
+                                                    appState.selectedProfile = updated
+                                                }
+                                            )
+                                        ) {
+                                            ForEach(ScheduleTimeFormatting.minuteOptions, id: \.self) { m in
+                                                Text(ScheduleTimeFormatting.minuteLabel(m)).tag(m)
+                                            }
+                                        }
+                                        .labelsHidden()
+                                        .frame(width: 75)
+                                    }
+                                }
+
+                            case .weekly:
+                                HStack {
+                                    Text(L10n.t(.scheduleDayLabel))
+                                        .font(.body)
+                                    Spacer()
+                                    Picker(
+                                        "",
+                                        selection: Binding(
+                                            get: { profile.schedule.weekday },
+                                            set: { w in
+                                                var updated = profile
+                                                updated.schedule.weekday = w
+                                                appState.selectedProfile = updated
+                                            }
+                                        )
+                                    ) {
+                                        Text(L10n.t(.monday)).tag(2)
+                                        Text(L10n.t(.tuesday)).tag(3)
+                                        Text(L10n.t(.wednesday)).tag(4)
+                                        Text(L10n.t(.thursday)).tag(5)
+                                        Text(L10n.t(.friday)).tag(6)
+                                        Text(L10n.t(.saturday)).tag(7)
+                                        Text(L10n.t(.sunday)).tag(1)
+                                    }
+                                    .labelsHidden()
+                                    .frame(width: 120)
+
+                                    Picker(
+                                        "",
+                                        selection: Binding(
+                                            get: { profile.schedule.hour },
+                                            set: { h in
+                                                var updated = profile
+                                                updated.schedule.hour = h
+                                                appState.selectedProfile = updated
+                                            }
+                                        )
+                                    ) {
                                         ForEach(ScheduleTimeFormatting.hourLabels, id: \.hour) { entry in
                                             Text(entry.label).tag(entry.hour)
                                         }
                                     }
                                     .labelsHidden()
                                     .frame(width: 90)
+                                }
 
-                                    Picker("", selection: Binding(
-                                        get: { profile.schedule.minute },
-                                        set: { m in
-                                            var updated = profile
-                                            updated.schedule.minute = m
-                                            appState.selectedProfile = updated
-                                        }
-                                    )) {
-                                        ForEach(ScheduleTimeFormatting.minuteOptions, id: \.self) { m in
-                                            Text(ScheduleTimeFormatting.minuteLabel(m)).tag(m)
-                                        }
+                            case .intervalMinutes:
+                                HStack {
+                                    Text(L10n.t(.scheduleIntervalLabel))
+                                        .font(.body)
+                                    Spacer()
+                                    Picker(
+                                        "",
+                                        selection: Binding(
+                                            get: { profile.schedule.intervalMinutes },
+                                            set: { val in
+                                                var updated = profile
+                                                updated.schedule.intervalMinutes = val
+                                                appState.selectedProfile = updated
+                                            }
+                                        )
+                                    ) {
+                                        Text(L10n.t(.interval15m)).tag(15)
+                                        Text(L10n.t(.interval30m)).tag(30)
+                                        Text(L10n.t(.interval1h)).tag(60)
+                                        Text(L10n.t(.interval2h)).tag(120)
+                                        Text(L10n.t(.interval4h)).tag(240)
+                                        Text(L10n.t(.interval8h)).tag(480)
                                     }
-                                    .labelsHidden()
-                                    .frame(width: 75)
+                                    .frame(width: 140)
                                 }
                             }
 
-                        case .weekly:
-                            HStack {
-                                Text(L10n.t(.scheduleDayLabel))
-                                    .font(.body)
-                                Spacer()
-                                Picker("", selection: Binding(
-                                    get: { profile.schedule.weekday },
-                                    set: { w in
-                                        var updated = profile
-                                        updated.schedule.weekday = w
-                                        appState.selectedProfile = updated
-                                    }
-                                )) {
-                                    Text(L10n.t(.monday)).tag(2)
-                                    Text(L10n.t(.tuesday)).tag(3)
-                                    Text(L10n.t(.wednesday)).tag(4)
-                                    Text(L10n.t(.thursday)).tag(5)
-                                    Text(L10n.t(.friday)).tag(6)
-                                    Text(L10n.t(.saturday)).tag(7)
-                                    Text(L10n.t(.sunday)).tag(1)
-                                }
-                                .labelsHidden()
-                                .frame(width: 120)
-
-                                Picker("", selection: Binding(
-                                    get: { profile.schedule.hour },
-                                    set: { h in
-                                        var updated = profile
-                                        updated.schedule.hour = h
-                                        appState.selectedProfile = updated
-                                    }
-                                )) {
-                                    ForEach(ScheduleTimeFormatting.hourLabels, id: \.hour) { entry in
-                                        Text(entry.label).tag(entry.hour)
-                                    }
-                                }
-                                .labelsHidden()
-                                .frame(width: 90)
-                            }
-
-                        case .intervalMinutes:
-                            HStack {
-                                Text(L10n.t(.scheduleIntervalLabel))
-                                    .font(.body)
-                                Spacer()
-                                Picker("", selection: Binding(
-                                    get: { profile.schedule.intervalMinutes },
+                            // Catch-up missed backups toggle
+                            Toggle(
+                                isOn: Binding(
+                                    get: { profile.schedule.catchUpIfMissed },
                                     set: { val in
                                         var updated = profile
-                                        updated.schedule.intervalMinutes = val
+                                        updated.schedule.catchUpIfMissed = val
                                         appState.selectedProfile = updated
                                     }
-                                )) {
-                                    Text(L10n.t(.interval15m)).tag(15)
-                                    Text(L10n.t(.interval30m)).tag(30)
-                                    Text(L10n.t(.interval1h)).tag(60)
-                                    Text(L10n.t(.interval2h)).tag(120)
-                                    Text(L10n.t(.interval4h)).tag(240)
-                                    Text(L10n.t(.interval8h)).tag(480)
+                                )
+                            ) {
+                                HStack(spacing: 6) {
+                                    Text(L10n.t(.scheduleCatchUpToggle))
+                                        .font(.body)
+                                    InfoTooltipView(L10n.t(.scheduleCatchUpDesc))
                                 }
-                                .frame(width: 140)
                             }
+                            .toggleStyle(.checkbox)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-
-                        // Catch-up missed backups toggle
-                        Toggle(isOn: Binding(
-                            get: { profile.schedule.catchUpIfMissed },
-                            set: { val in
-                                var updated = profile
-                                updated.schedule.catchUpIfMissed = val
-                                appState.selectedProfile = updated
-                            }
-                        )) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(L10n.t(.scheduleCatchUpToggle))
-                                    .font(.body)
-                                Text(L10n.t(.scheduleCatchUpDesc))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .toggleStyle(.checkbox)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-            }
             }
             .otterCard()
         }
@@ -264,22 +285,20 @@ extension ProfileRulesView {
 
             VStack(alignment: .leading, spacing: 14) {
                 // WORM Immutability Lock (uchg / schg)
-                Toggle(isOn: Binding(
-                    get: { profile.isImmutabilityLockEnabled },
-                    set: { enabled in
-                        var updated = profile
-                        updated.isImmutabilityLockEnabled = enabled
-                        appState.selectedProfile = updated
-                    }
-                )) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Text(L10n.t(.wormLockTitle))
-                                .font(.body.weight(.medium))
+                Toggle(
+                    isOn: Binding(
+                        get: { profile.isImmutabilityLockEnabled },
+                        set: { enabled in
+                            var updated = profile
+                            updated.isImmutabilityLockEnabled = enabled
+                            appState.selectedProfile = updated
                         }
-                        Text(L10n.t(.wormLockDescription))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    )
+                ) {
+                    HStack(spacing: 6) {
+                        Text(L10n.t(.wormLockTitle))
+                            .font(.body.weight(.medium))
+                        InfoTooltipView(L10n.t(.wormLockDescription))
                     }
                 }
                 .toggleStyle(.checkbox)
@@ -290,14 +309,16 @@ extension ProfileRulesView {
                         Text(L10n.t(.wormLockDurationDays))
                             .font(.body)
                         Spacer()
-                        Stepper(value: Binding(
-                            get: { profile.immutabilityLockDays },
-                            set: { val in
-                                var updated = profile
-                                updated.immutabilityLockDays = max(1, val)
-                                appState.selectedProfile = updated
-                            }
-                        ), in: 1...365) {
+                        Stepper(
+                            value: Binding(
+                                get: { profile.immutabilityLockDays },
+                                set: { val in
+                                    var updated = profile
+                                    updated.immutabilityLockDays = max(1, val)
+                                    appState.selectedProfile = updated
+                                }
+                            ), in: 1...365
+                        ) {
                             Text(L10n.format(.daysCountFormat, profile.immutabilityLockDays))
                                 .monospacedDigit()
                         }
@@ -309,16 +330,12 @@ extension ProfileRulesView {
 
                 // Manual Integrity Scrub button
                 HStack(alignment: .center) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "checkmark.shield")
-                                .foregroundStyle(OtterTheme.statusGreen)
-                            Text(L10n.t(.verifySnapshotIntegrityTitle))
-                                .font(.body.weight(.medium))
-                        }
-                        Text(L10n.t(.verifySnapshotIntegrityDesc))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.shield")
+                            .foregroundStyle(OtterTheme.statusGreen)
+                        Text(L10n.t(.verifySnapshotIntegrityTitle))
+                            .font(.body.weight(.medium))
+                        InfoTooltipView(L10n.t(.verifySnapshotIntegrityDesc))
                     }
                     Spacer()
                     Button {
@@ -355,39 +372,39 @@ extension ProfileRulesView {
             }
 
             VStack(alignment: .leading, spacing: 12) {
-                Toggle(isOn: Binding(
-                    get: { profile.backupOnVolumeMount },
-                    set: { val in
-                        var updated = profile
-                        updated.backupOnVolumeMount = val
-                        appState.selectedProfile = updated
-                    }
-                )) {
-                    VStack(alignment: .leading, spacing: 2) {
+                Toggle(
+                    isOn: Binding(
+                        get: { profile.backupOnVolumeMount },
+                        set: { val in
+                            var updated = profile
+                            updated.backupOnVolumeMount = val
+                            appState.selectedProfile = updated
+                        }
+                    )
+                ) {
+                    HStack(spacing: 6) {
                         Text(L10n.t(.backupOnVolumeMountToggle))
                             .font(.body.weight(.medium))
-                        Text(L10n.t(.backupOnVolumeMountDesc))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        InfoTooltipView(L10n.t(.backupOnVolumeMountDesc))
                     }
                 }
                 .toggleStyle(.checkbox)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                Toggle(isOn: Binding(
-                    get: { profile.autoEjectOnCompletion },
-                    set: { val in
-                        var updated = profile
-                        updated.autoEjectOnCompletion = val
-                        appState.selectedProfile = updated
-                    }
-                )) {
-                    VStack(alignment: .leading, spacing: 2) {
+                Toggle(
+                    isOn: Binding(
+                        get: { profile.autoEjectOnCompletion },
+                        set: { val in
+                            var updated = profile
+                            updated.autoEjectOnCompletion = val
+                            appState.selectedProfile = updated
+                        }
+                    )
+                ) {
+                    HStack(spacing: 6) {
                         Text(L10n.t(.autoEjectOnCompletionToggle))
                             .font(.body)
-                        Text(L10n.t(.autoEjectOnCompletionDesc))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        InfoTooltipView(L10n.t(.autoEjectOnCompletionDesc))
                     }
                 }
                 .toggleStyle(.checkbox)
@@ -399,6 +416,5 @@ extension ProfileRulesView {
             .otterCard()
         }
     }
-
 
 }

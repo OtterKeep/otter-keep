@@ -1,7 +1,7 @@
-import SwiftUI
 import AppKit
-import OtterKeepDomain
 import OtterKeepCore
+import OtterKeepDomain
+import SwiftUI
 
 extension ProfileRulesView {
     // MARK: - 6. 3-2-1 Backup Copy Job & Remote Targets
@@ -19,29 +19,32 @@ extension ProfileRulesView {
 
             VStack(alignment: .leading, spacing: 14) {
                 // Master Copy Job Toggle
-                Toggle(isOn: Binding(
-                    get: { profile.copyJobConfig.isEnabled },
-                    set: { enabled in
-                        var updated = profile
-                        updated.copyJobConfig.isEnabled = enabled
-                        if enabled && updated.copyJobConfig.destinations.isEmpty {
-                            // Provide default Cloud and NAS destinations
-                            let defaultS3 = RemoteDestination(
-                                name: "AWS S3 / Backblaze Cloud",
-                                type: .s3(S3Configuration(endpoint: "https://s3.eu-central-1.amazonaws.com", bucket: "otterkeep-offsite", region: "eu-central-1", pathPrefix: "backups")),
-                                isClientEncryptionEnabled: true
-                            )
-                            updated.copyJobConfig.destinations.append(defaultS3)
+                Toggle(
+                    isOn: Binding(
+                        get: { profile.copyJobConfig.isEnabled },
+                        set: { enabled in
+                            var updated = profile
+                            updated.copyJobConfig.isEnabled = enabled
+                            if enabled && updated.copyJobConfig.destinations.isEmpty {
+                                // Provide default Cloud and NAS destinations
+                                let defaultS3 = RemoteDestination(
+                                    name: "AWS S3 / Backblaze Cloud",
+                                    type: .s3(
+                                        S3Configuration(
+                                            endpoint: "https://s3.eu-central-1.amazonaws.com", bucket: "otterkeep-offsite", region: "eu-central-1",
+                                            pathPrefix: "backups")),
+                                    isClientEncryptionEnabled: true
+                                )
+                                updated.copyJobConfig.destinations.append(defaultS3)
+                            }
+                            appState.selectedProfile = updated
                         }
-                        appState.selectedProfile = updated
-                    }
-                )) {
-                    VStack(alignment: .leading, spacing: 2) {
+                    )
+                ) {
+                    HStack(spacing: 6) {
                         Text(L10n.t(.copyJobMasterToggleTitle))
                             .font(.body.weight(.medium))
-                        Text(L10n.t(.copyJobMasterToggleDesc))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        InfoTooltipView(L10n.t(.copyJobMasterToggleDesc))
                     }
                 }
                 .toggleStyle(.checkbox)
@@ -55,14 +58,17 @@ extension ProfileRulesView {
                         Text(L10n.t(.copyJobTriggerLabel))
                             .font(.body)
                         Spacer()
-                        Picker("", selection: Binding(
-                            get: { profile.copyJobConfig.trigger },
-                            set: { val in
-                                var updated = profile
-                                updated.copyJobConfig.trigger = val
-                                appState.selectedProfile = updated
-                            }
-                        )) {
+                        Picker(
+                            "",
+                            selection: Binding(
+                                get: { profile.copyJobConfig.trigger },
+                                set: { val in
+                                    var updated = profile
+                                    updated.copyJobConfig.trigger = val
+                                    appState.selectedProfile = updated
+                                }
+                            )
+                        ) {
                             ForEach(CopyJobTrigger.allCases, id: \.self) { trg in
                                 Text(trg.localizedTitle).tag(trg)
                             }
@@ -75,14 +81,17 @@ extension ProfileRulesView {
                         Text(L10n.t(.copyJobNetworkPolicyLabel))
                             .font(.body)
                         Spacer()
-                        Picker("", selection: Binding(
-                            get: { profile.copyJobConfig.networkPolicy },
-                            set: { val in
-                                var updated = profile
-                                updated.copyJobConfig.networkPolicy = val
-                                appState.selectedProfile = updated
-                            }
-                        )) {
+                        Picker(
+                            "",
+                            selection: Binding(
+                                get: { profile.copyJobConfig.networkPolicy },
+                                set: { val in
+                                    var updated = profile
+                                    updated.copyJobConfig.networkPolicy = val
+                                    appState.selectedProfile = updated
+                                }
+                            )
+                        ) {
                             ForEach(CopyJobNetworkPolicy.allCases, id: \.self) { pol in
                                 Text(pol.localizedTitle).tag(pol)
                             }
@@ -92,22 +101,23 @@ extension ProfileRulesView {
 
                     // Smart Bandwidth Throttling
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
                             Text(L10n.t(.smartThrottlingTitle))
                                 .font(.body)
-                            Text(L10n.t(.smartThrottlingDesc))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            InfoTooltipView(L10n.t(.smartThrottlingDesc))
                         }
                         Spacer()
-                        Picker("", selection: Binding(
-                            get: { profile.copyJobConfig.maxBandwidthBytesPerSec },
-                            set: { val in
-                                var updated = profile
-                                updated.copyJobConfig.maxBandwidthBytesPerSec = val
-                                appState.selectedProfile = updated
-                            }
-                        )) {
+                        Picker(
+                            "",
+                            selection: Binding(
+                                get: { profile.copyJobConfig.maxBandwidthBytesPerSec },
+                                set: { val in
+                                    var updated = profile
+                                    updated.copyJobConfig.maxBandwidthBytesPerSec = val
+                                    appState.selectedProfile = updated
+                                }
+                            )
+                        ) {
                             Text(L10n.t(.copyJobThrottlingUnlimited)).tag(Int64(0))
                             Text(L10n.t(.copyJobThrottlingGentle)).tag(Int64(2 * 1024 * 1024))
                             Text(L10n.t(.copyJobThrottlingRecommended)).tag(Int64(5 * 1024 * 1024))
@@ -118,24 +128,22 @@ extension ProfileRulesView {
                     }
 
                     // Parallel Multi-Destination Replication Toggle
-                    Toggle(isOn: Binding(
-                        get: { profile.isParallelMultiDestinationEnabled },
-                        set: { val in
-                            var updated = profile
-                            updated.isParallelMultiDestinationEnabled = val
-                            appState.selectedProfile = updated
-                        }
-                    )) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "arrow.triangle.branch")
-                                    .foregroundStyle(OtterTheme.oceanicTeal)
-                                Text(L10n.t(.parallelMultiDestTitle))
-                                    .font(.body.weight(.medium))
+                    Toggle(
+                        isOn: Binding(
+                            get: { profile.isParallelMultiDestinationEnabled },
+                            set: { val in
+                                var updated = profile
+                                updated.isParallelMultiDestinationEnabled = val
+                                appState.selectedProfile = updated
                             }
-                            Text(L10n.t(.parallelMultiDestDescription))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        )
+                    ) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.triangle.branch")
+                                .foregroundStyle(OtterTheme.oceanicTeal)
+                            Text(L10n.t(.parallelMultiDestTitle))
+                                .font(.body.weight(.medium))
+                            InfoTooltipView(L10n.t(.parallelMultiDestDescription))
                         }
                     }
                     .toggleStyle(.checkbox)
@@ -181,15 +189,17 @@ extension ProfileRulesView {
                     } else {
                         ForEach(profile.copyJobConfig.destinations) { dest in
                             HStack(spacing: 12) {
-                                Image(systemName: {
-                                    switch dest.type {
-                                    case .s3: return "icloud.fill"
-                                    case .backblazeB2: return "flame.fill"
-                                    case .smb: return "server.rack"
-                                    case .webdav: return "network"
-                                    case .sftp: return "terminal.fill"
-                                    }
-                                }())
+                                Image(
+                                    systemName: {
+                                        switch dest.type {
+                                        case .s3: return "icloud.fill"
+                                        case .backblazeB2: return "flame.fill"
+                                        case .smb: return "server.rack"
+                                        case .webdav: return "network"
+                                        case .sftp: return "terminal.fill"
+                                        }
+                                    }()
+                                )
                                 .foregroundStyle(OtterTheme.oceanicTeal)
                                 .font(.title3)
 
@@ -222,15 +232,17 @@ extension ProfileRulesView {
                                         }
                                     }
 
-                                    Text({ () -> String in
-                                        switch dest.type {
-                                        case .s3(let cfg): return "S3: \(cfg.endpoint) [\(cfg.bucket)]"
-                                        case .backblazeB2(let cfg): return "B2: \(cfg.bucketName) (\(cfg.region))"
-                                        case .smb(let cfg): return "SMB: \(cfg.shareURL)"
-                                        case .webdav(let cfg): return "WebDAV: \(cfg.serverURL)\(cfg.destinationPath)"
-                                        case .sftp(let cfg): return "SFTP: \(cfg.host):\(cfg.port)\(cfg.remotePath)"
-                                        }
-                                    }())
+                                    Text(
+                                        { () -> String in
+                                            switch dest.type {
+                                            case .s3(let cfg): return "S3: \(cfg.endpoint) [\(cfg.bucket)]"
+                                            case .backblazeB2(let cfg): return "B2: \(cfg.bucketName) (\(cfg.region))"
+                                            case .smb(let cfg): return "SMB: \(cfg.shareURL)"
+                                            case .webdav(let cfg): return "WebDAV: \(cfg.serverURL)\(cfg.destinationPath)"
+                                            case .sftp(let cfg): return "SFTP: \(cfg.host):\(cfg.port)\(cfg.remotePath)"
+                                            }
+                                        }()
+                                    )
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
@@ -260,16 +272,19 @@ extension ProfileRulesView {
                                     .controlSize(.small)
                                     .help(L10n.t(.deleteRemoteDestination))
 
-                                    Toggle("", isOn: Binding(
-                                        get: { dest.isEnabled },
-                                        set: { enabled in
-                                            var updated = profile
-                                            if let idx = updated.copyJobConfig.destinations.firstIndex(where: { $0.id == dest.id }) {
-                                                updated.copyJobConfig.destinations[idx].isEnabled = enabled
-                                                appState.selectedProfile = updated
+                                    Toggle(
+                                        "",
+                                        isOn: Binding(
+                                            get: { dest.isEnabled },
+                                            set: { enabled in
+                                                var updated = profile
+                                                if let idx = updated.copyJobConfig.destinations.firstIndex(where: { $0.id == dest.id }) {
+                                                    updated.copyJobConfig.destinations[idx].isEnabled = enabled
+                                                    appState.selectedProfile = updated
+                                                }
                                             }
-                                        }
-                                    ))
+                                        )
+                                    )
                                     .toggleStyle(.switch)
                                     .controlSize(.small)
                                     .labelsHidden()
@@ -301,14 +316,17 @@ extension ProfileRulesView {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Toggle("", isOn: Binding(
-                    get: { profile.enableRateOfChangeGuard },
-                    set: { val in
-                        var updated = profile
-                        updated.enableRateOfChangeGuard = val
-                        appState.selectedProfile = updated
-                    }
-                ))
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { profile.enableRateOfChangeGuard },
+                        set: { val in
+                            var updated = profile
+                            updated.enableRateOfChangeGuard = val
+                            appState.selectedProfile = updated
+                        }
+                    )
+                )
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 .labelsHidden()
@@ -370,25 +388,30 @@ extension ProfileRulesView {
                     Divider()
 
                     // Known extensions
-                    Toggle(L10n.t(.ransomwareDetectExtensionsToggle), isOn: Binding(
-                        get: { profile.detectKnownRansomwareExtensions },
-                        set: { val in
-                            var updated = profile
-                            updated.detectKnownRansomwareExtensions = val
-                            appState.selectedProfile = updated
-                        }
-                    ))
+                    Toggle(
+                        L10n.t(.ransomwareDetectExtensionsToggle),
+                        isOn: Binding(
+                            get: { profile.detectKnownRansomwareExtensions },
+                            set: { val in
+                                var updated = profile
+                                updated.detectKnownRansomwareExtensions = val
+                                appState.selectedProfile = updated
+                            }
+                        )
+                    )
                     .font(.subheadline)
 
                     // Abort on anomaly
-                    Toggle(isOn: Binding(
-                        get: { profile.abortOnAnomaly },
-                        set: { val in
-                            var updated = profile
-                            updated.abortOnAnomaly = val
-                            appState.selectedProfile = updated
-                        }
-                    )) {
+                    Toggle(
+                        isOn: Binding(
+                            get: { profile.abortOnAnomaly },
+                            set: { val in
+                                var updated = profile
+                                updated.abortOnAnomaly = val
+                                appState.selectedProfile = updated
+                            }
+                        )
+                    ) {
                         HStack {
                             Text(L10n.t(.ransomwareAbortToggle))
                                 .font(.subheadline)
@@ -421,14 +444,16 @@ extension ProfileRulesView {
 
             VStack(alignment: .leading, spacing: 14) {
                 // Pause on battery
-                Toggle(isOn: Binding(
-                    get: { profile.pauseOnBattery },
-                    set: { val in
-                        var updated = profile
-                        updated.pauseOnBattery = val
-                        appState.selectedProfile = updated
-                    }
-                )) {
+                Toggle(
+                    isOn: Binding(
+                        get: { profile.pauseOnBattery },
+                        set: { val in
+                            var updated = profile
+                            updated.pauseOnBattery = val
+                            appState.selectedProfile = updated
+                        }
+                    )
+                ) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(L10n.t(.pauseOnBatteryLabel))
                             .font(.body.weight(.medium))
@@ -443,20 +468,20 @@ extension ProfileRulesView {
                 Divider()
 
                 // Thermal throttling
-                Toggle(isOn: Binding(
-                    get: { profile.throttleOnThermalPressure },
-                    set: { val in
-                        var updated = profile
-                        updated.throttleOnThermalPressure = val
-                        appState.selectedProfile = updated
-                    }
-                )) {
-                    VStack(alignment: .leading, spacing: 2) {
+                Toggle(
+                    isOn: Binding(
+                        get: { profile.throttleOnThermalPressure },
+                        set: { val in
+                            var updated = profile
+                            updated.throttleOnThermalPressure = val
+                            appState.selectedProfile = updated
+                        }
+                    )
+                ) {
+                    HStack(spacing: 6) {
                         Text(L10n.t(.throttleOnThermalLabel))
                             .font(.body.weight(.medium))
-                        Text(L10n.t(.throttleOnThermalDesc))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        InfoTooltipView(L10n.t(.throttleOnThermalDesc))
                     }
                 }
                 .toggleStyle(.checkbox)
@@ -477,20 +502,20 @@ extension ProfileRulesView {
             }
 
             VStack(alignment: .leading, spacing: 14) {
-                Toggle(isOn: Binding(
-                    get: { profile.enableCanaryTraps },
-                    set: { val in
-                        var updated = profile
-                        updated.enableCanaryTraps = val
-                        appState.selectedProfile = updated
-                    }
-                )) {
-                    VStack(alignment: .leading, spacing: 2) {
+                Toggle(
+                    isOn: Binding(
+                        get: { profile.enableCanaryTraps },
+                        set: { val in
+                            var updated = profile
+                            updated.enableCanaryTraps = val
+                            appState.selectedProfile = updated
+                        }
+                    )
+                ) {
+                    HStack(spacing: 6) {
                         Text(L10n.t(.enableCanaryTrapsLabel))
                             .font(.body.weight(.medium))
-                        Text(L10n.t(.enableCanaryTrapsDesc))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        InfoTooltipView(L10n.t(.enableCanaryTrapsDesc))
                     }
                 }
                 .toggleStyle(.checkbox)
@@ -517,12 +542,10 @@ extension ProfileRulesView {
                             .font(.title3)
                             .foregroundStyle(OtterTheme.statusGreen)
 
-                        VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
                             Text(L10n.t(.enableLocalEncryptionLabel) + " (OKENC2 - Végleges)")
                                 .font(.body.weight(.bold))
-                            Text(L10n.t(.encryptionLockedNotice))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            InfoTooltipView(L10n.t(.encryptionLockedNotice))
                         }
                     }
                     .padding(10)
@@ -541,12 +564,10 @@ extension ProfileRulesView {
                     }
 
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
                             Text(L10n.t(.sparsebundlePasswordLabel))
                                 .font(.body)
-                            Text("A jelszó a létrehozáskor a Keychainbe és a Secure Enclave-be került.")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                            InfoTooltipView("A jelszó a létrehozáskor a Keychainbe és a Secure Enclave-be került.")
                         }
                         Spacer()
                         Text("••••••••••••••••")
@@ -559,12 +580,10 @@ extension ProfileRulesView {
                             .font(.title3)
                             .foregroundStyle(.secondary)
 
-                        VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
                             Text("Titkosítás nélkül létrehozott profil")
                                 .font(.body.weight(.medium))
-                            Text(L10n.t(.encryptionLockedNotice))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            InfoTooltipView(L10n.t(.encryptionLockedNotice))
                         }
                     }
                     .padding(10)
@@ -624,8 +643,9 @@ extension ProfileRulesView {
                     Spacer()
                     Button {
                         if let uuid = (try? profile.destinationURL.resourceValues(forKeys: [.volumeUUIDStringKey]))?.volumeUUIDString,
-                           !uuid.isEmpty,
-                           !profile.destinationVolumeUUIDs.contains(uuid) {
+                            !uuid.isEmpty,
+                            !profile.destinationVolumeUUIDs.contains(uuid)
+                        {
                             var updated = profile
                             updated.destinationVolumeUUIDs.append(uuid)
                             appState.selectedProfile = updated

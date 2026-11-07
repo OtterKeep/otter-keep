@@ -6,9 +6,9 @@
 //  retention policy, and WORM immutability.
 //
 
-import SwiftUI
 import AppKit
 import OtterKeepCore
+import SwiftUI
 
 /// Tabbed popup modal sheet for configuring all parameters of an individual backup profile.
 public struct ProfileSettingsModalView: View {
@@ -38,22 +38,15 @@ public struct ProfileSettingsModalView: View {
 
                 Spacer()
 
-                // This modal is the only route to rules, automation and maintenance, so it must be
-                // dismissible without saving — otherwise a stray edit traps the user in the sheet.
-                Button(L10n.t(.cancel)) {
+                Button {
                     appState.showProfileSettingsModal = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-                .keyboardShortcut(.cancelAction)
-
-                Button(L10n.t(.save)) {
-                    appState.saveProfiles()
-                    appState.showProfileSettingsModal = false
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.t(.closeButton))
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
@@ -63,6 +56,19 @@ public struct ProfileSettingsModalView: View {
 
             // Tabbed Content
             ProfileRulesAndMaintenanceView(appState: appState, profile: profile)
+
+            // Pinned Action Buttons Footer
+            ModalFooterActionsView(
+                cancelTitle: L10n.t(.cancel),
+                primaryTitle: L10n.t(.save),
+                onCancel: {
+                    appState.showProfileSettingsModal = false
+                },
+                onPrimary: {
+                    appState.saveProfiles()
+                    appState.showProfileSettingsModal = false
+                }
+            )
         }
         .frame(minWidth: 720, idealWidth: 760, maxWidth: .infinity, minHeight: 520, idealHeight: 580, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))

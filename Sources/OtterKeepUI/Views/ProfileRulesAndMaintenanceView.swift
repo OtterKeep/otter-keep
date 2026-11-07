@@ -1,6 +1,6 @@
-import SwiftUI
 import AppKit
 import OtterKeepCore
+import SwiftUI
 
 /// Redesigned 3-workspace tab view separating Rules & Exclusions, Automation & Schedule,
 /// and Maintenance & Storage into a clean, calm, user-friendly macOS interface.
@@ -126,10 +126,12 @@ public struct ProfileRulesAndMaintenanceView: View {
         // The remote destination editor is a nested sheet: every entry point lives in the 3-2-1
         // replication section below, so presenting it from the global modal slot would queue it
         // behind this settings sheet instead of stacking it on top.
-        .sheet(isPresented: Binding(
-            get: { appState.showRemoteDestinationEditorSheet },
-            set: { appState.showRemoteDestinationEditorSheet = $0 }
-        )) {
+        .sheet(
+            isPresented: Binding(
+                get: { appState.showRemoteDestinationEditorSheet },
+                set: { appState.showRemoteDestinationEditorSheet = $0 }
+            )
+        ) {
             RemoteDestinationEditorModalView(appState: appState)
         }
     }
@@ -181,29 +183,26 @@ public struct ProfileRulesAndMaintenanceView: View {
                     .foregroundStyle(OtterTheme.otterAmber)
                 Text(L10n.t(.maintenanceConsolidationTitle))
                     .font(.headline)
+                InfoTooltipView(L10n.t(.maintenanceConsolidationDesc))
             }
-
-            Text(L10n.t(.maintenanceConsolidationDesc))
-                .font(.callout)
-                .foregroundStyle(.secondary)
 
             Divider()
 
             // Auto-pruning toggle
-            Toggle(isOn: Binding(
-                get: { profile.pruningPolicy.isAutoPruningEnabled },
-                set: { enabled in
-                    var updated = profile
-                    updated.pruningPolicy.isAutoPruningEnabled = enabled
-                    appState.selectedProfile = updated
-                }
-            )) {
-                VStack(alignment: .leading, spacing: 2) {
+            Toggle(
+                isOn: Binding(
+                    get: { profile.pruningPolicy.isAutoPruningEnabled },
+                    set: { enabled in
+                        var updated = profile
+                        updated.pruningPolicy.isAutoPruningEnabled = enabled
+                        appState.selectedProfile = updated
+                    }
+                )
+            ) {
+                HStack(spacing: 6) {
                     Text(L10n.t(.autoPruningToggleTitle))
                         .font(.body.weight(.medium))
-                    Text(L10n.t(.autoPruningToggleDesc))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    InfoTooltipView(L10n.t(.autoPruningToggleDesc))
                 }
             }
             .toggleStyle(.checkbox)
@@ -239,11 +238,8 @@ public struct ProfileRulesAndMaintenanceView: View {
                     .foregroundStyle(OtterTheme.cyberTeal)
                 Text(L10n.t(.maintenanceRecoveryTitle))
                     .font(.headline)
+                InfoTooltipView(L10n.t(.maintenanceRecoveryDesc))
             }
-
-            Text(L10n.t(.maintenanceRecoveryDesc))
-                .font(.callout)
-                .foregroundStyle(.secondary)
 
             HStack {
                 Spacer()
