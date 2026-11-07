@@ -39,10 +39,8 @@ public final class BiometricSecurityService: @unchecked Sendable {
 
     private let logger = Logger(subsystem: "com.otterkeep", category: "Biometrics")
 
-    #if DEBUG
-    /// Test hook to simulate authentication outcomes in automated test environments.
+    /// Test hook to simulate authentication outcomes in automated test environments or CI runners.
     public var testAuthenticationHandler: (@Sendable (String) -> Result<Void, BiometricAuthError>)? = nil
-    #endif
 
     public init() {}
 
@@ -65,11 +63,9 @@ public final class BiometricSecurityService: @unchecked Sendable {
     /// - Parameter reason: Clear explanation displayed in the macOS authentication sheet.
     /// - Returns: Success if verified, or typed `BiometricAuthError` on failure or cancellation.
     public func authenticate(reason: String) async -> Result<Void, BiometricAuthError> {
-        #if DEBUG
         if let handler = testAuthenticationHandler {
             return handler(reason)
         }
-        #endif
 
         let context = LAContext()
         context.localizedCancelTitle = "Mégse"

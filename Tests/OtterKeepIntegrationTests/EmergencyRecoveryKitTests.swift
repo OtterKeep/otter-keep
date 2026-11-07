@@ -7,9 +7,9 @@
 //
 
 import Foundation
-import Testing
-import OtterKeepDomain
 import OtterKeepCore
+import OtterKeepDomain
+import Testing
 
 @MainActor
 @Suite(.serialized)
@@ -37,6 +37,7 @@ struct EmergencyRecoveryKitTests {
         try assertEqual(metadata.embeddedPassphrase, passphrase)
         try assertTrue(!metadata.saltHex.isEmpty, "Salt hex must not be empty")
         try assertTrue(!metadata.keyFingerprint.isEmpty, "Key fingerprint must not be empty")
+        try assertTrue(metadata.keyFingerprint.hasPrefix("PBKDF2:"), "Key fingerprint must use PBKDF2 derivation")
         try assertTrue(!metadata.qrPayload.isEmpty, "QR code payload must contain serialized metadata")
 
         let pngData = EmergencyKitBuilder.generateQRCodePNGData(for: metadata.qrPayload)
@@ -59,6 +60,7 @@ struct EmergencyRecoveryKitTests {
 
         try assertTrue(metadata.embeddedPassphrase == nil, "Embedded passphrase must be nil when includePassphrase is false")
         try assertTrue(!metadata.keyFingerprint.isEmpty, "Key fingerprint is still present for verification")
+        try assertTrue(metadata.keyFingerprint.hasPrefix("PBKDF2:"), "Key fingerprint must use PBKDF2 derivation")
     }
 
     @Test func testEmergencyKitTerminalRestoreCommand() throws {

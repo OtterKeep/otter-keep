@@ -1,10 +1,10 @@
-import Foundation
-import CryptoKit
 import CoreImage
+import CryptoKit
+import Foundation
 import OtterKeepDomain
 
 #if canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
 
 /// Service responsible for building the Emergency Kit metadata and recovery tokens from a backup profile.
@@ -23,13 +23,18 @@ public enum EmergencyKitBuilder: Sendable {
     ) -> EmergencyKitMetadata {
         let effectivePassphrase = passphrase ?? KeychainManager.getPassphrase(for: profile.id)
 
-        // Derive deterministic key fingerprint and salt indicator
-        let secretMaterial = (effectivePassphrase ?? "") + profile.id.uuidString
-        let fingerprintHash = SHA256.hash(data: Data(secretMaterial.utf8))
-        let keyFingerprint = "SHA256:" + fingerprintHash.compactMap { String(format: "%02x", $0) }.prefix(8).joined().uppercased()
-
+        // Derive deterministic PBKDF2 salt indicator based on profile identity
         let saltData = SHA256.hash(data: Data((profile.id.uuidString + "_salt").utf8))
-        let saltHex = saltData.compactMap { String(format: "%02x", $0) }.prefix(16).joined()
+        let salt = Data(saltData)
+        let saltHex = salt.prefix(16).map { String(format: "%02x", $0) }.joined()
+
+        // Derive deterministic key fingerprint using PBKDF2-HMAC-SHA256 (CWE-328 compliant, brute-force resistant)
+        let keyFingerprint: String
+        if let effectivePassphrase, !effectivePassphrase.isEmpty {
+            keyFingerprint = ClientSideEncryptor.deriveFingerprintPBKDF2(from: effectivePassphrase, salt: salt)
+        } else {
+            keyFingerprint = "NONE"
+        }
 
         // Map secondary replication destinations (3-2-1 targets)
         var remoteDestinations: [EmergencyRemoteDestination] = []
@@ -64,7 +69,8 @@ public enum EmergencyKitBuilder: Sendable {
         let cliRestore = "otterkeep restore --profile \"\(profile.name)\" --target \"\(profile.destinationURL.path)\""
 
         // Construct standard recovery QR payload
-        let qrPayload = "otterkeep://sanctuary-recover?id=\(profile.id.uuidString)&name=\(profile.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")&fp=\(keyFingerprint)"
+        let qrPayload =
+            "otterkeep://sanctuary-recover?id=\(profile.id.uuidString)&name=\(profile.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")&fp=\(keyFingerprint)"
 
         return EmergencyKitMetadata(
             profileId: profile.id,
@@ -103,10 +109,10 @@ public enum EmergencyKitBuilder: Sendable {
         guard let cgImage = context.createCGImage(transformed, from: transformed.extent) else { return nil }
 
         #if canImport(AppKit)
-        let rep = NSBitmapImageRep(cgImage: cgImage)
-        return rep.representation(using: .png, properties: [:])
+            let rep = NSBitmapImageRep(cgImage: cgImage)
+            return rep.representation(using: .png, properties: [:])
         #else
-        return nil
+            return nil
         #endif
     }
 }
